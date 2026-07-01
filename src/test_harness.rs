@@ -71,11 +71,18 @@ struct Diagnostic {
     message: String,
 }
 
-/// Evaluate every `unittest` in `program`, writing a report to `out`.
+/// Evaluate every `unittest` in `program`, writing a report to `out`. Failure
+/// excerpts are reported under `source_name`.
 ///
 /// Returns once all assertions are evaluated, or — when [`Config::fail_fast`] is
 /// set — as soon as one fails. Write errors on `out` are propagated.
-pub fn run(program: &Ast, source: &str, config: Config, out: &mut dyn Write) -> io::Result<Report> {
+pub fn run(
+    program: &Ast,
+    source: &str,
+    source_name: &str,
+    config: Config,
+    out: &mut dyn Write,
+) -> io::Result<Report> {
     let mut report = Report::default();
 
     // Symbol table of the program's top-level `type`s and `interface`s, so a
@@ -108,7 +115,11 @@ pub fn run(program: &Ast, source: &str, config: Config, out: &mut dyn Write) -> 
                         describe(result)
                     );
                     writeln!(out, "  FAILED  {claim_src}")?;
-                    writeln!(out, "{}", span.as_custom_error(source, message))?;
+                    writeln!(
+                        out,
+                        "{}",
+                        crate::report::render_to_string(source_name, source, span, &message)
+                    )?;
                     if config.fail_fast {
                         break 'outer;
                     }
@@ -120,7 +131,12 @@ pub fn run(program: &Ast, source: &str, config: Config, out: &mut dyn Write) -> 
                         writeln!(
                             out,
                             "{}",
-                            diagnostic.span.as_custom_error(source, diagnostic.message)
+                            crate::report::render_to_string(
+                                source_name,
+                                source,
+                                diagnostic.span,
+                                &diagnostic.message
+                            )
                         )?;
                     }
                     if config.fail_fast {
@@ -350,7 +366,7 @@ mod tests {
     fn run_src(src: &str, fail_fast: bool) -> (Report, String) {
         let program = parse_newtype_program(src).unwrap().simplify();
         let mut out = Vec::new();
-        let report = run(&program, src, Config { fail_fast }, &mut out).unwrap();
+        let report = run(&program, src, "<test>", Config { fail_fast }, &mut out).unwrap();
         (report, String::from_utf8(out).unwrap())
     }
 

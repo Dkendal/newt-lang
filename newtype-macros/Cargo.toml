@@ -17,4 +17,3 @@ syn = { version = "2.*", features = ["extra-traits", "full"] }
 serde = { version = "1.0.204", features = ["serde_derive", "derive", "rc"] }
 serde_derive = "1.0.204"
 derivative = "2.2.0"
-pest = { version = "2.6.0", features = ["pretty-print"] }

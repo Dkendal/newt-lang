@@ -56,8 +56,9 @@ BINARY = os.path.join(REPO_ROOT, "target", "debug", "newtype")
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 # A generated alias declaration, e.g. `type _newtype_test__foo_0 = …`.
 TYPE_RE = re.compile(r"^type\s+(_newtype_test__\w+)\s*=")
-# newtype's failure pointer in the stderr report, e.g. `  --> 35:10`.
-NT_FAIL_RE = re.compile(r"-->\s+(\d+):\d+")
+# newtype's failure pointer in the stderr report: the ariadne report header,
+# e.g. `╭─[ file.nt:35:10 ]`.
+NT_FAIL_RE = re.compile(r":(\d+):\d+\s*\]")
 # A tsgo diagnostic line, e.g. `/abs/psub.ts:84:49 - error TS2344: …`.
 TSGO_ERR_RE = re.compile(r":(\d+):(\d+)\s+-\s+error\s+TS\d+")
 
@@ -233,7 +234,7 @@ def parse_test_universe(ts_text, srcmap):
 
 
 def parse_newtype_failures(stderr_report):
-    """Source lines newtype flagged FAILED, from `--> LINE:COL` pointers."""
+    """Source lines newtype flagged FAILED, from `[ FILE:LINE:COL ]` pointers."""
     return {int(m.group(1)) for m in NT_FAIL_RE.finditer(strip_ansi(stderr_report))}
 
 

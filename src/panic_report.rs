@@ -6,8 +6,8 @@
 //! large and near-impossible to relate back to the program the user wrote.
 //! Because every AST node embeds a `Span { start, end }`, this hook scans the
 //! panic message for those spans, takes the widest enclosing range, and renders
-//! that region of the original `.nt` source with a caret underline (reusing the
-//! same pest diagnostic renderer used for parse errors). When no span can be
+//! that region of the original `.nt` source with an underline (reusing the
+//! same diagnostic renderer used for parse errors). When no span can be
 //! recovered it defers to the default panic hook, so nothing is lost.
 
 use crate::ast::Span;
@@ -43,12 +43,12 @@ fn report(info: &PanicHookInfo, source_name: &str, source: &str) -> bool {
         .map(|l| format!(" at {}:{}", l.file(), l.line()))
         .unwrap_or_default();
 
-    let error = span
-        .as_custom_error(
-            source,
-            format!("internal compiler panic{location}: {headline}"),
-        )
-        .with_path(source_name);
+    let error = crate::report::render_to_string(
+        source_name,
+        source,
+        span,
+        &format!("internal compiler panic{location}: {headline}"),
+    );
     eprintln!("{error}");
     true
 }

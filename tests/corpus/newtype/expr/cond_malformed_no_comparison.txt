@@ -10,9 +10,10 @@ end
 
 =======
 
- --> <stdin>:2:5
-  |
-2 |     a -> b,
-  |     ^
-  |
-  = Left hand side of condition branch is missing comparison.
+Error: Left hand side of condition branch is missing comparison.
+   ╭─[ <stdin>:2:5 ]
+   │
+ 2 │     a -> b,
+   │     ┬  
+   │     ╰── Left hand side of condition branch is missing comparison.
+───╯

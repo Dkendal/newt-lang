@@ -1,7 +1,7 @@
 //! Runtime support for the *corpus* tests.
 //!
-//! Two corpora share this machinery, both modelled on the `pest-test` corpus
-//! under `tests/pest` but asserting on rendered output rather than a parse tree:
+//! Two corpora share this machinery, both asserting on rendered output rather
+//! than a parse tree:
 //!
 //! * **TypeScript corpus** (`tests/corpus/typescript`, [`run_case`]): assert that
 //!   newtype source renders to the expected TypeScript.
@@ -54,9 +54,9 @@
 //! stay consistent.
 
 use crate::ast::Ast;
-use crate::parser::{self, NewtypeParser, Rule};
+use crate::parser::{self, Rule};
 use crate::typescript::Pretty;
-use pest::Parser;
+use itertools::Itertools;
 use std::path::Path;
 
 /// Width passed to the pretty-printer. Matches the value used by the inline
@@ -146,22 +146,17 @@ pub fn parse_fixture(contents: &str) -> Case {
     }
 }
 
-/// Parses `source` starting from `rule`. Panics with the pest error on a parse
-/// failure, or if the rule does not consume the entire source.
+/// Parses `source` starting from `rule`. Panics with the rendered parse errors
+/// on a failure (full-input consumption is inherent to the parser's entry
+/// points, so trailing garbage is a parse error).
 pub fn parse_source(rule: Rule, source: &str) -> Ast {
-    let pair = NewtypeParser::parse(rule, source)
-        .unwrap_or_else(|e| panic!("failed to parse as {:?}:\n{}", rule, e))
-        .next()
-        .unwrap_or_else(|| panic!("rule {:?} matched no pairs for source:\n{}", rule, source));
-
-    pretty_assertions::assert_eq!(
-        pair.as_span().as_str(),
-        source,
-        "rule {:?} did not consume the entire source",
-        rule
-    );
-
-    parser::parse(pair)
+    parser::parse_source(rule, source).unwrap_or_else(|errors| {
+        let rendered = errors
+            .iter()
+            .map(|e| e.render("<stdin>", source))
+            .join("\n");
+        panic!("failed to parse as {:?}:\n{}", rule, rendered)
+    })
 }
 
 /// Parses and simplifies `source`, then renders it to TypeScript.
@@ -190,7 +185,7 @@ pub fn render_diagnostics(rule: Rule, source: &str) -> String {
     parse_source(rule, source)
         .validate()
         .iter()
-        .map(|d| d.to_pest_error(source).with_path("<stdin>").to_string())
+        .map(|d| d.to_report_string("<stdin>", source))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -251,6 +246,7 @@ pub fn run_assertion_case(rule: Rule, path: &Path) {
     let report = crate::test_harness::run(
         &program,
         &case.source,
+        "<stdin>",
         crate::test_harness::Config { fail_fast: false },
         &mut log,
     )

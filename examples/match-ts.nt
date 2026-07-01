@@ -1,4 +1,4 @@
-import { A, B, I, M, Union } from 'ts-toolbelt'
+import { B, I, M, Union } from 'ts-toolbelt'
 
 // match-ts brands holes and captures with symbol keys (see
 // `match-ts/src/const.ts`); as computed keys they must be `unique symbol`s.
@@ -6,6 +6,15 @@ unique symbol __kind__
 unique symbol __capture__
 
 type True as 1
+
+type Primitive as
+  boolean
+  | string
+  | number
+  | bigint
+  | symbol
+  | undefined
+  | null
 
 type ExtractSubcapture(T) as
   match T do
@@ -102,7 +111,7 @@ type CapturePattern(T) as
   end
 
 type RecursiveExpandCapture(T) as
-  if A::Equals(T, any) <: True then
+  if T == any then
     T
   else
     if T <: Hole | Capture then
@@ -139,10 +148,13 @@ export type RecursiveCollect(Node) as
   |> NeverToEmpty()
 
 type IsLeafNode(T) as
-  B::Or(
-    B::Not(A::Extends(T, Record(string, any))),
-    B::Or(A::Extends(T, Hole), A::Equals(T, any))
-  )
+  cond do
+    not(T <: Record(string, any)) -> true,
+    T <: Hole -> true,
+    T == any -> true,
+    else -> false,
+  end
+
 
 type WalkChildren(Node) as
   map Key in keyof(Node) do
@@ -185,13 +197,13 @@ export type PatternHandler(Pattern) as
   (VariableCapture(Pattern)) => unknown
 
 type IsTopType(T) as
-  A::Extends(
-    True,
-    A::Equals(T, unknown)
-    | A::Equals(T, object)
-    | A::Equals(T, Object)
-    | A::Equals(T, any)
-  )
+  cond do
+      T == unknown -> true,
+      T == object -> true,
+      T == Object -> true,
+      T == any -> true
+  end
+
 
 export type UnifyAll(Value, Pattern) as
   cond do
@@ -220,13 +232,15 @@ export type DoUnifyAll(Value, Pattern) as
       )
   end
 
-export type ShouldUnifyAll(Value, Pattern) as
-  B::Not(
-    B::Or(
-      A::Equals(Pattern, any) & A::Equals(Value, any),
-      A::Extends(Pattern, M::Primitive) & A::Extends(Value, M::Primitive)
-    )
+export type ShouldUnifyAll(Value, Pattern) as 
+  if not(
+    (Pattern == any and Value == any) or
+    ((Pattern <: Primitive) and (Value <: Primitive))
   )
+  then true
+  else false
+  end
+
 
 export type CaseParameters(Value, Pattern) as
   UnifyAll(Value, Pattern)

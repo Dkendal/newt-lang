@@ -21,5 +21,13 @@ cargo run -- --generate-tests
 [tasks.build]
 run = "cargo build"
 
+
+[tasks.newt]
+usage = '''
+arg <file>
+'''
+run = "cargo run < ${usage_file}"
+
 [tools]
 jj = "latest"
+

@@ -23,11 +23,11 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    /// Render this diagnostic against `source` as a pest error, which
-    /// Display-formats to a source-highlighted, caret-underlined report. Set the
-    /// reported filename with [`pest::error::Error::with_path`].
-    pub fn to_pest_error(&self, source: &str) -> pest::error::Error<crate::parser::Rule> {
-        self.span.as_custom_error(source, self.message.clone())
+    /// Render this diagnostic against `source` (reported under `source_name`)
+    /// as a source-highlighted, underlined report — without color, so the
+    /// output is deterministic and string-comparable.
+    pub fn to_report_string(&self, source_name: &str, source: &str) -> String {
+        crate::report::render_to_string(source_name, source, self.span, &self.message)
     }
 }
 

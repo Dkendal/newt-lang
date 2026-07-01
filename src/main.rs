@@ -62,23 +62,20 @@ fn main() {
     let result = newtype::parser::parse_newtype_program(input);
 
     match result {
-        Ok(result) => {
+        Ok(ast) => {
             // Statically validate before simplification: malformed constructs
             // (e.g. an `if`/`cond` condition that is a bare value instead of a
             // comparison) would otherwise panic during `simplify`. Report each
             // diagnostic against the source and exit non-zero.
-            let diagnostics = result.validate();
+            let diagnostics = ast.validate();
             if !diagnostics.is_empty() {
                 for diagnostic in &diagnostics {
-                    eprintln!(
-                        "{}",
-                        diagnostic.to_pest_error(input).with_path(&source_name)
-                    );
+                    eprintln!("{}", diagnostic.to_report_string(&source_name, input));
                 }
                 std::process::exit(1);
             }
 
-            let simplified = result.simplify();
+            let simplified = ast.simplify();
 
             // Evaluate `unittest` assertions after simplification but before
             // rendering. Failures are reported to stderr; rendering still
@@ -86,6 +83,7 @@ fn main() {
             let report = test_harness::run(
                 &simplified,
                 input,
+                &source_name,
                 test_harness::Config {
                     fail_fast: args.fail_fast,
                 },
@@ -134,7 +132,7 @@ fn main() {
                 std::fs::write(path, json).unwrap();
             }
 
-            if let Some(output_filename) = args.output {
+            if let Some(ref output_filename) = &args.output {
                 std::fs::write(output_filename, out).unwrap();
             } else {
                 println!("{}", out);
@@ -145,8 +143,10 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Err(error) => {
-            eprintln!("{}", error);
+        Err(errors) => {
+            for error in errors.iter() {
+                newtype::report::eprint(&source_name, input, error.span, &error.message);
+            }
             std::process::exit(1);
         }
     }

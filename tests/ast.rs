@@ -401,12 +401,12 @@ mod assignability_tests {
 
 mod simplify_tests {
     use newtype::parser::{self, Rule::expr};
-    use pest::Parser;
 
     #[test]
     fn simplify_path_access() {
-        let pairs = parser::NewtypeParser::parse(parser::Rule::expr, "A::B::C::D").unwrap();
-        let actual = parser::parse_expr(pairs).simplify();
+        let actual = parser::parse_source(parser::Rule::expr, "A::B::C::D")
+            .unwrap()
+            .simplify();
         insta::assert_snapshot!(actual.to_sexp().unwrap());
     }
 

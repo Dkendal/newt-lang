@@ -9,13 +9,9 @@ use match_expr::MatchExpr;
 use newtype_macros_lib::ast_node;
 use serde_derive::Serialize;
 
-use crate::{
-    parser::{Pair, Rule},
-    runtime::builtin,
-};
+use crate::runtime::builtin;
 
 pub(crate) mod errors;
-pub(crate) mod macros;
 
 pub type Bindings = HashMap<String, Ast>;
 
@@ -855,59 +851,6 @@ impl Span {
         Self {
             start: self.start.min(other.start),
             end: self.end.max(other.end),
-        }
-    }
-
-    pub fn as_pest<'a>(&self, input: &'a str) -> pest::Span<'a> {
-        pest::Span::new(input, self.start, self.end).unwrap()
-    }
-
-    pub fn as_parsing_error(
-        &self,
-        input: &str,
-        positives: Vec<Rule>,
-        negatives: Vec<Rule>,
-    ) -> pest::error::Error<Rule> {
-        let span = self.as_pest(input);
-        let variant = pest::error::ErrorVariant::ParsingError {
-            positives,
-            negatives,
-        };
-        pest::error::Error::new_from_span(variant, span)
-    }
-
-    pub(crate) fn as_custom_error(&self, input: &str, message: String) -> pest::error::Error<Rule> {
-        let span = self.as_pest(input);
-        let variant = pest::error::ErrorVariant::CustomError { message };
-        pest::error::Error::new_from_span(variant, span)
-    }
-}
-
-impl From<Vec<Pair<'_>>> for Span {
-    fn from(list: Vec<Pair<'_>>) -> Self {
-        let start = list.iter().map(|p| p.as_span().start()).min().unwrap_or(0);
-        let end = list.iter().map(|p| p.as_span().end()).max().unwrap_or(0);
-        Self { start, end }
-    }
-}
-
-impl From<&Pair<'_>> for Span {
-    fn from(value: &Pair<'_>) -> Self {
-        value.as_span().into()
-    }
-}
-
-impl From<Pair<'_>> for Span {
-    fn from(value: Pair<'_>) -> Self {
-        (&value).into()
-    }
-}
-
-impl From<pest::Span<'_>> for Span {
-    fn from(value: pest::Span<'_>) -> Self {
-        Self {
-            start: value.start().to_owned(),
-            end: value.end().to_owned(),
         }
     }
 }

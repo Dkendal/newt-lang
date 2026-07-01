@@ -1,1136 +1,1028 @@
-pub(crate) mod pratt;
+//! The newtype parser: source text → [`Ast`], via chumsky.
+//!
+//! Two stages:
+//!
+//! 1. [`lexer`] turns the source into a `(Token, SimpleSpan)` stream (see the
+//!    module docs for the token design and its pest-fidelity subtleties).
+//! 2. The token-level parsers below build the [`Ast`]. Operator precedence is
+//!    encoded in two pratt tables — one for type expressions ([`Rule::expr`])
+//!    and one for boolean/relational claims ([`Rule::extends_expr`]) — with the
+//!    same relative binding order the old pest grammar used.
+//!
+//! Every grammar unit a test corpus or caller starts from is a [`Rule`]
+//! variant; [`parse_source`] parses a full input as that unit (an inherent
+//! `end()` guarantees the whole source is consumed).
+//!
+//! Recoverable syntax errors are returned as [`ParseError`]s. A handful of
+//! *semantic* checks (`readonly` on a non-array, `not` on a non-relation, a
+//! `where`/`defaults` clause naming an unknown type parameter, `::`/`|>` with
+//! an invalid operand) panic with a rendered source excerpt, exactly as the
+//! pest-based parser did; the CLI's panic hook presents these.
 
-use std::{
-    collections::{BTreeSet, HashMap},
-    default,
-    iter::FilterMap,
-    rc::Rc,
-    result,
-};
+pub(crate) mod lexer;
 
-use crate::{
-    ast::{macros::*, *},
-    typescript,
-};
+use std::{collections::HashMap, rc::Rc, result::Result};
+
+use crate::ast::*;
+use crate::report;
 
 use cond_expr::CondExpr;
 use if_expr::IfExpr;
-use itertools::Itertools;
-
 use let_expr::LetExpr;
 use match_expr::MatchExpr;
-use pest::{
-    error::{Error, ErrorVariant},
-    pratt_parser::PrattParser,
-    Parser,
-};
 
-use pratt::{EXPR_PARSER, EXTENDS_PARSER};
+use chumsky::input::{Input as _, ValueInput};
+use chumsky::pratt::{infix, left, postfix, prefix};
+use chumsky::prelude::*;
 
-#[derive(Parser)]
-#[grammar = "grammar.pest"]
-pub struct NewtypeParser;
+pub use lexer::{Kw, Token};
 
-pub type ParserError = Error<Rule>;
+/// Token-stream span (byte offsets into the original source).
+type TSpan = SimpleSpan<usize>;
+type Extra<'t> = extra::Err<Rich<'t, Token, TSpan>>;
+type P<'t, I, O> = Boxed<'t, 't, I, O, Extra<'t>>;
 
-pub type Pair<'i> = pest::iterators::Pair<'i, Rule>;
-pub type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
+/// The source name used when rendering source excerpts for the parser's
+/// semantic panics (the parser does not know the real filename).
+const SOURCE_NAME: &str = "<input>";
 
-pub fn parse_expr(pairs: Pairs) -> Ast {
-    use Rule::*;
+/// A grammar start symbol. The corpus test macros reference these variants by
+/// name (`newtype::parser::Rule, "expr"`), hence the lowercase names.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rule {
+    program,
+    expr,
+    extends_expr,
+    if_expr,
+    map_expr,
+    interface,
+    object_literal,
+    tuple,
+    type_alias,
+}
 
-    EXPR_PARSER
-        .map_primary(parse)
-        .map_prefix(|op, child| match op.as_rule() {
-            infer => Ast::Infer(child.into()),
-            keyof => {
-                let span: Span = Span::from(&op).merge(&child.as_span());
-                Ast::Builtin(Builtin {
-                    name: BuiltinKeyword::Keyof,
-                    argument: child.into(),
-                    span,
-                })
+/// A single parse error: a source span and a human-readable message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError {
+    pub span: Span,
+    pub message: String,
+}
+
+impl ParseError {
+    /// Render this error against `source` as an underlined excerpt.
+    pub fn render(&self, source_name: &str, source: &str) -> String {
+        report::render_to_string(source_name, source, self.span, &self.message)
+    }
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+/// All errors from one parse. Kept as a type alias so callers can iterate.
+pub type ParserError = Vec<ParseError>;
+
+/// Parse the entire `source` as the grammar unit `rule`.
+pub fn parse_source(rule: Rule, source: &str) -> Result<Ast, ParserError> {
+    let (tokens, lex_errs) = lexer::lex(source);
+    if !lex_errs.is_empty() {
+        return Err(lex_errs
+            .into_iter()
+            .map(|e| ParseError {
+                span: Span::new(e.span().start, e.span().end),
+                message: e.to_string(),
+            })
+            .collect());
+    }
+    let tokens = tokens.expect("lexing produced neither tokens nor errors");
+    parse_tokens(rule, &tokens, source)
+}
+
+/// Parse a whole program to a single [`Ast::Program`].
+pub fn parse_newtype_program(source: &str) -> Result<Ast, Box<ParserError>> {
+    parse_source(Rule::program, source).map_err(Box::new)
+}
+
+/// Parse a whole program to its top-level items (the CLI entry point).
+pub fn parse_newtype_program1(source: &str) -> Result<Vec<Ast>, Box<ParserError>> {
+    parse_source(Rule::program, source)
+        .map(|ast| vec![ast])
+        .map_err(Box::new)
+}
+
+fn parse_tokens(rule: Rule, tokens: &[(Token, TSpan)], source: &str) -> Result<Ast, ParserError> {
+    let eoi = TSpan::from(source.len()..source.len());
+    let input = tokens.map(eoi, |(t, s)| (t, s));
+    let parsers = build(source);
+
+    let result = match rule {
+        Rule::program => parsers.program.then_ignore(end()).parse(input),
+        Rule::expr => parsers.expr.then_ignore(end()).parse(input),
+        Rule::extends_expr => parsers.extends_expr.then_ignore(end()).parse(input),
+        Rule::if_expr => parsers.if_expr.then_ignore(end()).parse(input),
+        Rule::map_expr => parsers.map_expr.then_ignore(end()).parse(input),
+        Rule::interface => parsers.interface.then_ignore(end()).parse(input),
+        Rule::object_literal => parsers.object_literal.then_ignore(end()).parse(input),
+        Rule::tuple => parsers.tuple.then_ignore(end()).parse(input),
+        Rule::type_alias => parsers.type_alias.then_ignore(end()).parse(input),
+    };
+
+    result.into_result().map_err(|errs| {
+        errs.into_iter()
+            .map(|e| ParseError {
+                span: Span::new(e.span().start, e.span().end),
+                message: e.to_string(),
+            })
+            .collect()
+    })
+}
+
+/// The named entry points, one per [`Rule`].
+struct Parsers<'t, I>
+where
+    I: ValueInput<'t, Token = Token, Span = TSpan>,
+{
+    program: P<'t, I, Ast>,
+    expr: P<'t, I, Ast>,
+    extends_expr: P<'t, I, Ast>,
+    if_expr: P<'t, I, Ast>,
+    map_expr: P<'t, I, Ast>,
+    interface: P<'t, I, Ast>,
+    object_literal: P<'t, I, Ast>,
+    tuple: P<'t, I, Ast>,
+    type_alias: P<'t, I, Ast>,
+}
+
+fn sp(s: TSpan) -> Span {
+    Span::new(s.start, s.end)
+}
+
+/// Strip the surrounding quotes off a raw string-literal token. Mirrors the old
+/// parser's `trim_matches`, which strips *repeated* quote chars at both ends
+/// (there are no escape sequences in the language).
+fn trim_quotes(raw: &str) -> String {
+    if raw.starts_with('"') {
+        raw.trim_matches('"').to_string()
+    } else {
+        raw.trim_matches('\'').to_string()
+    }
+}
+
+/// Desugar the pipe operator into a type application:
+/// `A |> B` is `B(A)`, and `A |> F(X)` is `F(A, X)`.
+fn pipe_to_application(lhs: Ast, rhs: Ast, op_span: Span, span: Span, src: &str) -> Ast {
+    match rhs {
+        Ast::Ident(_) => Ast::ApplyGeneric(ApplyGeneric {
+            span,
+            receiver: Rc::new(rhs),
+            args: vec![lhs],
+        }),
+        Ast::ApplyGeneric(ApplyGeneric { receiver, args, .. }) => {
+            let mut args = args.clone();
+            args.insert(0, lhs);
+            Ast::ApplyGeneric(ApplyGeneric {
+                span,
+                receiver,
+                args,
+            })
+        }
+        _ => {
+            let error = report::render_to_string(
+                SOURCE_NAME,
+                src,
+                op_span,
+                "the right-hand side of `|>` must be an identifier or a type application",
+            );
+            panic!("{error}");
+        }
+    }
+}
+
+/// Flatten `lhs :: rhs` into a single [`Ast::Path`]; both operands must be
+/// identifiers or paths.
+fn join_path(lhs: Ast, rhs: Ast, span: Span, src: &str) -> Ast {
+    let mut segments = vec![];
+
+    for side in [lhs, rhs] {
+        match side {
+            Ast::Path(Path {
+                segments: inner, ..
+            }) => segments.extend(inner),
+            Ast::Ident(_) => segments.push(side),
+            ast => {
+                let error = report::render_to_string(
+                    SOURCE_NAME,
+                    src,
+                    ast.as_span(),
+                    "expected an identifier on this side of `::`",
+                );
+                panic!("{error}");
             }
-            // `readonly` is only permitted on array and tuple literal types
-            // (the same restriction TypeScript enforces).
-            readonly_modifier => match child {
-                Ast::Array(_) | Ast::Tuple(_) => Ast::Readonly(child.into()),
+        }
+    }
+
+    Ast::Path(Path { span, segments })
+}
+
+/// Merge the optional `(A, B)` parameter list, `defaults` clause and `where`
+/// clause of a `type`/`interface` definition into ordered [`TypeParameter`]s.
+///
+/// # Panics
+///
+/// Panics (with a rendered source excerpt) when a `where`/`defaults` entry
+/// names a type parameter that is not in the signature — same as the old
+/// parser.
+fn assemble_type_params(
+    src: &str,
+    params: Option<Vec<Ident>>,
+    defaults: Option<Vec<(String, Ast, Span)>>,
+    constraints: Option<Vec<(String, Ast, Span)>>,
+) -> Vec<TypeParameter> {
+    let mut order: Vec<String> = Vec::new();
+    let mut by_name: HashMap<String, TypeParameter> = HashMap::new();
+
+    for id in params.unwrap_or_default() {
+        order.push(id.name.clone());
+        by_name.insert(
+            id.name.clone(),
+            TypeParameter {
+                span: id.span,
+                name: id.name,
+                constraint: None,
+                default: None,
+                rest: false,
+            },
+        );
+    }
+
+    let mut set = |name: String,
+                   value: Ast,
+                   span: Span,
+                   field: fn(&mut TypeParameter) -> &mut Option<Ast>| {
+        match by_name.get_mut(&name) {
+            Some(param) => *field(param) = Some(value),
+            None => {
+                let error = report::render_to_string(
+                    SOURCE_NAME,
+                    src,
+                    span,
+                    &format!(r#"Type parameter "{name}", is missing from signature"#),
+                );
+                panic!("{error}");
+            }
+        }
+    };
+
+    for (name, body, span) in constraints.unwrap_or_default() {
+        set(name, body, span, |p| &mut p.constraint);
+    }
+
+    for (name, value, span) in defaults.unwrap_or_default() {
+        set(name, value, span, |p| &mut p.default);
+    }
+
+    order.iter().map(|name| by_name[name].clone()).collect()
+}
+
+/// Build every parser. `src` is captured so the semantic panics can render a
+/// source excerpt.
+fn build<'t, I>(src: &'t str) -> Parsers<'t, I>
+where
+    I: ValueInput<'t, Token = Token, Span = TSpan>,
+{
+    use Token as T;
+
+    let kw = |k: Kw| just(T::Kw(k));
+    // A contextual keyword: a plain identifier matched by text (`do`, `match`,
+    // `cond`, `where`, `defaults`, `from`; `and`/`or` are handled in the
+    // extends pratt table). These words stay usable as ordinary identifiers.
+    let soft = |word: &'static str| {
+        any()
+            .filter(move |t: &Token| matches!(t, T::Ident(s) if s == word))
+            .ignored()
+            .labelled(word)
+    };
+    let comma = just(T::Comma);
+    let lparen = just(T::LParen);
+    let rparen = just(T::RParen);
+    let lbracket = just(T::LBracket);
+    let rbracket = just(T::RBracket);
+    let lbrace = just(T::LBrace);
+    let rbrace = just(T::RBrace);
+
+    let ident =
+        select! { T::Ident(name) = e => Ident { name, span: sp(e.span()) } }.labelled("identifier");
+    let ident_name = select! { T::Ident(name) => name }.labelled("identifier");
+    let string_raw = select! { T::Str(raw) => raw }.labelled("string");
+
+    let mut expr = Recursive::declare();
+    let mut extends_expr = Recursive::declare();
+
+    // ---- Terms -------------------------------------------------------------
+
+    let number = select! {
+        T::Number(raw) = e => Ast::TypeNumber(TypeNumber { ty: raw, span: sp(e.span()) }),
+    };
+
+    let string_lit = select! {
+        T::Str(raw) = e => Ast::TypeString(TypeString { ty: trim_quotes(&raw), span: sp(e.span()) }),
+    };
+
+    let template_string = select! {
+        T::TemplateStr(raw) = e => Ast::TemplateString(TemplateString { ty: raw, span: sp(e.span()) }),
+    };
+
+    let keyword_term = select! {
+        T::Kw(Kw::Any) = e => Ast::AnyKeyword(sp(e.span())),
+        T::Kw(Kw::Unknown) = e => Ast::UnknownKeyword(sp(e.span())),
+        T::Kw(Kw::Never) = e => Ast::NeverKeyword(sp(e.span())),
+        T::Kw(Kw::True) = e => Ast::TrueKeyword(sp(e.span())),
+        T::Kw(Kw::False) = e => Ast::FalseKeyword(sp(e.span())),
+        T::Kw(Kw::String) = e => Ast::Primitive(PrimitiveType::String, sp(e.span())),
+        T::Kw(Kw::Boolean) = e => Ast::Primitive(PrimitiveType::Boolean, sp(e.span())),
+        T::Kw(Kw::Number) = e => Ast::Primitive(PrimitiveType::Number, sp(e.span())),
+        T::Kw(Kw::Object) = e => Ast::Primitive(PrimitiveType::Object, sp(e.span())),
+        T::Kw(Kw::Bigint) = e => Ast::Primitive(PrimitiveType::BigInt, sp(e.span())),
+        T::Kw(Kw::Symbol) = e => Ast::Primitive(PrimitiveType::Symbol, sp(e.span())),
+        T::Kw(Kw::Void) = e => Ast::Primitive(PrimitiveType::Void, sp(e.span())),
+        T::Kw(Kw::Null) = e => Ast::Primitive(PrimitiveType::Null, sp(e.span())),
+        T::Kw(Kw::Undefined) = e => Ast::Primitive(PrimitiveType::Undefined, sp(e.span())),
+    };
+
+    let ident_term = select! {
+        T::Ident(name) = e => Ast::Ident(Ident { name, span: sp(e.span()) }),
+    };
+
+    // ---- Object literals ----------------------------------------------------
+
+    // Object member names are deliberately permissive: any identifier-shaped
+    // word, including every reserved word (`string`, `type`, `any`, ...).
+    let property_key_name = select! {
+        T::Ident(name) => name,
+        T::Kw(k) => k.as_str().to_string(),
+    }
+    .labelled("property name");
+
+    // `k in T` / `k in T as R` — a mapped-type index signature.
+    let index_property_key = ident
+        .then_ignore(kw(Kw::In))
+        .then(expr.clone())
+        .then(kw(Kw::As).ignore_then(expr.clone()).or_not())
+        .map_with(|((index, iterable), remapped_as), e| PropertyKeyIndex {
+            span: sp(e.span()),
+            key: index.name,
+            iterable,
+            remapped_as,
+        })
+        .boxed();
+
+    let property_key_inner = choice((
+        property_key_name.map(ObjectPropertyKey::Key),
+        index_property_key
+            .clone()
+            .map(ObjectPropertyKey::Index)
+            .or(ident.map(ObjectPropertyKey::Computed))
+            .delimited_by(lbracket.clone(), rbracket.clone()),
+    ));
+
+    // Optional-marker normalization: the legacy prefix `?a: T` and the
+    // TypeScript-style postfix `a?: T` both mark the property optional.
+    let object_property = kw(Kw::Readonly)
+        .or_not()
+        .then(just(T::Question).or_not())
+        .then(property_key_inner)
+        .then(just(T::Question).or_not())
+        .then_ignore(just(T::Colon))
+        .then(expr.clone())
+        .map_with(
+            |((((readonly, prefix_opt), key), postfix_opt), value), e| ObjectProperty {
+                span: sp(e.span()),
+                readonly: readonly.is_some(),
+                optional: prefix_opt.is_some() || postfix_opt.is_some(),
+                key,
+                value,
+            },
+        );
+
+    let object_literal = object_property
+        .separated_by(comma.clone())
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .delimited_by(lbrace.clone(), rbrace.clone())
+        .map_with(|properties, e| TypeLiteral {
+            properties,
+            span: sp(e.span()),
+        })
+        .boxed();
+
+    // ---- Tuples -------------------------------------------------------------
+
+    // `[]` with no gap lexes as one token (also the array postfix); a bracketed
+    // list takes no trailing comma.
+    let tuple = choice((
+        just(T::BracketPair).map_with(|_, e| {
+            Ast::Tuple(Tuple {
+                span: sp(e.span()),
+                items: vec![],
+            })
+        }),
+        expr.clone()
+            .separated_by(comma.clone())
+            .collect::<Vec<_>>()
+            .delimited_by(lbracket.clone(), rbracket.clone())
+            .map_with(|items, e| {
+                Ast::Tuple(Tuple {
+                    span: sp(e.span()),
+                    items,
+                })
+            }),
+    ))
+    .boxed();
+
+    // ---- Function types ------------------------------------------------------
+
+    let named_parameter = just(T::Ellipsis)
+        .or_not()
+        .then(ident_name)
+        .then_ignore(just(T::Colon))
+        .then(expr.clone())
+        .map_with(|((ellipsis, name), kind), e| Parameter {
+            span: sp(e.span()),
+            ellipsis: ellipsis.is_some(),
+            name,
+            kind,
+        });
+    let named_parameters = named_parameter
+        .separated_by(comma.clone())
+        .allow_trailing()
+        .at_least(1)
+        .collect::<Vec<_>>();
+
+    // Unnamed parameters get synthesized positional names; a rest parameter is
+    // named `rest`.
+    let unnamed_parameter = just(T::Ellipsis)
+        .or_not()
+        .then(expr.clone())
+        .map_with(|(ellipsis, kind), e| (ellipsis.is_some(), kind, sp(e.span())));
+    let unnamed_parameters = unnamed_parameter
+        .separated_by(comma.clone())
+        .allow_trailing()
+        .at_least(1)
+        .collect::<Vec<_>>()
+        .map(|params| {
+            params
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (ellipsis, kind, span))| Parameter {
+                    span,
+                    ellipsis,
+                    name: if ellipsis {
+                        "rest".to_string()
+                    } else {
+                        format!("arg{idx}")
+                    },
+                    kind,
+                })
+                .collect::<Vec<_>>()
+        });
+
+    let parameters = named_parameters
+        .or(unnamed_parameters)
+        .or_not()
+        .map(Option::unwrap_or_default)
+        .delimited_by(lparen.clone(), rparen.clone());
+
+    let function_type = parameters
+        .then_ignore(just(T::FatArrow))
+        .then(expr.clone())
+        .map_with(|(params, return_type), e| {
+            Ast::FunctionType(FunctionType {
+                span: sp(e.span()),
+                params,
+                return_type: Rc::new(return_type),
+            })
+        })
+        .boxed();
+
+    // ---- Sugar expressions (desugared during `simplify`) ---------------------
+
+    let if_expr = kw(Kw::If)
+        .ignore_then(extends_expr.clone())
+        .then_ignore(kw(Kw::Then))
+        .then(expr.clone())
+        .then(kw(Kw::Else).ignore_then(expr.clone()).or_not())
+        .then_ignore(kw(Kw::End))
+        .map_with(|((condition, then_branch), else_branch), e| {
+            let span = sp(e.span());
+            Ast::IfExpr(IfExpr {
+                span,
+                condition: Rc::new(condition),
+                then_branch: Rc::new(then_branch),
+                else_branch: Some(Rc::new(else_branch.unwrap_or(Ast::NeverKeyword(span)))),
+            })
+        })
+        .boxed();
+
+    let else_arm = kw(Kw::Else)
+        .ignore_then(just(T::Arrow))
+        .ignore_then(expr.clone());
+
+    let match_arm = expr
+        .clone()
+        .then_ignore(just(T::Arrow))
+        .then(expr.clone())
+        .map_with(|(pattern, body), e| match_expr::Arm {
+            span: sp(e.span()),
+            pattern,
+            body,
+        });
+    let match_expr_p = soft("match")
+        .ignore_then(expr.clone())
+        .then_ignore(soft("do"))
+        .then(
+            match_arm
+                .separated_by(comma.clone())
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .then(comma.clone().ignore_then(else_arm.clone()).or_not())
+        .then_ignore(comma.clone().or_not())
+        .then_ignore(kw(Kw::End))
+        .map_with(|((value, arms), else_arm), e| {
+            let span = sp(e.span());
+            Ast::MatchExpr(MatchExpr {
+                span,
+                value: Rc::new(value),
+                arms,
+                else_arm: Rc::new(else_arm.unwrap_or(Ast::NeverKeyword(span))),
+            })
+        })
+        .boxed();
+
+    let cond_arm = extends_expr
+        .clone()
+        .then_ignore(just(T::Arrow))
+        .then(expr.clone())
+        .map_with(|(condition, body), e| cond_expr::Arm {
+            span: sp(e.span()),
+            condition,
+            body,
+        });
+    let cond_expr_p = soft("cond")
+        .ignore_then(soft("do"))
+        .ignore_then(
+            cond_arm
+                .separated_by(comma.clone())
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .then(comma.clone().ignore_then(else_arm.clone()).or_not())
+        .then_ignore(comma.clone().or_not())
+        .then_ignore(kw(Kw::End))
+        .map_with(|(arms, else_arm), e| {
+            let span = sp(e.span());
+            Ast::CondExpr(CondExpr {
+                span,
+                arms,
+                else_arm: Rc::new(else_arm.unwrap_or(Ast::NeverKeyword(span))),
+            })
+        })
+        .boxed();
+
+    let let_binding = ident_name.then_ignore(just(T::Eq)).then(expr.clone());
+    let let_expr_p = kw(Kw::Let)
+        .ignore_then(
+            let_binding
+                .separated_by(comma.clone())
+                .allow_trailing()
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(kw(Kw::In))
+        .then(expr.clone())
+        .map_with(|(bindings, body), e| {
+            Ast::LetExpr(LetExpr {
+                span: sp(e.span()),
+                bindings: bindings.into_iter().collect(),
+                body: Rc::new(body),
+            })
+        })
+        .boxed();
+
+    let map_expr_p = kw(Kw::Map)
+        .ignore_then(kw(Kw::Readonly).or_not())
+        .then(just(T::Question).or_not())
+        .then(index_property_key.clone())
+        .then_ignore(soft("do"))
+        .then(expr.clone())
+        .then_ignore(kw(Kw::End))
+        .map_with(|(((readonly, optional), index_key), body), e| {
+            Ast::MappedType(MappedType {
+                span: sp(e.span()),
+                index: index_key.key,
+                iterable: Rc::new(index_key.iterable),
+                remapped_as: index_key.remapped_as.map(Rc::new),
+                readonly_mod: readonly.map(|_| MappingModifier::Add),
+                optional_mod: optional.map(|_| MappingModifier::Add),
+                body: Rc::new(body),
+            })
+        })
+        .boxed();
+
+    // ---- Calls ----------------------------------------------------------------
+
+    let argument_list = expr
+        .clone()
+        .separated_by(comma.clone())
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .delimited_by(lparen.clone(), rparen.clone())
+        .boxed();
+
+    // The macro name keeps its trailing `!` (`MacroCall::eval` strips it).
+    let macro_call = select! { T::MacroIdent(name) => name }
+        .then(argument_list.clone())
+        .map_with(|(name, args), e| {
+            Ast::MacroCall(MacroCall {
+                span: sp(e.span()),
+                name,
+                args,
+            })
+        });
+
+    // ---- The expression pratt table --------------------------------------------
+
+    // Primary-expression alternatives, in the old grammar's order (`match`/
+    // `cond` before a bare identifier; parenthesized expression last).
+    let atom = choice((
+        if_expr.clone(),
+        map_expr_p.clone(),
+        match_expr_p,
+        cond_expr_p,
+        let_expr_p,
+        macro_call,
+        function_type,
+        number,
+        keyword_term,
+        template_string,
+        string_lit,
+        ident_term,
+        tuple.clone(),
+        object_literal.clone().map(Ast::TypeLiteral),
+        expr.clone().delimited_by(lparen.clone(), rparen.clone()),
+    ))
+    .boxed();
+
+    let indexed_access = expr
+        .clone()
+        .delimited_by(lbracket.clone(), rbracket.clone());
+
+    // Binding order (loosest first): `|` < `&` < `|>` < keyof/readonly <
+    // application < `[]` < `?` (infer) < `::`/`.` < `[expr]`. Union and
+    // intersection build strictly binary nodes; n-ary flattening happens in
+    // `simplify`.
+    let expr_pratt = atom.pratt((
+        infix(left(1), just(T::Union), |lhs: Ast, _, rhs: Ast, e| {
+            Ast::UnionType(UnionType {
+                types: vec![lhs, rhs],
+                span: sp(e.span()),
+            })
+        }),
+        infix(
+            left(2),
+            just(T::Intersection),
+            |lhs: Ast, _, rhs: Ast, e| {
+                Ast::IntersectionType(IntersectionType {
+                    types: vec![lhs, rhs],
+                    span: sp(e.span()),
+                })
+            },
+        ),
+        infix(
+            left(3),
+            just(T::PipeOp).map_with(|_, e| e.span()),
+            move |lhs: Ast, op_span: TSpan, rhs: Ast, e| {
+                pipe_to_application(lhs, rhs, sp(op_span), sp(e.span()), src)
+            },
+        ),
+        prefix(4, kw(Kw::Keyof), |_, argument: Ast, e| {
+            Ast::Builtin(Builtin {
+                name: BuiltinKeyword::Keyof,
+                argument: Rc::new(argument),
+                span: sp(e.span()),
+            })
+        }),
+        // `readonly` is only permitted on array and tuple literal types (the
+        // same restriction TypeScript enforces).
+        prefix(
+            4,
+            kw(Kw::Readonly),
+            move |_, operand: Ast, _e| match operand {
+                Ast::Array(_) | Ast::Tuple(_) => Ast::Readonly(Rc::new(operand)),
                 other => {
-                    let error = other.as_span().as_custom_error(
-                        op.get_input(),
+                    let error = report::render_to_string(
+                        SOURCE_NAME,
+                        src,
+                        other.as_span(),
                         "readonly type modifier is only permitted on array and tuple \
-                         literal types"
-                            .to_string(),
+                     literal types",
                     );
                     panic!("{error}");
                 }
             },
-            rule => {
-                parse_error!(op, vec![infer, keyof, readonly_modifier], vec![rule]);
-            }
-        })
-        .map_postfix(|lhs, op| match op.as_rule() {
-            indexed_access => {
-                let span: Span = lhs.as_span().merge(&Span::from(&op));
-
-                let inner = op.into_inner().next().unwrap();
-                let lhs = lhs.into();
-                let rhs = parse(inner).into();
-
-                Ast::Access(Access {
-                    lhs,
-                    rhs,
-                    is_dot: false,
-                    span,
-                })
-            }
-            array_modifier => Ast::Array(lhs.into()),
-            application => {
-                let span: Span = lhs.as_span().merge(&Span::from(&op));
-
-                let args = next_pair!(op.clone().into_inner(), Rule::argument_list);
-
-                Ast::ApplyGeneric(ApplyGeneric {
-                    span,
-                    receiver: lhs.into(),
-                    args: args.into_inner().map(parse).collect(),
-                })
-            }
-            rule => {
-                parse_error!(op, vec![indexed_access, array_modifier], vec![rule]);
-            }
-        })
-        .map_infix(|lhs, op, rhs| {
-            let span: Span = lhs.as_span().merge(&rhs.as_span());
-
-            if op.as_rule() == pipe {
-                return replace_pipe_with_type_application(rhs, lhs, op);
-            }
-
-            let ast = match op.as_rule() {
-                union => Ast::UnionType(UnionType {
-                    types: vec![lhs, rhs],
-                    span,
-                }),
-
-                intersection => Ast::IntersectionType(IntersectionType {
-                    types: vec![lhs, rhs],
-                    span,
-                }),
-
-                colon2 => {
-                    let mut acc = vec![];
-
-                    match lhs {
-                        Ast::Path(Path { segments, .. }) => acc.extend(segments.to_owned()),
-                        Ast::Ident(_) => acc.push(lhs),
-                        ast => {
-                            let error = ast.as_span().as_parsing_error(
-                                op.get_input(),
-                                vec![Rule::ident],
-                                vec![],
-                            );
-                            panic!("{error}");
-                        }
-                    };
-
-                    match rhs {
-                        Ast::Path(Path { segments, .. }) => acc.extend(segments.to_owned()),
-                        Ast::Ident(_) => acc.push(rhs),
-                        ast => {
-                            let error = ast.as_span().as_parsing_error(
-                                op.get_input(),
-                                vec![Rule::ident],
-                                vec![],
-                            );
-                            panic!("{error}");
-                        }
-                    };
-
-                    Ast::Path(Path {
-                        span,
-                        segments: acc,
-                    })
-                }
-
-                dot_op => Ast::Access(Access {
-                    lhs: lhs.into(),
-                    rhs: rhs.into(),
-                    is_dot: true,
-                    span,
-                }),
-
-                rule => unreachable!("Expected infix operator, found {:?}", rule),
-            };
-
-            ast
-        })
-        .parse(pairs)
-}
-
-/// Replace the pipe operator macro with a type application
-/// ```text
-/// A |> B
-/// # B(A)
-/// ```
-fn replace_pipe_with_type_application(rhs: Ast, lhs: Ast, op: Pair) -> Ast {
-    let span: Span = lhs.as_span().merge(&rhs.as_span());
-
-    match rhs {
-        Ast::Ident(_) => {
-            // FIXME missing span
-            Ast::ApplyGeneric(ApplyGeneric {
-                span,
-                receiver: rhs.into(),
-                args: vec![lhs],
-            })
-        }
-        Ast::ApplyGeneric(ApplyGeneric {
-            receiver: name,
-            args: params,
-            ..
-        }) => {
-            let mut params = params.clone();
-            params.insert(0, lhs);
-            Ast::ApplyGeneric(ApplyGeneric {
-                span,
-                receiver: name.clone(),
-                args: params,
-            })
-        }
-        _ => {
-            let error = Error::new_from_span(
-                ErrorVariant::ParsingError {
-                    positives: vec![Rule::ident, Rule::application],
-                    // FIXME: don't know what the input rule was
-                    negatives: vec![],
-                },
-                op.as_span(),
-            );
-            panic!("{}", error);
-        }
-    }
-}
-
-pub fn parse_newtype_program(source: &str) -> result::Result<Ast, Box<Error<Rule>>> {
-    let pair = NewtypeParser::parse(Rule::program, source)?.next().unwrap();
-
-    Ok(parse(pair))
-}
-
-pub fn parse_extends_expr(pairs: Pairs) -> Ast {
-    EXTENDS_PARSER
-        .map_primary(|pair| match pair.as_rule() {
-            Rule::expr => parse_expr(pair.into_inner()),
-            Rule::extends_expr => parse_extends_expr(pair.into_inner()),
-            rule => parse_error!(pair, vec![Rule::expr, Rule::extends_expr], vec![rule]),
-        })
-        .map_postfix(|_lhs, op| {
-            unreachable!("Expected postfix operation, found {:?}", op.as_rule())
-        })
-        .map_prefix(|op, primary_node| {
-            let span: Span = primary_node.as_span().merge(&op.as_span().into());
-
-            if op.as_rule() == Rule::not && !primary_node.is_extends_infix_op() {
-                let error_not = Error::<Rule>::new_from_span(
-                    ErrorVariant::CustomError {
-                        message: "`not` may only be used with an extends expression".to_string(),
-                    },
-                    op.as_span(),
-                );
-
-                let error = span.as_parsing_error(
-                    op.get_input(),
-                    vec![Rule::extends_expr],
-                    vec![],
-                );
-
-                let error_expr = format!("{error}");
-
-                panic!("{error_not}\n{error_expr}\nHint: You might have forgotten to wrap the expression in parentheses, `not` has higher precedence than other operators.");
-            }
-
-            let op = match op.as_rule() {
-                Rule::not => PrefixOp::Not,
-                rule => parse_error!(op, vec![Rule::not], vec![rule]),
-            };
-
-           let value = primary_node.into();
-
-        Ast::ExtendsPrefixOp(ExtendsPrefixOp {
-            op,
-            value,
-            span
-        })
-        })
-        .map_infix(|lhs: Ast, op: Pair, rhs: Ast| {
-            let span: Span = lhs.as_span().merge(&rhs.as_span());
-
-            let op = match op.as_rule() {
-                Rule::extends => InfixOp::Extends,
-                Rule::not_extends => InfixOp::NotExtends,
-                Rule::equals => InfixOp::Equals,
-                Rule::not_equals => InfixOp::NotEquals,
-                Rule::strict_equals => InfixOp::StrictEquals,
-                Rule::strict_not_equals => InfixOp::StrictNotEquals,
-                Rule::and => InfixOp::And,
-                Rule::or => InfixOp::Or,
-                rule => parse_error!(
-                    op,
-                    vec![
-                        Rule::extends,
-                        Rule::not_extends,
-                        Rule::equals,
-                        Rule::not_equals,
-                        Rule::strict_equals,
-                        Rule::strict_not_equals,
-                        Rule::and,
-                        Rule::or
-                    ],
-                    vec![rule]
-                ),
-            };
-
-            let lhs = lhs.into();
-            let rhs = rhs.into();
-            let extends_infix_op = ExtendsInfixOp { lhs, op, rhs, span };
-
-            Ast::ExtendsInfixOp(extends_infix_op)
-        })
-        .parse(pairs)
-}
-
-pub fn parse(pair: Pair) -> Ast {
-    let rule = pair.clone().as_rule();
-    let span: Span = pair.as_span().into();
-
-    // TODO: just return AST, remove calls to new/1 wrap result
-    match rule {
-        Rule::program => parse_program(pair),
-        Rule::statement => parse_statement(pair),
-        Rule::type_alias => parse_type_alias(pair),
-        Rule::unittest => Ast::UnitTest(parse_unittest(pair)),
-        Rule::assert_stmt => parse_assert(pair),
-        Rule::interface => parse_interface(pair),
-        Rule::unique_symbol_decl => parse_unique_symbol_decl(pair),
-        Rule::import_statement => parse_import_statement(pair),
-        Rule::if_expr => parse_if_expr(pair),
-        Rule::object_literal => Ast::TypeLiteral(parse_object_literal(pair)),
-        Rule::primitive => {
-            let value = pair.into_inner().next().unwrap();
-
-            let primitive = match value.as_rule() {
-                Rule::primitive_string => PrimitiveType::String,
-                Rule::primitive_number => PrimitiveType::Number,
-                Rule::primitive_boolean => PrimitiveType::Boolean,
-                Rule::primitive_bigint => PrimitiveType::BigInt,
-                Rule::primitive_symbol => PrimitiveType::Symbol,
-                Rule::primitive_object => PrimitiveType::Object,
-                Rule::primitive_null => PrimitiveType::Null,
-                Rule::primitive_void => PrimitiveType::Void,
-                Rule::primitive_undefined => PrimitiveType::Undefined,
-                _ => unimplemented!("{:?}", rule),
-            };
-            Ast::Primitive(primitive, span)
-        }
-        Rule::number => Ast!(TypeNumber {
-            ty: pair.as_str().to_string(),
-            span,
-        }),
-        Rule::string => parse_type_string(pair),
-        Rule::template_string => Ast!(TemplateString {
-            ty: pair.as_str().to_string(),
-            span,
-        }),
-        Rule::ident => Ast::Ident(parse_ident(pair)),
-        Rule::never => Ast::NeverKeyword(span),
-        Rule::any => Ast::AnyKeyword(span),
-        Rule::unknown => Ast::UnknownKeyword(span),
-        Rule::boolean => {
-            let value = pair.into_inner().next().unwrap();
-
-            match value.as_rule() {
-                Rule::literal_true => Ast::TrueKeyword(span),
-                Rule::literal_false => Ast::FalseKeyword(span),
-                _ => unreachable!(),
-            }
-        }
-        Rule::tuple => parse_tuple(pair),
-        Rule::macro_call => Ast::MacroCall(parse_macro_call(pair)),
-        Rule::builtin => parse_builtin(pair),
-        Rule::expr => parse_expr(pair.into_inner()),
-        Rule::match_expr => Ast::MatchExpr(parse_match_expr(pair)),
-        Rule::cond_expr => Ast::CondExpr(parse_cond_expr(pair)),
-        Rule::map_expr => Ast::MappedType(parse_map_expr(pair)),
-        Rule::let_expr => Ast::LetExpr(parse_let_expr(pair)),
-        Rule::function_type => Ast::FunctionType(parse_function_type(pair)),
-
-        Rule::EOI => {
-            parse_error!(pair, format!("Unexpected end of input"));
-        }
-
-        rule => {
-            parse_error!(pair, format!("Unexpected rule: {:?}", rule));
-        }
-    }
-}
-
-fn parse_builtin(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let mut inner = pair.into_inner();
-
-    let name = inner.find(match_tag("name")).unwrap();
-
-    let name = match name.as_rule() {
-        Rule::keyof => BuiltinKeyword::Keyof,
-        _ => unreachable!(
-            "unexpected rule while parsing builtin: {:?}",
-            name.as_rule()
         ),
-    };
-
-    let argument = inner.find(match_tag("argument")).map(parse).unwrap().into();
-
-    Ast::Builtin(Builtin {
-        name,
-        argument,
-        span,
-    })
-}
-
-fn parse_match_expr(pair: Pair) -> MatchExpr {
-    use match_expr::Arm;
-
-    let span: Span = (&pair).into();
-
-    let mut inner = pair.into_inner();
-
-    let value = inner.find(match_tag("value")).map(parse).unwrap().into();
-
-    let arms: Vec<match_expr::Arm> = inner
-        .clone()
-        .filter(match_tag("arm"))
-        .map(|pair| {
-            let span: Span = (&pair).into();
-            let mut inner = pair.into_inner();
-            let pattern = inner.find(match_tag("pattern")).map(parse).unwrap();
-            let body = inner.find(match_tag("body")).map(parse).unwrap();
-
-            Arm {
-                span,
-                pattern,
-                body,
-            }
-        })
-        .collect();
-
-    let else_arm = inner
-        .find(match_tag("else"))
-        .and_then(|p| p.into_inner().find(match_tag("body")))
-        .map(parse)
-        .unwrap_or(Ast::NeverKeyword(span))
-        .into();
-
-    MatchExpr {
-        span,
-        value,
-        arms,
-        else_arm,
-    }
-}
-
-fn parse_cond_expr(pair: Pair) -> CondExpr {
-    let span = Span::from(&pair);
-    let inner = pair.into_inner();
-
-    let else_arm = inner
-        .clone()
-        .find(match_tag("else"))
-        .and_then(|p| p.into_inner().find(match_tag("body")))
-        .map(parse)
-        .unwrap_or(Ast::NeverKeyword(span))
-        .into();
-
-    let arms: Vec<cond_expr::Arm> = inner
-        .clone()
-        .filter(match_tag("arm"))
-        .map(|arm| {
-            use cond_expr::Arm;
-            let span = Span::from(&arm);
-            let mut inner = arm.into_inner();
-
-            let condition = inner
-                .find(match_tag("condition"))
-                .map(|p| p.into_inner())
-                .map(parse_extends_expr)
-                .unwrap();
-
-            let body = inner.find(match_tag("body")).map(parse).unwrap();
-
-            Arm {
-                span,
-                condition,
-                body,
-            }
-        })
-        .collect();
-
-    CondExpr {
-        span,
-        arms,
-        else_arm,
-    }
-}
-
-fn parse_map_expr(pair: Pair) -> MappedType {
-    let span: Span = (&pair).into();
-    let inner = pair.into_inner();
-
-    let readonly_mod = inner
-        .clone()
-        .find(match_tag("readonly"))
-        .map(|_| MappingModifier::Add);
-    let optional_mod = inner
-        .clone()
-        .find(match_tag("optional"))
-        .map(|_| MappingModifier::Add);
-
-    let body = inner
-        .clone()
-        .find(match_tag("body"))
-        .map(parse)
-        .unwrap()
-        .into();
-
-    let ipk = inner
-        .clone()
-        .find(match_rule(Rule::index_property_key))
-        .unwrap();
-    let ipk_inner = ipk.into_inner();
-
-    let index = ipk_inner
-        .clone()
-        .find(match_tag("index"))
-        .unwrap()
-        .as_str()
-        .to_string();
-    let iterable = ipk_inner
-        .clone()
-        .find(match_tag("iterable"))
-        .map(parse)
-        .unwrap()
-        .into();
-    let remapped_as = ipk_inner
-        .clone()
-        .find(match_tag("remap_clause"))
-        .map(|p| parse(p).into());
-
-    MappedType {
-        span,
-        index,
-        iterable,
-        body,
-        remapped_as,
-        readonly_mod,
-        optional_mod,
-    }
-}
-
-fn parse_let_expr(pair: Pair) -> LetExpr {
-    let span: Span = (&pair).into();
-
-    let bindings: HashMap<_, _> = pair
-        .clone()
-        .into_inner()
-        .filter(match_tag("binding"))
-        .map(|pair| {
-            let mut inner = pair.into_inner();
-            let name = inner.next().unwrap();
-            assert_eq!(name.as_rule(), Rule::ident);
-
-            let name = name.as_str().to_string();
-            let value = inner.next().unwrap();
-            assert_eq!(value.as_rule(), Rule::expr);
-            let value = parse(value);
-
-            (name, value)
-        })
-        .collect();
-
-    let body = pair
-        .clone()
-        .into_inner()
-        .find(match_tag("body"))
-        .map(parse)
-        .unwrap()
-        .into();
-
-    LetExpr {
-        span,
-        bindings,
-        body,
-    }
-}
-
-fn parse_function_type(pair: Pair) -> FunctionType {
-    let span: Span = (&pair).into();
-
-    let mut inner = pair.into_inner();
-
-    let next = next_pair!(inner, Rule::parameters);
-
-    let next = next.into_inner().next();
-
-    let params = match next.as_ref().map(|p| p.as_rule()) {
-        Some(Rule::unnamed_parameters) => next
-            .unwrap()
-            .into_inner()
-            .enumerate()
-            .map(|(idx, pair)| {
-                assert_eq!(pair.as_rule(), Rule::unnamed_parameter);
-
-                let binding = pair
-                    .clone()
-                    .into_inner()
-                    .map(|p| (p.as_rule(), p))
-                    .collect_vec();
-
-                let (ellipsis, name, kind) = match binding.as_slice() {
-                    [(Rule::ellipsis_token, _), (_, kind)] => (true, "rest".to_string(), kind),
-                    [(_, kind)] => (false, format!("arg{}", idx), kind),
-                    _ => unreachable!(),
-                };
-
-                Parameter {
-                    span: pair.as_span().into(),
-                    ellipsis,
-                    name,
-                    kind: parse(kind.to_owned()),
-                }
-            })
-            .collect_vec(),
-
-        Some(Rule::named_parameters) => next
-            .unwrap()
-            .into_inner()
-            .map(|pair| {
-                assert_eq!(pair.as_rule(), Rule::named_parameter);
-
-                let binding = pair
-                    .clone()
-                    .into_inner()
-                    .map(|p| (p.as_rule(), p))
-                    .collect_vec();
-
-                let (ellipsis, name, kind) = match binding.as_slice() {
-                    [(Rule::ellipsis_token, _), (_, name), (_, kind)] => (true, name, kind),
-                    [(_, name), (_, kind)] => (false, name, kind),
-                    _ => unreachable!(),
-                };
-
-                Parameter {
-                    span: pair.as_span().into(),
-                    ellipsis,
-                    name: name.as_str().to_string(),
-                    kind: parse(kind.to_owned()),
-                }
-            })
-            .collect_vec(),
-
-        Some(_) => unreachable!(),
-
-        None => vec![],
-    };
-
-    let return_type = next_pair!(inner, Rule::expr);
-
-    let return_type = parse(return_type).into();
-
-    FunctionType {
-        span,
-        params,
-        return_type,
-    }
-}
-
-fn parse_macro_call(pair: Pair) -> MacroCall {
-    let span: Span = (&pair).into();
-    let mut inner = pair.into_inner();
-    let name = next_pair!(inner, Rule::macro_ident);
-    let args = next_pair!(inner, Rule::argument_list);
-    let name = name.as_str().to_string();
-    let inner = args.into_inner();
-    let args = inner.map(parse).collect_vec();
-    MacroCall { span, name, args }
-}
-
-fn parse_unittest(pair: Pair) -> UnitTest {
-    let span: Span = (&pair).into();
-    let mut inner = pair.into_inner();
-    let name = next_pair!(inner, Rule::string);
-    let name = name.as_str().to_string();
-    let body = inner.map(parse).collect_vec();
-
-    UnitTest { span, name, body }
-}
-
-fn parse_assert(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let mut inner = pair.into_inner();
-
-    let claim = inner
-        .find(match_tag("claim"))
-        .map(|p| parse_extends_expr(p.into_inner()))
-        .unwrap();
-
-    Ast::Assert(Assert {
-        span,
-        claim: Rc::new(claim),
-    })
-}
-
-fn parse_type_alias(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let inner = pair.clone().into_inner();
-
-    let export = inner
-        .peek()
-        .map(|p| p.as_rule() == Rule::export)
-        .unwrap_or(false);
-
-    let name = inner.clone().find(match_tag("name")).unwrap().as_str();
-
-    let name = Ident {
-        name: name.to_string(),
-        span,
-    };
-
-    let body = Rc::new(inner.clone().find(match_tag("body")).map(parse).unwrap());
-
-    let params = parse_definition_options(inner);
-
-    Ast::TypeAlias(TypeAlias {
-        export,
-        name,
-        params,
-        body,
-        span,
-    })
-}
-
-fn parse_statement(pair: Pair) -> Ast {
-    let inner = pair.into_inner().next().unwrap();
-    let inner = parse(inner);
-    Ast::Statement(inner.into())
-}
-
-fn parse_program(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-
-    let statements: Vec<_> = pair
-        .clone()
-        .into_inner()
-        .filter(|pair| pair.as_rule() != Rule::EOI) // Remove the end of input token
-        .map(parse)
-        .collect();
-
-    Ast::Program(Program { statements, span })
-}
-
-fn parse_interface(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let inner = pair.clone().into_inner();
-
-    let export = inner
-        .peek()
-        .map(|p| p.as_rule() == Rule::export)
-        .unwrap_or(false);
-
-    let name = inner
-        .clone()
-        .find(match_tag("name"))
-        .unwrap()
-        .as_str()
-        .into();
-
-    let body = inner.clone().find(match_tag("body")).unwrap();
-
-    let body = parse_object_literal(body);
-
-    let definition = body.properties;
-
-    let extends = inner.clone().find(match_tag("extends")).map(|p| {
-        let ty = p.into_inner().find(match_tag("type")).unwrap();
-        Rc::new(parse(ty))
-    });
-
-    let params = parse_definition_options(inner);
-
-    Ast::Interface(Interface {
-        span,
-        export,
-        extends,
-        name,
-        params,
-        definition,
-    })
-}
-
-fn parse_unique_symbol_decl(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let name = pair
-        .into_inner()
-        .find(match_tag("name"))
-        .unwrap()
-        .as_str()
-        .to_string();
-
-    Ast::UniqueSymbolDecl(UniqueSymbol { name, span })
-}
-
-fn parse_definition_options(inner: pest::iterators::Pairs<Rule>) -> Vec<TypeParameter> {
-    // Track the order of the inserted parametes
-    let mut ordered_params: Vec<&str> = Default::default();
-
-    let mut params: HashMap<&str, TypeParameter> = inner
-        .clone()
-        .find(match_tag("parameters"))
-        .map(|p| -> HashMap<&str, TypeParameter> {
-            p.into_inner()
-                .map(|pair| {
-                    let span: Span = (&pair).into();
-                    let str = pair.as_str();
-                    let name = str.to_string();
-
-                    ordered_params.push(str);
-
-                    (
-                        str,
-                        TypeParameter {
-                            span,
-                            name,
-                            constraint: None,
-                            default: None,
-                            rest: false,
-                        },
-                    )
+        postfix(
+            5,
+            argument_list.clone(),
+            |receiver: Ast, args: Vec<Ast>, e| {
+                Ast::ApplyGeneric(ApplyGeneric {
+                    span: sp(e.span()),
+                    receiver: Rc::new(receiver),
+                    args,
                 })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    if let Some(where_clause) = inner.clone().find(match_tag("where")) {
-        where_clause
-            .into_inner()
-            .filter(match_tag("constraint"))
-            .for_each(|pair| {
-                let mut inner = pair.clone().into_inner();
-                let name = inner.next().unwrap();
-                assert_eq!(name.as_node_tag(), Some("constraint_name"));
-                assert_eq!(name.as_rule(), Rule::ident);
-                let name = name.as_str();
-
-                assert_eq!(inner.next().unwrap().as_rule(), Rule::extends);
-
-                let body = inner.next().unwrap();
-                assert_eq!(body.as_node_tag(), Some("constraint_body"));
-                assert_eq!(body.as_rule(), Rule::expr);
-                let body = parse(body);
-
-                let param = match params.get_mut(name) {
-                    Some(param) => param,
-                    None => {
-                        let error = Error::<Rule>::new_from_span(
-                            ErrorVariant::CustomError {
-                                message: format!(
-                                    r#"Type parameter "{}", is missing from signature"#,
-                                    name
-                                ),
-                            },
-                            pair.clone().as_span(),
-                        );
-
-                        panic!("{error}")
-                    }
-                };
-
-                param.constraint = Some(body);
-            });
-    }
-
-    if let Some(defaults_clause) = inner.clone().find(match_tag("defaults")) {
-        defaults_clause
-            .into_inner()
-            .filter(match_tag("default"))
-            .for_each(|pair| {
-                let mut inner = pair.clone().into_inner();
-                let name = inner.next().unwrap();
-                assert_eq!(name.as_node_tag(), Some("name"));
-                assert_eq!(name.as_rule(), Rule::ident);
-                let name = name.as_str();
-
-                let body = inner.next().unwrap();
-                assert_eq!(body.as_node_tag(), Some("value"));
-                assert_eq!(body.as_rule(), Rule::expr);
-                let body = parse(body);
-
-                let param = match params.get_mut(name) {
-                    Some(param) => param,
-                    None => {
-                        let error = Error::<Rule>::new_from_span(
-                            ErrorVariant::CustomError {
-                                message: format!(
-                                    r#"Type parameter "{}", is missing from signature"#,
-                                    name
-                                ),
-                            },
-                            pair.clone().as_span(),
-                        );
-
-                        panic!("{error}")
-                    }
-                };
-
-                param.default = Some(body);
-            });
-    };
-
-    ordered_params
-        .iter()
-        .map(|name| params.get(name).unwrap().clone())
-        .collect()
-}
-
-fn parse_ident(pair: Pair) -> Ident {
-    assert_ast!(pair, Rule::ident);
-    Ident {
-        name: pair.as_str().to_string(),
-        span: pair.as_span().into(),
-    }
-}
-
-/// Returns a `String` with the contents of a string literal (without the quotes).
-fn parse_string_literal(pair: Pair) -> String {
-    assert_ast!(pair, Rule::string);
-
-    match pair.clone().into_inner().next().unwrap().as_rule() {
-        Rule::double_quote_string => pair.as_str().trim_matches('"').to_string(),
-        Rule::single_quote_string => pair.as_str().trim_matches('\'').to_string(),
-        _ => unreachable!(),
-    }
-}
-
-fn parse_type_string(pair: Pair) -> Ast {
-    Ast!(TypeString {
-        span: (&pair).into(),
-        ty: parse_string_literal(pair.clone()),
-    })
-}
-
-fn parse_import_statement(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let mut inner = pair.clone().into_inner();
-
-    let import_clause = inner.next().unwrap();
-
-    let import_clause = match import_clause.as_rule() {
-        Rule::named_import => {
-            let specs = import_clause
-                .into_inner()
-                .find_tagged("import_specifier")
-                .map(|pair| {
-                    let span: Span = (&pair).into();
-                    let mut inner = pair.into_inner();
-                    let name = inner.next().unwrap();
-                    let name = parse_ident(name);
-                    let alias = inner.next().map(parse_ident);
-
-                    ImportSpecifier {
-                        span,
-                        module_export_name: name,
-                        alias,
-                    }
-                })
-                .collect_vec();
-
-            ImportClause::Named(specs)
-        }
-        Rule::namespace_import => {
-            let alias = import_clause
-                .into_inner()
-                .find(match_tag("alias"))
-                .map(parse_ident)
-                .unwrap();
-            ImportClause::Namespace { alias }
-        }
-        _ => parse_error!(pair),
-    };
-
-    let module = inner.next().map(parse_string_literal).unwrap();
-
-    Ast::ImportStatement(ImportStatement {
-        import_clause,
-        module,
-        span,
-    })
-}
-
-fn parse_if_expr(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let mut inner = pair.clone().into_inner();
-
-    let condition = inner
-        .find(match_tag("condition"))
-        .map(|p| parse_extends_expr(p.into_inner()))
-        .unwrap();
-
-    let then_branch = inner.find(match_tag("then")).map(parse).unwrap().into();
-
-    let else_branch = inner
-        .find(match_tag("else"))
-        .map(parse)
-        .unwrap_or_else(|| Ast::NeverKeyword(span))
-        .into();
-
-    match condition {
-        // Other conditions are desugared later in the simplification step
-        Ast::ExtendsInfixOp(ExtendsInfixOp { .. })
-        | Ast::ExtendsPrefixOp(ExtendsPrefixOp { .. }) => Ast::IfExpr(IfExpr {
-            span,
-            condition: Rc::new(condition),
-            then_branch,
-            else_branch: Some(else_branch),
+            },
+        ),
+        postfix(6, just(T::BracketPair), |lhs: Ast, _, _e| {
+            Ast::Array(Rc::new(lhs))
         }),
-        _ => unreachable!(),
+        prefix(7, just(T::Question), |_, value: Ast, _e| {
+            Ast::Infer(Rc::new(value))
+        }),
+        infix(left(8), just(T::Colon2), move |lhs: Ast, _, rhs: Ast, e| {
+            join_path(lhs, rhs, sp(e.span()), src)
+        }),
+        infix(left(8), just(T::Dot), |lhs: Ast, _, rhs: Ast, e| {
+            Ast::Access(Access {
+                lhs: Rc::new(lhs),
+                rhs: Rc::new(rhs),
+                is_dot: true,
+                span: sp(e.span()),
+            })
+        }),
+        postfix(9, indexed_access, |lhs: Ast, rhs: Ast, e| {
+            Ast::Access(Access {
+                lhs: Rc::new(lhs),
+                rhs: Rc::new(rhs),
+                is_dot: false,
+                span: sp(e.span()),
+            })
+        }),
+    ));
+    expr.define(expr_pratt.boxed());
+
+    // ---- The extends (boolean/relational) pratt table ---------------------------
+
+    // A claim's primary is a plain type expression; a parenthesized claim only
+    // matches after the expression alternative fails on the relational operator
+    // inside — same backtracking the pest grammar relied on.
+    let extends_primary = expr
+        .clone()
+        .or(extends_expr
+            .clone()
+            .delimited_by(lparen.clone(), rparen.clone()))
+        .boxed();
+
+    let bool_op = select! {
+        T::Ident(s) if s == "and" => InfixOp::And,
+        T::Ident(s) if s == "or" => InfixOp::Or,
+    };
+    let relation_op = select! {
+        T::Extends => InfixOp::Extends,
+        T::NotExtends => InfixOp::NotExtends,
+        T::EqEq => InfixOp::StrictEquals,
+        T::NeqStrict => InfixOp::StrictNotEquals,
+        T::Eq => InfixOp::Equals,
+        T::Neq => InfixOp::NotEquals,
+    };
+
+    let fold_extends_infix =
+        |lhs: Ast,
+         op: InfixOp,
+         rhs: Ast,
+         e: &mut chumsky::input::MapExtra<'t, '_, I, Extra<'t>>| {
+            Ast::ExtendsInfixOp(ExtendsInfixOp {
+                lhs: Rc::new(lhs),
+                op,
+                rhs: Rc::new(rhs),
+                span: sp(e.span()),
+            })
+        };
+
+    // `and`/`or` share one (loosest) level; the relations share the next; `not`
+    // binds tightest, so `not A <: B` is `(not A) <: B` — rejected below with a
+    // parenthesization hint.
+    let extends_pratt = extends_primary.pratt((
+        infix(left(1), bool_op, fold_extends_infix),
+        infix(left(2), relation_op, fold_extends_infix),
+        prefix(
+            3,
+            kw(Kw::Not).map_with(|_, e| e.span()),
+            move |op_span: TSpan, value: Ast, e| {
+                if !value.is_extends_infix_op() {
+                    let error_not = report::render_to_string(
+                        SOURCE_NAME,
+                        src,
+                        sp(op_span),
+                        "`not` may only be used with an extends expression",
+                    );
+                    let error_expr = report::render_to_string(
+                        SOURCE_NAME,
+                        src,
+                        sp(e.span()),
+                        "expected an extends expression",
+                    );
+                    panic!(
+                        "{error_not}\n{error_expr}\nHint: You might have forgotten to wrap the expression in parentheses, `not` has higher precedence than other operators."
+                    );
+                }
+
+                Ast::ExtendsPrefixOp(ExtendsPrefixOp {
+                    op: PrefixOp::Not,
+                    value: Rc::new(value),
+                    span: sp(e.span()),
+                })
+            },
+        ),
+    ));
+    extends_expr.define(extends_pratt.boxed());
+
+    // ---- Statements ---------------------------------------------------------
+
+    let export = kw(Kw::Export).or_not().map(|e| e.is_some());
+
+    // `(A, B, C)` — no trailing comma.
+    let type_parameters = ident
+        .separated_by(comma.clone())
+        .at_least(1)
+        .collect::<Vec<_>>()
+        .delimited_by(lparen.clone(), rparen.clone());
+
+    let default_entry = ident_name
+        .then_ignore(just(T::Eq))
+        .then(expr.clone())
+        .map_with(|(name, value), e| (name, value, sp(e.span())));
+    let defaults_clause = soft("defaults").ignore_then(
+        default_entry
+            .separated_by(comma.clone())
+            .allow_trailing()
+            .at_least(1)
+            .collect::<Vec<_>>(),
+    );
+
+    let constraint_entry = ident_name
+        .then_ignore(just(T::Extends))
+        .then(expr.clone())
+        .map_with(|(name, body), e| (name, body, sp(e.span())));
+    let where_clause = soft("where").ignore_then(
+        constraint_entry
+            .separated_by(comma.clone())
+            .allow_trailing()
+            .at_least(1)
+            .collect::<Vec<_>>(),
+    );
+
+    let definition_options = type_parameters
+        .or_not()
+        .then(defaults_clause.or_not())
+        .then(where_clause.or_not())
+        .map(move |((params, defaults), constraints)| {
+            assemble_type_params(src, params, defaults, constraints)
+        })
+        .boxed();
+
+    let type_alias = export
+        .clone()
+        .then_ignore(kw(Kw::Type))
+        .then(ident)
+        .then(definition_options.clone())
+        .then_ignore(kw(Kw::As))
+        .then(expr.clone())
+        .map_with(|(((export, name), params), body), e| {
+            Ast::TypeAlias(TypeAlias {
+                span: sp(e.span()),
+                export,
+                name,
+                params,
+                body: Rc::new(body),
+            })
+        })
+        .boxed();
+
+    let interface = export
+        .clone()
+        .then_ignore(kw(Kw::Interface))
+        .then(ident_name)
+        .then(definition_options.clone())
+        .then(kw(Kw::Extends).ignore_then(expr.clone()).or_not())
+        .then(object_literal.clone())
+        .map_with(|((((export, name), params), extends), body), e| {
+            Ast::Interface(Interface {
+                span: sp(e.span()),
+                export,
+                name,
+                params,
+                extends: extends.map(Rc::new),
+                definition: body.properties,
+            })
+        })
+        .boxed();
+
+    let unique_symbol_decl = kw(Kw::Unique)
+        .ignore_then(kw(Kw::Symbol))
+        .ignore_then(ident_name)
+        .map_with(|name, e| {
+            Ast::UniqueSymbolDecl(UniqueSymbol {
+                name,
+                span: sp(e.span()),
+            })
+        });
+
+    let import_specifier =
+        ident
+            .then(kw(Kw::As).ignore_then(ident).or_not())
+            .map_with(|(name, alias), e| ImportSpecifier {
+                span: sp(e.span()),
+                module_export_name: name,
+                alias,
+            });
+    let named_import = import_specifier
+        .separated_by(comma.clone())
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .delimited_by(lbrace.clone(), rbrace.clone())
+        .map(ImportClause::Named);
+    let namespace_import = just(T::Star)
+        .ignore_then(kw(Kw::As))
+        .ignore_then(ident)
+        .map(|alias| ImportClause::Namespace { alias });
+    let import_statement = kw(Kw::Import)
+        .ignore_then(named_import.or(namespace_import))
+        .then_ignore(soft("from"))
+        .then(string_raw.map(|raw| trim_quotes(&raw)))
+        .map_with(|(import_clause, module), e| {
+            Ast::ImportStatement(ImportStatement {
+                import_clause,
+                module,
+                span: sp(e.span()),
+            })
+        });
+
+    // The unittest name keeps its surrounding quotes.
+    let assert_stmt = kw(Kw::Assert)
+        .ignore_then(extends_expr.clone())
+        .map_with(|claim, e| {
+            Ast::Assert(Assert {
+                span: sp(e.span()),
+                claim: Rc::new(claim),
+            })
+        });
+    let unittest = kw(Kw::Unittest)
+        .ignore_then(string_raw)
+        .then_ignore(soft("do"))
+        .then(assert_stmt.repeated().collect::<Vec<_>>())
+        .then_ignore(kw(Kw::End))
+        .map_with(|(name, body), e| {
+            Ast::UnitTest(UnitTest {
+                span: sp(e.span()),
+                name,
+                body,
+            })
+        });
+
+    let statement = choice((
+        type_alias.clone(),
+        interface.clone(),
+        unique_symbol_decl,
+        import_statement,
+        unittest,
+    ))
+    .map(|inner| Ast::Statement(Rc::new(inner)))
+    .labelled("a statement")
+    .boxed();
+
+    let program = statement
+        .repeated()
+        .collect::<Vec<_>>()
+        .map_with(|statements, e| {
+            Ast::Program(Program {
+                statements,
+                span: sp(e.span()),
+            })
+        })
+        .boxed();
+
+    Parsers {
+        program,
+        expr: expr.boxed(),
+        extends_expr: extends_expr.boxed(),
+        if_expr,
+        map_expr: map_expr_p,
+        interface,
+        object_literal: object_literal.map(Ast::TypeLiteral).boxed(),
+        tuple,
+        type_alias,
     }
-}
-
-fn parse_tuple(pair: Pair) -> Ast {
-    let span: Span = (&pair).into();
-    let items = pair.clone().into_inner().map(parse).collect();
-
-    Ast::Tuple(Tuple { span, items })
-}
-
-fn parse_object_literal(pair: Pair) -> TypeLiteral {
-    let span: Span = (&pair).into();
-    let object_property_rules = pair.clone().into_inner();
-    let mut properties = Vec::new();
-
-    for prop_pair in object_property_rules {
-        let span: Span = (&pair).into();
-
-        match prop_pair.as_rule() {
-            Rule::object_property => {
-                let prop_inner = prop_pair.into_inner();
-
-                let key = prop_inner
-                    .clone()
-                    .find(match_rule(Rule::property_key))
-                    .unwrap();
-
-                let value = prop_inner
-                    .clone()
-                    .find(match_tag("value"))
-                    .map(parse)
-                    .expect("object property missing value");
-
-                // The postfix `?` (TypeScript style: `a?: T`) is a direct child
-                // of `object_property`; the legacy prefix `?` (`?a: T`) lives
-                // nested inside `property_key`. Either marks the property optional.
-                let postfix_optional = find_tag(prop_inner.clone(), "optional").is_some();
-
-                let inner = key.into_inner();
-
-                let readonly = find_tag(inner.clone(), "readonly").is_some();
-                let prefix_optional = find_tag(inner.clone(), "optional").is_some();
-                let optional = prefix_optional || postfix_optional;
-
-                let key = find_tag(inner.clone(), "key").unwrap();
-
-                let key = parse_property_key_inner(key);
-
-                properties.push(ObjectProperty {
-                    span,
-                    readonly,
-                    optional,
-                    key,
-                    value,
-                });
-            }
-            _ => unreachable!(
-                "unexpected rule while parsing object literal: {:?}",
-                prop_pair.as_rule()
-            ),
-        }
-    }
-
-    TypeLiteral { properties, span }
-}
-
-fn parse_property_key_inner(key: Pair) -> ObjectPropertyKey {
-    match key.as_rule() {
-        Rule::property_key_name | Rule::ident => ObjectPropertyKey::Key(key.as_str().to_string()),
-        Rule::index_property_key => parse_index_property_key(key),
-        Rule::computed_property_key => {
-            let inner = key.into_inner().next().unwrap();
-            let id = parse_ident(inner);
-            ObjectPropertyKey::Computed(id)
-        }
-        _ => unreachable!(),
-    }
-}
-
-fn parse_index_property_key(key: Pair) -> ObjectPropertyKey {
-    let span: Span = key.clone().into();
-    let inner = key.into_inner();
-
-    let [index, iterable, remap_clause] = take_tags!(inner, ["index", "iterable", "remap_clause"]);
-
-    let key = index.unwrap().as_str().to_string();
-    let iterable = parse(iterable.unwrap());
-    let remapped_as = remap_clause.map(parse);
-
-    ObjectPropertyKey::Index(PropertyKeyIndex {
-        span,
-        key,
-        iterable,
-        remapped_as,
-    })
-}
-
-fn node_as_string(pair: Pair<'_>) -> String {
-    pair.as_str().to_string()
-}
-
-fn match_tag<'a>(tag: &'a str) -> impl FnMut(&Pair<'a>) -> bool {
-    |pair| pair.as_node_tag() == Some(tag)
-}
-
-fn filter_tag<'a>(tag: &'a str) -> impl FnMut(Pair<'a>) -> Option<Pair<'a>> {
-    move |pair| {
-        if pair.as_node_tag() == Some(tag) {
-            Some(pair)
-        } else {
-            None
-        }
-    }
-}
-
-fn match_rule(rule: Rule) -> impl Fn(&Pair) -> bool {
-    move |pair| pair.as_rule() == rule
-}
-
-fn filter_rule(rule: Rule) -> impl Fn(Pair) -> Option<Pair> {
-    move |pair| {
-        if pair.as_rule() == rule {
-            Some(pair)
-        } else {
-            None
-        }
-    }
-}
-
-fn find_tag<'a>(mut pairs: Pairs<'a>, tag: &'a str) -> Option<Pair<'a>> {
-    return pairs.find(|p| p.as_node_tag() == Some(tag));
 }

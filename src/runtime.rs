@@ -61,12 +61,8 @@ pub mod builtin {
 #[cfg(test)]
 mod tests {
     use crate::test_support::*;
-    use pest::Parser;
 
-    use crate::{
-        parser::{self, NewtypeParser, Rule},
-        runtime,
-    };
+    use crate::{parser, runtime};
 
     use super::*;
 
@@ -114,21 +110,9 @@ mod tests {
                 // add some random whitespace to affect the spans
                 let left = format!(" {} ", left,);
 
-                let left = {
-                    let pair = parser::NewtypeParser::parse(parser::Rule::expr, left.as_str())
-                        .unwrap()
-                        .next()
-                        .unwrap();
-                    parser::parse(pair)
-                };
+                let left = parser::parse_source(parser::Rule::expr, left.as_str()).unwrap();
 
-                let right = {
-                    let pair = parser::NewtypeParser::parse(parser::Rule::expr, right)
-                        .unwrap()
-                        .next()
-                        .unwrap();
-                    parser::parse(pair)
-                };
+                let right = parser::parse_source(parser::Rule::expr, right).unwrap();
 
                 assert_eq!(
                     to_value(runtime::builtin::assert_equal(left, right))

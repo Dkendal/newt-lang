@@ -3,10 +3,6 @@
 #![allow(unused_macros)]
 
 extern crate alloc;
-extern crate pest;
-
-#[macro_use]
-extern crate pest_derive;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -21,6 +17,7 @@ pub mod extends_result;
 pub mod panic_report;
 pub mod parser;
 pub mod pretty;
+pub mod report;
 pub mod runtime;
 pub mod test_codegen;
 pub mod test_harness;

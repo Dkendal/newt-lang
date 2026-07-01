@@ -1,50 +1,39 @@
 use newtype::ast::Ast;
-use newtype::parser::{self, NewtypeParser, Rule};
-use pest::{consumes_to, fails_with, parses_to, Parser};
-use Rule::*;
+use newtype::parser::{parse_source, Rule};
 
 #[macro_use]
 mod common;
 
 #[test]
 fn parse_expr_sexp_apply() {
-    let pairs = NewtypeParser::parse(Rule::expr, "Equals(T, any)").unwrap();
-    let actual = parser::parse_expr(pairs);
+    let actual = parse_source(Rule::expr, "Equals(T, any)").unwrap();
     insta::assert_snapshot!(actual.to_sexp().unwrap());
 }
 
 #[test]
 fn parse_expr_sexp_apply_with_path() {
-    let pairs = NewtypeParser::parse(Rule::expr, "A::Equals(T, any)").unwrap();
-    let actual = parser::parse_expr(pairs);
+    let actual = parse_source(Rule::expr, "A::Equals(T, any)").unwrap();
     insta::assert_snapshot!(actual.to_sexp().unwrap());
 }
 
 #[test]
 fn parses_to_ident() {
-    parses_to! {
-        parser: NewtypeParser,
-        input: "x",
-        rule: Rule::ident,
-        tokens: [ident(0, 1)]
-    };
+    let actual = parse_source(Rule::expr, "x").unwrap();
+    assert!(matches!(&actual, Ast::Ident(id) if id.name == "x"));
+    let span = actual.as_span();
+    assert_eq!((span.start, span.end), (0, 1));
 }
 
 #[test]
 fn fails_with_else() {
-    fails_with! {
-        parser: NewtypeParser,
-        input: "else",
-        rule: Rule::ident,
-        positives: [ident],
-        negatives: [],
-        pos: 0
-    };
+    // `else` is a reserved word, not an identifier.
+    let errors = parse_source(Rule::expr, "else").unwrap_err();
+    assert!(!errors.is_empty());
+    assert_eq!(errors[0].span.start, 0);
 }
 
 fn parse_extends(input: &str) -> Ast {
-    let pairs = NewtypeParser::parse(Rule::extends_expr, input).unwrap();
-    parser::parse_extends_expr(pairs)
+    parse_source(Rule::extends_expr, input).unwrap()
 }
 
 #[test]
@@ -96,7 +85,7 @@ mod unittest_statement {
 
     #[test]
     fn parses_assert_statements() {
-        let pair = NewtypeParser::parse(
+        let actual = parse_source(
             Rule::program,
             r#"
             unittest "assignability" do
@@ -105,11 +94,8 @@ mod unittest_statement {
             end
             "#,
         )
-        .unwrap()
-        .next()
         .unwrap();
 
-        let actual = parser::parse(pair);
         insta::assert_snapshot!(actual.to_sexp().unwrap());
     }
 }
@@ -120,8 +106,7 @@ mod unquote {
 
     #[test]
     fn parsing() {
-        let pairs = NewtypeParser::parse(R, "unquote!(1)").unwrap();
-        let actual = parser::parse_expr(pairs);
+        let actual = parse_source(R, "unquote!(1)").unwrap();
         insta::assert_snapshot!(actual.to_sexp().unwrap());
     }
 
