@@ -231,19 +231,7 @@ mod assignability_tests {
     #[case("{ x: { y: 1 } }", "{ x: { y: string } }", FALSE)]
     #[case("{ x: 1 }", "string", FALSE)]
     #[case("{ x: 1 }", "[number]", FALSE)]
-    // optional target properties (newtype prefix `?` syntax)
-    #[case("{ one: number }", "{ one: number, ?two: string }", TRUE)] // optional missing ok
-    #[case("{ one: number, two: string }", "{ one: number, ?two: string }", TRUE)]
-    #[case("{ one: number, two: number }", "{ one: number, ?two: string }", FALSE)]
-    // present but wrong
-    // optional source property may be absent → not assignable to a required target
-    #[case("{ ?two: string }", "{ two: string }", FALSE)]
-    #[case("{ ?two: string }", "{ ?two: string }", TRUE)] // optional → optional ok
-    // optional target widens with undefined
-    #[case("{ x: undefined }", "{ ?x: number }", TRUE)]
     // empty source is assignable to an all-optional target
-    #[case("{}", "{ ?x: number }", TRUE)]
-    #[case("{}", "{ ?a: string, ?b: number }", TRUE)]
     #[case("{}", "{ x: number }", FALSE)]
     // still false: required prop missing
     // optional target/source via TypeScript postfix `?` syntax (`a?: T`)

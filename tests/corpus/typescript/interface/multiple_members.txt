@@ -4,7 +4,7 @@ interface with multiple mixed members
 
 interface Foo {
     readonly x: number,
-    ?y: string,
+    y?: string,
     z: boolean,
 }
 

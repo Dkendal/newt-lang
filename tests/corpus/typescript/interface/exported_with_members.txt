@@ -4,7 +4,7 @@ exported interface with members
 
 export interface Foo {
     readonly x: number,
-    ?y: string,
+    y?: string,
 }
 
 =======

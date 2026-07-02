@@ -2,7 +2,7 @@ Index signature with readonly and optional modifiers
 
 =======
 
-{ readonly ?[k in K]: value }
+{ readonly [k in K]?: value }
 
 =======
 

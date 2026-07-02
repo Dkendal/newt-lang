@@ -1,11 +1,17 @@
-import { B, I, M, Union } from 'ts-toolbelt'
-
-// match-ts brands holes and captures with symbol keys (see
-// `match-ts/src/const.ts`); as computed keys they must be `unique symbol`s.
 unique symbol __kind__
 unique symbol __capture__
 
 type True as 1
+
+type SymToStringTag as Symbol.toStringTag
+
+export type BuiltIn as
+    Function
+    | Error
+    | Date
+    | {readonly [Symbol.toStringTag]: string}
+    | RegExp
+    | Generator
 
 type Primitive as
   boolean
@@ -18,7 +24,7 @@ type Primitive as
 
 type ExtractSubcapture(T) as
   match T do
-    M::Primitive | M::BuiltIn -> never,
+    Primitive | BuiltIn -> never,
     object -> T[ Exclude(keyof(T), keyof([]) | keyof({})) ],
   end
 

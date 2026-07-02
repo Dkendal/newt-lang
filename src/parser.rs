@@ -388,20 +388,17 @@ where
             .delimited_by(lbracket.clone(), rbracket.clone()),
     ));
 
-    // Optional-marker normalization: the legacy prefix `?a: T` and the
-    // TypeScript-style postfix `a?: T` both mark the property optional.
     let object_property = kw(Kw::Readonly)
         .or_not()
-        .then(just(T::Question).or_not())
         .then(property_key_inner)
         .then(just(T::Question).or_not())
         .then_ignore(just(T::Colon))
         .then(expr.clone())
         .map_with(
-            |((((readonly, prefix_opt), key), postfix_opt), value), e| ObjectProperty {
+            |(((readonly, key), postfix_opt), value), e| ObjectProperty {
                 span: sp(e.span()),
                 readonly: readonly.is_some(),
-                optional: prefix_opt.is_some() || postfix_opt.is_some(),
+                optional: postfix_opt.is_some(),
                 key,
                 value,
             },

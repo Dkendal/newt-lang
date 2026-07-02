@@ -1,15 +1,15 @@
-import type { B, I, M, Union } from 'ts-toolbelt';
-
 declare const __kind__: unique symbol;
 
 declare const __capture__: unique symbol;
 
 type True = 1;
 
+export type BuiltIn = Function | Error | Date | {readonly [Symbol.toStringTag]: string} | RegExp | Generator;
+
 type Primitive = boolean | string | number | bigint | symbol | undefined | null;
 
 type ExtractSubcapture<T> =
-    T extends M.Primitive | M.BuiltIn
+    T extends Primitive | BuiltIn
         ? never
         : T extends object
             ? T[Exclude<keyof T, keyof [] | keyof {}>]

@@ -1,7 +1,7 @@
 interface with a readonly optional index property
 =======
 interface Foo {
-    readonly ?[K in T]: number,
+    readonly [K in T]?: number,
 }
 =======
 interface Foo {

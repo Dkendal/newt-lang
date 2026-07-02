@@ -4,9 +4,9 @@ interface with many mixed members
 
 interface Foo {
     readonly a: number,
-    ?b: string,
+    b?: string,
     c: boolean,
-    readonly ?d: 1,
+    readonly d?: 1,
     [K in T]: number,
 }
 

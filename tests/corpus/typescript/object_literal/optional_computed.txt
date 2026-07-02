@@ -2,7 +2,7 @@ Optional modifier on a computed key
 
 =======
 
-{ ?[K]: T }
+{ [K]?: T }
 
 =======
 
