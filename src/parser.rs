@@ -380,7 +380,7 @@ where
         .boxed();
 
     let property_key_inner = choice((
-        property_key_name.map(ObjectPropertyKey::Key),
+        property_key_name.map(ObjectPropertyKey::LiteralPropertyName),
         index_property_key
             .clone()
             .map(ObjectPropertyKey::Index)

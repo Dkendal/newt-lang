@@ -514,7 +514,7 @@ impl typescript::Pretty for ObjectPropertyKey {
     fn to_ts(&self) -> D<'_, ()> {
         match self {
             ObjectPropertyKey::Index(index) => surround(index.to_ts(), "[", "]").group(),
-            ObjectPropertyKey::Key(key) => D::text(key.clone()),
+            ObjectPropertyKey::LiteralPropertyName(key) => D::text(key.clone()),
             ObjectPropertyKey::Computed(id) => surround(id.to_ts(), "[", "]").group(),
         }
     }

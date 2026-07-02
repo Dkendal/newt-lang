@@ -995,7 +995,7 @@ pub enum MappingModifier {
 #[serde(rename_all = "snake_case")]
 pub enum ObjectPropertyKey {
     Index(PropertyKeyIndex),
-    Key(String),
+    LiteralPropertyName(String),
     Computed(Ident),
 }
 

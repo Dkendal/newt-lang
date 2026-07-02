@@ -380,7 +380,7 @@ impl Ast {
                 ObjectProperty {
                     readonly: false,
                     optional: false,
-                    key: ObjectPropertyKey::Key("length".to_string()),
+                    key: ObjectPropertyKey::LiteralPropertyName("length".to_string()),
                     value: Ast::Primitive(PrimitiveType::Number, span),
                     span,
                 },
@@ -563,7 +563,7 @@ impl Ast {
         let mut properties = vec![ObjectProperty {
             readonly: false,
             optional: false,
-            key: ObjectPropertyKey::Key("length".to_string()),
+            key: ObjectPropertyKey::LiteralPropertyName("length".to_string()),
             value: Ast::TypeNumber(TypeNumber {
                 ty: tuple.items.len().to_string(),
                 span,
@@ -574,7 +574,7 @@ impl Ast {
             properties.push(ObjectProperty {
                 readonly: false,
                 optional: false,
-                key: ObjectPropertyKey::Key(i.to_string()),
+                key: ObjectPropertyKey::LiteralPropertyName(i.to_string()),
                 value: item.clone(),
                 span,
             });
@@ -724,7 +724,7 @@ impl Ast {
     /// iterable such as a union, `keyof`, or mapped iterable) is `Other`.
     fn classify_key(key: &ObjectPropertyKey) -> KeyClass<'_> {
         match key {
-            ObjectPropertyKey::Key(name) => KeyClass::Named(name),
+            ObjectPropertyKey::LiteralPropertyName(name) => KeyClass::Named(name),
             ObjectPropertyKey::Index(index) if index.remapped_as.is_none() => match &index.iterable
             {
                 Ast::Primitive(PrimitiveType::String, _) => KeyClass::StringIndex,
@@ -1017,10 +1017,10 @@ impl Ast {
                     span = Some(tl.span);
                 }
                 for prop in tl.properties.iter() {
-                    if let ObjectPropertyKey::Key(name) = &prop.key {
+                    if let ObjectPropertyKey::LiteralPropertyName(name) = &prop.key {
                         if let Some(existing) = properties
                             .iter_mut()
-                            .find(|p| matches!(&p.key, ObjectPropertyKey::Key(n) if n == name))
+                            .find(|p| matches!(&p.key, ObjectPropertyKey::LiteralPropertyName(n) if n == name))
                         {
                             existing.value = Ast::IntersectionType(IntersectionType {
                                 types: vec![existing.value.clone(), prop.value.clone()],
@@ -1125,7 +1125,7 @@ impl Ast {
     /// Evaluate `keyof arg` to the set of its plain string-named keys, as
     /// `TypeString` literal nodes. Returns `None` (indeterminate) unless `arg`
     /// is — or resolves via the environment to — an object literal whose keys
-    /// are *all* plain names (`ObjectPropertyKey::Key`). Index, computed, or
+    /// are *all* plain names (`ObjectPropertyKey::LiteralPropertyName`). Index, computed, or
     /// remapped keys, and non-object arguments, are not enumerable here and
     /// yield `None`. Exposed as a reusable building block (mapped types).
     fn keyof_string_keys(arg: &Ast, ctx: &ResolveCtx) -> Option<Vec<Ast>> {
@@ -1139,7 +1139,7 @@ impl Ast {
         let mut keys = Vec::with_capacity(literal.properties.len());
         for prop in literal.iter() {
             match &prop.key {
-                ObjectPropertyKey::Key(name) => keys.push(Ast::TypeString(TypeString {
+                ObjectPropertyKey::LiteralPropertyName(name) => keys.push(Ast::TypeString(TypeString {
                     ty: name.clone(),
                     span: literal.span,
                 })),
@@ -1209,7 +1209,7 @@ impl Ast {
             properties.push(ObjectProperty {
                 readonly: add_readonly || src_readonly,
                 optional: add_optional || src_optional,
-                key: ObjectPropertyKey::Key(name.clone()),
+                key: ObjectPropertyKey::LiteralPropertyName(name.clone()),
                 value,
                 span: mt.span,
             });
@@ -1237,7 +1237,7 @@ impl Ast {
             let target = resolved.as_ref().unwrap_or(argument);
             if let Ast::TypeLiteral(tl) = target {
                 for p in tl.iter() {
-                    if let ObjectPropertyKey::Key(name) = &p.key {
+                    if let ObjectPropertyKey::LiteralPropertyName(name) = &p.key {
                         out.insert(name.clone(), (p.optional, p.readonly));
                     }
                 }
@@ -1475,12 +1475,12 @@ impl Ast {
             Ast::TypeLiteral(pattern_lit) => match value {
                 Ast::TypeLiteral(value_lit) => {
                     for pp in pattern_lit.iter() {
-                        let ObjectPropertyKey::Key(key) = &pp.key else {
+                        let ObjectPropertyKey::LiteralPropertyName(key) = &pp.key else {
                             return false;
                         };
                         let matched = value_lit
                             .iter()
-                            .find(|vp| matches!(&vp.key, ObjectPropertyKey::Key(vk) if vk == key));
+                            .find(|vp| matches!(&vp.key, ObjectPropertyKey::LiteralPropertyName(vk) if vk == key));
                         match matched {
                             Some(vp) => {
                                 if !Self::match_infer(&vp.value, &pp.value, ctx, bindings) {
@@ -1523,7 +1523,7 @@ impl Ast {
         };
 
         for prop in literal.iter() {
-            if let ObjectPropertyKey::Key(name) = &prop.key {
+            if let ObjectPropertyKey::LiteralPropertyName(name) = &prop.key {
                 if name == key_name {
                     return prop.value.clone();
                 }
