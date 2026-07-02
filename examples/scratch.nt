@@ -1,0 +1,2 @@
+type B as { [Symbol.toStringTag]: string }
+type A as { [{}]: string }

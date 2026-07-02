@@ -1,4 +1,4 @@
-Computed property key
+ComputedPropertyName property key
 =======
 {[K]: T}
 =======

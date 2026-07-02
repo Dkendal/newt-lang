@@ -5,10 +5,6 @@
 //! with an AST dump. This pass runs first and turns those invariants into
 //! readable [`Diagnostic`]s anchored to the offending source span, so the CLI
 //! can report an error and exit cleanly instead of panicking.
-//!
-//! Currently it catches one class: an `if`/`cond` condition that is a bare value
-//! instead of a comparison (`a -> b` rather than `a <: b -> …`). New checks can
-//! be added by extending [`collect`].
 
 use std::cell::RefCell;
 
@@ -40,36 +36,62 @@ impl Ast {
         // `postwalk` visits every node; the diagnostics accumulate through the
         // shared `RefCell` (its threaded context is per-branch, not cumulative).
         self.postwalk((), &|node, ctx| {
-            collect(&node, &mut diagnostics.borrow_mut());
+            {
+                let node: &Ast = &node;
+                let out: &mut Vec<Diagnostic> = &mut diagnostics.borrow_mut();
+                match node {
+                    Ast::CondExpr(cond) => {
+                        for arm in &cond.arms {
+                            if let Some(span) = malformed_condition_span(&arm.condition) {
+                                out.push(Diagnostic {
+                                    span,
+                                    message:
+                                        "Left hand side of condition branch is missing comparison."
+                                            .into(),
+                                });
+                            }
+                        }
+                    }
+                    Ast::IfExpr(if_expr) => {
+                        if let Some(span) = malformed_condition_span(&if_expr.condition) {
+                            out.push(Diagnostic {
+                                span,
+                                message: "Left hand side of condition is missing comparison."
+                                    .into(),
+                            });
+                        }
+                    }
+
+                    Ast::TypeLiteral(type_literal) => {
+                        for prop in &type_literal.properties {
+                            match &prop.key {
+                                PropertyName::ComputedPropertyName(expr) => {
+                                    match expr {
+                                        Ast::Access(access_expr) => {
+                                            // ok
+                                            // todo!();
+                                        }
+                                        computed_property_expr => {
+                                            dbg!(computed_property_expr);
+                                            if let Some(span) = malformed_condition_span(&computed_property_expr) {
+                                                out.push(Diagnostic {
+                                                    span,
+                                                    message: "TODO computed property name message"
+                                                        .into(),
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            };
             (node, ctx)
         });
         diagnostics.into_inner()
-    }
-}
-
-/// Append any diagnostics `node` is directly responsible for. Only `if`/`cond`
-/// nodes carry conditions; their descendants are validated when the walk
-/// reaches them.
-fn collect(node: &Ast, out: &mut Vec<Diagnostic>) {
-    match node {
-        Ast::CondExpr(cond) => {
-            for arm in &cond.arms {
-                if let Some(span) = malformed_condition_span(&arm.condition) {
-                    out.push(Diagnostic {
-                        span,
-                        message: "Left hand side of condition branch is missing comparison.".into(),
-                    });
-                }
-            }
-        }
-        Ast::IfExpr(if_expr) => {
-            if let Some(span) = malformed_condition_span(&if_expr.condition) {
-                out.push(Diagnostic {
-                    span,
-                    message: "Left hand side of condition is missing comparison.".into(),
-                });
-            }
-        }
-        _ => {}
     }
 }

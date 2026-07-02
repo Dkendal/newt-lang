@@ -1,0 +1,7 @@
+Returns an error when computed property is not valid
+=======
+{ [{}]: string }
+=======
+{[{}]: string}
+=======
+error

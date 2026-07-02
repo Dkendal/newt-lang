@@ -1,0 +1,6 @@
+Well known symbols may be used as properties
+=======
+{ [Symbol.toStringTag]: string }
+=======
+{ [Symbol.toStringTag]: string }
+=======

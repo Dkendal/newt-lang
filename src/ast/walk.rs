@@ -77,8 +77,8 @@ impl Ast {
     /// conditional desugaring in [`Ast::simplify`], this recurses into `unittest`
     /// bodies and `assert` claims — assert claims are otherwise left alone, but a
     /// unique-symbol reference there must still become `typeof <name>` in both
-    /// evaluation and generated TypeScript. Computed property keys hold their
-    /// `Ident` inside `ObjectPropertyKey` (not an `Ast::Ident` the walk visits),
+    /// evaluation and generated TypeScript. ComputedPropertyName property keys hold their
+    /// `Ident` inside `PropertyName` (not an `Ast::Ident` the walk visits),
     /// so they are intentionally untouched and still render as `[<name>]`.
     fn rewrite_unique_symbols(&self, symbols: &HashSet<String>) -> Ast {
         match self {

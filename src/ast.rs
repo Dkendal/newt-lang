@@ -993,20 +993,20 @@ pub enum MappingModifier {
 #[derivative(PartialEq)]
 #[derivative(Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum ObjectPropertyKey {
+pub enum PropertyName {
     Index(PropertyKeyIndex),
     LiteralPropertyName(String),
-    Computed(Ident),
+    ComputedPropertyName(Ast),
 }
 
-impl ObjectPropertyKey {
+impl PropertyName {
     fn map<F>(&self, f: F) -> Self
     where
         F: Fn(&Ast) -> Ast,
     {
         match self {
-            ObjectPropertyKey::Index(index) => ObjectPropertyKey::Index(index.map(f)),
-            ObjectPropertyKey::Computed(id) => ObjectPropertyKey::Computed(id.clone()),
+            PropertyName::Index(index) => PropertyName::Index(index.map(f)),
+            PropertyName::ComputedPropertyName(id) => PropertyName::ComputedPropertyName(id.clone()),
             _ => self.clone(),
         }
     }
@@ -1036,7 +1036,7 @@ impl PropertyKeyIndex {
 pub struct ObjectProperty {
     pub readonly: bool,
     pub optional: bool,
-    pub key: ObjectPropertyKey,
+    pub key: PropertyName,
     pub value: Ast,
 }
 

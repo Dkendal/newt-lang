@@ -7,7 +7,7 @@ use crate::{
         cond_expr, match_expr, Access, ApplyGeneric, Ast, Builtin, BuiltinKeyword, ExtendsExpr,
         ExtendsInfixOp, ExtendsPrefixOp, FunctionType, Ident, ImportClause, ImportSpecifier,
         ImportStatement, InfixOp, Interface, IntersectionType, MappedType, MappingModifier,
-        ObjectProperty, ObjectPropertyKey, Parameter, Path, PrimitiveType, Program,
+        ObjectProperty, PropertyName, Parameter, Path, PrimitiveType, Program,
         PropertyKeyIndex, Tuple, TypeAlias, TypeLiteral, TypeParameter, UnionType,
     },
     pretty::{parens, string_literal, surround},
@@ -510,12 +510,12 @@ impl Display for PrimitiveType {
     }
 }
 
-impl typescript::Pretty for ObjectPropertyKey {
+impl typescript::Pretty for PropertyName {
     fn to_ts(&self) -> D<'_, ()> {
         match self {
-            ObjectPropertyKey::Index(index) => surround(index.to_ts(), "[", "]").group(),
-            ObjectPropertyKey::LiteralPropertyName(key) => D::text(key.clone()),
-            ObjectPropertyKey::Computed(id) => surround(id.to_ts(), "[", "]").group(),
+            PropertyName::Index(index) => surround(index.to_ts(), "[", "]").group(),
+            PropertyName::LiteralPropertyName(key) => D::text(key.clone()),
+            PropertyName::ComputedPropertyName(id) => surround(id.to_ts(), "[", "]").group(),
         }
     }
 }
