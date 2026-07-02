@@ -23,13 +23,18 @@ defined as *agreeing with `tsgo` (tsc 7.0) under `--strict`*.
 
 ```sh
 cargo build                       # build (binary: target/debug/newtype)
-cargo nextest run                 # full test suite (preferred runner)
+cargo nextest run                 # Rust test suite (preferred runner)
 cargo nextest run <substring>     # run a single test / filtered set, e.g. `case_075`
 cargo test --test pending -- --ignored   # run the #[ignore]d pending specs
-mise run test                     # = cargo nextest run
+mise run tr                       # = cargo nextest run
 mise run tc                       # conformance: cross-check newtype vs tsgo
+mise run test                     # both: Rust tests, then conformance
 cargo fmt                         # format (the repo is kept fmt-clean)
 ```
+
+Parser tests in `tests/parser.rs` are `insta` snapshot tests
+(`tests/snapshots/`); after an intentional parse-tree change, review and accept
+with `cargo insta review`.
 
 Run the compiler directly:
 
@@ -43,22 +48,35 @@ echo '…' | target/debug/newtype --stdin --stdin-filename F.nt --source-map MAP
 
 `scripts/conformance.py [FILE.nt …]` feeds the *same* `.nt` source to both
 newtype and `tsgo`, then checks they **agree per assertion** (newtype passes an
-assert iff tsgo type-checks the generated alias). It requires `tsgo` on `PATH`
-(installed via `mise`; tsc 7.0). A `PASS`/`FAIL` split is a real divergence; a
-"both fail" is still agreement. With no arguments it runs `examples/test.nt` and
-every `tests/conformance/*.nt`. This is the primary tool for finding and
-verifying type-system bugs — write a probe `.nt` with assertions known to hold
-in TS, run it, and a `DISAGREE` row is a bug. See `TODO.md` for the audit log of
-known divergences.
+assert iff tsgo type-checks the generated alias, attributed back to `.nt` lines
+via the emitted source map). It requires `tsgo` on `PATH` (installed via
+`mise`; tsc 7.0). A `PASS`/`FAIL` split is a real divergence; a "both fail" is
+still agreement. With no arguments it runs `examples/test.nt` and every
+`tests/conformance/*.nt`. This is the primary tool for finding and verifying
+type-system bugs — write a probe `.nt` with assertions known to hold in TS, run
+it, and a `DISAGREE` row is a bug. See `TODO.md` for the audit log of known
+divergences.
 
 ## Architecture
 
-Pipeline: **parse → simplify → (evaluate asserts | render TS | codegen tests)**.
+Pipeline: **lex → parse → simplify → (evaluate asserts | render TS | codegen tests)**.
 
-- **Parser** — `src/grammar.pest` (PEG grammar) drives `src/parser.rs`, with
-  operator precedence in `src/parser/pratt.rs`. Produces the `Ast` in
-  `src/ast.rs`. Fields/spans on AST structs come from the `#[ast_node]` attribute
+- **Parser** — chumsky 0.13, two stages: `src/parser/lexer.rs` turns source
+  into a `(Token, SimpleSpan)` stream (keyword table in `Kw`), then the
+  token-level parsers in `src/parser.rs` build the `Ast` in `src/ast.rs`.
+  Operator precedence lives in two chumsky **pratt tables** inside
+  `src/parser.rs` — one for type expressions, one for boolean/relational
+  `assert` claims. Every grammar start symbol is a `Rule` variant and
+  `parse_source(Rule::…, src)` is the entry point (the corpus test macros
+  reference `Rule` variants by name). Recoverable syntax errors come back as
+  `ParseError`s; a handful of *semantic* checks panic with a rendered source
+  excerpt, which the CLI's panic hook (`src/panic_report.rs`) recovers into a
+  diagnostic. Fields/spans on AST structs come from the `#[ast_node]` attribute
   macro in the `newtype-macros` crate.
+
+- **Diagnostics** — `src/report.rs` renders every source-anchored error (parse
+  errors, validation, assert failures, recovered panic spans) as an ariadne
+  underlined-excerpt report; all pretty errors funnel through it.
 
 - **AST + assignability engine** — `src/ast.rs` plus the `src/ast/` submodules.
   The heart is **`src/ast/assignability.rs`**: `Ast::is_assignable_to_ctx` is one
@@ -106,7 +124,7 @@ Pipeline: **parse → simplify → (evaluate asserts | render TS | codegen tests
 
 ## Tests
 
-Three layers, all run by `cargo nextest`:
+Three layers; the first two run under `cargo nextest`:
 
 - **Corpus tests** — fixture files under `tests/corpus/` in pest-test format
   (`name ======= input ======= expected`). The `typescript_tests` /
@@ -118,7 +136,7 @@ Three layers, all run by `cargo nextest`:
   `assert` (end-to-end).
 - **Unit tests** — e.g. `tests/ast.rs` parameterizes `is_assignable_to` over
   `(source, target, ExtendsResult)` cases via `rstest`; expectations mirror the
-  TypeScript checker.
+  TypeScript checker. `tests/parser.rs` snapshots parse trees with `insta`.
 - **Conformance** — `tests/conformance/*.nt`, checked against `tsgo` by
   `scripts/conformance.py` (not part of `cargo nextest`; run via `mise run tc`).
   `*_extra.nt` files hold edge cases added from audits.
