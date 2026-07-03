@@ -170,12 +170,21 @@ pub fn render(rule: Rule, source: &str) -> String {
 /// from a generated `#[test]` function, so a mismatch panics with a readable
 /// diff.
 pub fn run_case(rule: Rule, path: &Path) {
-    let contents = read_fixture(path);
-    let case = parse_fixture(&contents);
+    let case = load_case(path);
     let actual = render(rule, &case.source);
 
-    pretty_assertions::assert_eq!(case.expected, actual.trim());
-    pretty_assertions::assert_eq!(case.stderr, cli_stderr(rule, &case.source).trim());
+    pretty_assertions::assert_eq!(
+        case.expected,
+        actual.trim(),
+        "rendered TypeScript mismatch in fixture {}",
+        path.display()
+    );
+    pretty_assertions::assert_eq!(
+        case.stderr,
+        cli_stderr(rule, &case.source).trim(),
+        "stderr mismatch in fixture {}",
+        path.display()
+    );
 }
 
 /// Parses `source` with `rule`, runs static validation, and renders the
@@ -226,10 +235,14 @@ pub fn cli_stderr(rule: Rule, source: &str) -> String {
 /// validation diagnostic) there is no simplified form to compare, so the
 /// equivalence check is skipped and the stdout section is expected to be empty.
 pub fn run_equivalence_case(rule: Rule, path: &Path) {
-    let contents = read_fixture(path);
-    let case = parse_fixture(&contents);
+    let case = load_case(path);
 
-    pretty_assertions::assert_eq!(case.stderr, cli_stderr(rule, &case.source).trim());
+    pretty_assertions::assert_eq!(
+        case.stderr,
+        cli_stderr(rule, &case.source).trim(),
+        "stderr mismatch in fixture {}",
+        path.display()
+    );
 
     // A source that fails static validation can't be simplified (`simplify`
     // would panic on the malformed construct the CLI rejects), so the
@@ -245,7 +258,8 @@ pub fn run_equivalence_case(rule: Rule, path: &Path) {
     pretty_assertions::assert_eq!(
         lhs.to_sexp().unwrap(),
         rhs.to_sexp().unwrap(),
-        "the two snippets are not equivalent after simplification"
+        "the two snippets are not equivalent after simplification in fixture {}",
+        path.display()
     );
 }
 
@@ -263,14 +277,18 @@ pub fn run_equivalence_case(rule: Rule, path: &Path) {
 /// assertions, or if any assertion fails (the report is included in the
 /// message).
 pub fn run_assertion_case(rule: Rule, path: &Path) {
-    let contents = read_fixture(path);
-    let case = parse_fixture(&contents);
+    let case = load_case(path);
 
     let program = parse_source(rule, &case.source).simplify();
 
     // Rendering: the `unittest` blocks vanish; everything else renders normally.
     let rendered = program.render_pretty_ts(RENDER_WIDTH);
-    pretty_assertions::assert_eq!(case.expected, rendered.trim());
+    pretty_assertions::assert_eq!(
+        case.expected,
+        rendered.trim(),
+        "rendered TypeScript mismatch in fixture {}",
+        path.display()
+    );
 
     // Assertions: every `assert` in the program must hold, and the report the
     // harness writes to stderr must match the fixture's stderr section.
@@ -299,12 +317,34 @@ pub fn run_assertion_case(rule: Rule, path: &Path) {
         log
     );
 
-    pretty_assertions::assert_eq!(case.stderr, log.trim());
+    pretty_assertions::assert_eq!(
+        case.stderr,
+        log.trim(),
+        "stderr mismatch in fixture {}",
+        path.display()
+    );
 }
 
 fn read_fixture(path: &Path) -> String {
     std::fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("failed to read fixture {}: {}", path.display(), e))
+}
+
+/// Reads and parses the fixture at `path`, attributing a malformed-structure
+/// failure (too few sections, e.g. a missing stderr section) to the offending
+/// `.txt` file rather than to the bare contents.
+fn load_case(path: &Path) -> Case {
+    let contents = read_fixture(path);
+    let separators = contents.lines().filter(|l| is_separator(l)).count();
+    assert!(
+        separators >= 3,
+        "corpus fixture {} is malformed: found {} `===` separator line(s), need at \
+         least 3 (name, source, expected, stderr) — every fixture must include a \
+         stderr section, left empty when the program writes nothing to stderr",
+        path.display(),
+        separators
+    );
+    parse_fixture(&contents)
 }
 
 #[cfg(test)]
