@@ -1139,10 +1139,12 @@ impl Ast {
         let mut keys = Vec::with_capacity(literal.properties.len());
         for prop in literal.iter() {
             match &prop.key {
-                ObjectPropertyKey::LiteralPropertyName(name) => keys.push(Ast::TypeString(TypeString {
-                    ty: name.clone(),
-                    span: literal.span,
-                })),
+                ObjectPropertyKey::LiteralPropertyName(name) => {
+                    keys.push(Ast::TypeString(TypeString {
+                        ty: name.clone(),
+                        span: literal.span,
+                    }))
+                }
                 // A non-plain key can't be enumerated structurally.
                 _ => return None,
             }

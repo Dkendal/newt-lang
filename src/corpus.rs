@@ -25,8 +25,8 @@
 //!
 //! # Fixture format
 //!
-//! A fixture file has three required sections and one optional fourth, each
-//! separated by a line of three or more `=` characters:
+//! A fixture file has four required sections, each separated by a line of three
+//! or more `=` characters:
 //!
 //! ```text
 //! Name of the test
@@ -41,17 +41,18 @@
 //!
 //! =======
 //!
-//! <expected stderr: e.g. a validation diagnostic>   (optional)
+//! <expected stderr: the CLI's diagnostics/assertion report, or empty>
 //! ```
 //!
 //! Only the first *three* separators split the file; any further `===` lines are
 //! kept verbatim as part of the final section, so output that legitimately
-//! contains such a line is preserved. The fourth (stderr) section is optional:
-//! when present, a runner may assert that processing the source produces it on
-//! stderr (see [`run_equivalence_case`]). Each section is dedented (common
-//! leading indentation stripped) and trimmed, mirroring the inline
-//! `assert_typescript!` / `assert_expr_eq!` macros so fixtures and inline tests
-//! stay consistent.
+//! contains such a line is preserved. The fourth (stderr) section is
+//! **required** — every runner asserts that processing the source produces
+//! exactly it on stderr (see [`cli_stderr`]). It is frequently empty (a valid
+//! program with no `unittest`s writes nothing), but the section itself must
+//! still be present. Each section is dedented (common leading indentation
+//! stripped) and trimmed, mirroring the inline `assert_typescript!` /
+//! `assert_expr_eq!` macros so fixtures and inline tests stay consistent.
 
 use crate::ast::Ast;
 use crate::parser::{self, Rule};
@@ -72,10 +73,11 @@ pub struct Case {
     pub name: String,
     pub source: String,
     pub expected: String,
-    /// The optional fourth section: expected stderr (e.g. a validation
-    /// diagnostic). `None` when the fixture has no stderr section, or it is
-    /// blank after trimming.
-    pub stderr: Option<String>,
+    /// The required fourth section: the exact stderr the CLI produces for
+    /// `source` — validation diagnostics or the `unittest` assertion report —
+    /// dedented and trimmed. Empty (but always present) when the program is
+    /// valid and declares no assertions.
+    pub stderr: String,
 }
 
 /// Returns `true` for a separator line: trimmed, non-empty, and made up solely
@@ -104,14 +106,15 @@ fn dedent_trim(section: &str) -> String {
     dedented.join("\n").trim().to_string()
 }
 
-/// Splits a fixture file's contents into its sections: name, source, expected,
-/// and an optional stderr. Only the first three separator lines split the file;
-/// later `===` lines stay in the final section.
+/// Splits a fixture file's contents into its four sections: name, source,
+/// expected, and stderr. Only the first three separator lines split the file;
+/// later `===` lines stay in the final (stderr) section.
 ///
 /// # Panics
 ///
-/// Panics with a descriptive message if the file contains fewer than two
-/// separator lines (i.e. fewer than three sections).
+/// Panics with a descriptive message if the file contains fewer than three
+/// separator lines (i.e. fewer than four sections) — the stderr section is
+/// required, even when empty.
 pub fn parse_fixture(contents: &str) -> Case {
     let mut sections: Vec<String> = vec![String::new()];
     for line in contents.lines() {
@@ -125,24 +128,19 @@ pub fn parse_fixture(contents: &str) -> Case {
     }
 
     assert!(
-        sections.len() >= 3,
-        "expected a corpus fixture with at least 2 `===` separator lines \
-         (name, source, expected), found {} section(s)",
+        sections.len() >= 4,
+        "expected a corpus fixture with at least 3 `===` separator lines \
+         (name, source, expected, stderr), found {} section(s); every fixture \
+         must include a stderr section — leave it empty if the program writes \
+         nothing to stderr",
         sections.len()
     );
-
-    // The optional stderr section is dropped when blank after trimming, so a
-    // trailing separator with no content asserts nothing.
-    let stderr = sections
-        .get(3)
-        .map(|s| dedent_trim(s))
-        .filter(|s| !s.is_empty());
 
     Case {
         name: dedent_trim(&sections[0]),
         source: dedent_trim(&sections[1]),
         expected: dedent_trim(&sections[2]),
-        stderr,
+        stderr: dedent_trim(&sections[3]),
     }
 }
 
@@ -166,15 +164,18 @@ pub fn render(rule: Rule, source: &str) -> String {
         .render_pretty_ts(RENDER_WIDTH)
 }
 
-/// Reads the fixture at `path`, renders its source with `rule`, and asserts the
-/// output matches the expected (TypeScript) section. Intended to be called from
-/// a generated `#[test]` function, so a mismatch panics with a readable diff.
+/// Reads the fixture at `path`, renders its source with `rule`, and asserts both
+/// that the output matches the expected (TypeScript) section *and* that the
+/// program's stderr matches the fixture's stderr section. Intended to be called
+/// from a generated `#[test]` function, so a mismatch panics with a readable
+/// diff.
 pub fn run_case(rule: Rule, path: &Path) {
     let contents = read_fixture(path);
     let case = parse_fixture(&contents);
     let actual = render(rule, &case.source);
 
     pretty_assertions::assert_eq!(case.expected, actual.trim());
+    pretty_assertions::assert_eq!(case.stderr, cli_stderr(rule, &case.source).trim());
 }
 
 /// Parses `source` with `rule`, runs static validation, and renders the
@@ -190,26 +191,55 @@ pub fn render_diagnostics(rule: Rule, source: &str) -> String {
         .join("\n")
 }
 
-/// Reads the fixture at `path` and asserts that its two newtype snippets
-/// simplify to the same AST (compared via their s-expression form, exactly as
-/// the inline `assert_expr_eq!` macro does). Intended to be called from a
-/// generated `#[test]` function.
+/// The exact bytes the CLI writes to stderr for `source` parsed via `rule`,
+/// reported under the `<stdin>` filename: the validation diagnostics if the
+/// program is invalid (the CLI stops there), otherwise the `unittest` assertion
+/// report. Empty when the program is valid and declares no assertions. This is
+/// the runner-side mirror of `src/main.rs`'s stderr behavior, used by every
+/// corpus runner to assert against a fixture's stderr section.
+pub fn cli_stderr(rule: Rule, source: &str) -> String {
+    let diagnostics = render_diagnostics(rule, source);
+    if !diagnostics.is_empty() {
+        return diagnostics;
+    }
+
+    let program = parse_source(rule, source).simplify();
+    let mut out = Vec::new();
+    crate::test_harness::run(
+        &program,
+        source,
+        "<stdin>",
+        crate::test_harness::Config { fail_fast: false },
+        &mut out,
+    )
+    .expect("writing the assertion report to an in-memory buffer cannot fail");
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Reads the fixture at `path`, asserts its source's stderr matches the
+/// fixture's stderr section, and — for a well-formed source — asserts that its
+/// two newtype snippets simplify to the same AST (compared via their
+/// s-expression form, exactly as the inline `assert_expr_eq!` macro does).
+/// Intended to be called from a generated `#[test]` function.
 ///
-/// When the fixture carries a fourth (stderr) section it is instead treated as
-/// a *diagnostic* fixture: the source must produce exactly those validation
-/// diagnostics on stderr, and the equivalence check is skipped (the stdout
-/// section is expected to be empty).
+/// When the source is intentionally malformed (its stderr section carries a
+/// validation diagnostic) there is no simplified form to compare, so the
+/// equivalence check is skipped and the stdout section is expected to be empty.
 pub fn run_equivalence_case(rule: Rule, path: &Path) {
     let contents = read_fixture(path);
     let case = parse_fixture(&contents);
 
-    if let Some(expected_stderr) = &case.stderr {
-        let actual = render_diagnostics(rule, &case.source);
-        pretty_assertions::assert_eq!(*expected_stderr, actual.trim());
+    pretty_assertions::assert_eq!(case.stderr, cli_stderr(rule, &case.source).trim());
+
+    // A source that fails static validation can't be simplified (`simplify`
+    // would panic on the malformed construct the CLI rejects), so the
+    // equivalence comparison is meaningful only for well-formed snippets.
+    let source_ast = parse_source(rule, &case.source);
+    if !source_ast.validate().is_empty() {
         return;
     }
 
-    let lhs = parse_source(rule, &case.source).simplify();
+    let lhs = source_ast.simplify();
     let rhs = parse_source(rule, &case.expected).simplify();
 
     pretty_assertions::assert_eq!(
@@ -229,8 +259,9 @@ pub fn run_equivalence_case(rule: Rule, path: &Path) {
 /// # Panics
 ///
 /// Panics if the rendered output differs from the expected section, if the
-/// fixture declares no assertions, or if any assertion fails (the report is
-/// included in the message).
+/// assertion report differs from the stderr section, if the fixture declares no
+/// assertions, or if any assertion fails (the report is included in the
+/// message).
 pub fn run_assertion_case(rule: Rule, path: &Path) {
     let contents = read_fixture(path);
     let case = parse_fixture(&contents);
@@ -241,7 +272,8 @@ pub fn run_assertion_case(rule: Rule, path: &Path) {
     let rendered = program.render_pretty_ts(RENDER_WIDTH);
     pretty_assertions::assert_eq!(case.expected, rendered.trim());
 
-    // Assertions: every `assert` in the program must hold.
+    // Assertions: every `assert` in the program must hold, and the report the
+    // harness writes to stderr must match the fixture's stderr section.
     let mut log = Vec::new();
     let report = crate::test_harness::run(
         &program,
@@ -266,6 +298,8 @@ pub fn run_assertion_case(rule: Rule, path: &Path) {
         path.display(),
         log
     );
+
+    pretty_assertions::assert_eq!(case.stderr, log.trim());
 }
 
 fn read_fixture(path: &Path) -> String {
@@ -278,32 +312,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn splits_three_sections() {
-        let case = parse_fixture("Name\n\n=======\n\ntype A as 1\n\n=======\n\ntype A = 1;\n");
+    fn splits_four_sections() {
+        let case =
+            parse_fixture("Name\n\n=======\n\ntype A as 1\n\n=======\n\ntype A = 1;\n\n=======\n");
         assert_eq!(case.name, "Name");
         assert_eq!(case.source, "type A as 1");
         assert_eq!(case.expected, "type A = 1;");
-        assert_eq!(case.stderr, None);
+        assert_eq!(case.stderr, "");
     }
 
     #[test]
-    fn captures_optional_stderr_section() {
+    fn captures_stderr_section() {
         let case = parse_fixture("Name\n=======\nsrc\n=======\n\n=======\nboom\n");
         assert_eq!(case.source, "src");
         assert_eq!(case.expected, "");
-        assert_eq!(case.stderr.as_deref(), Some("boom"));
+        assert_eq!(case.stderr, "boom");
     }
 
     #[test]
-    fn blank_stderr_section_is_none() {
+    fn blank_stderr_section_is_empty() {
         let case = parse_fixture("Name\n=======\nsrc\n=======\nout\n=======\n\n");
-        assert_eq!(case.stderr, None);
+        assert_eq!(case.stderr, "");
     }
 
     #[test]
-    #[should_panic(expected = "at least 2 `===` separator")]
-    fn rejects_missing_section() {
-        parse_fixture("Name\n\n=======\n\ntype A as 1\n");
+    #[should_panic(expected = "at least 3 `===` separator")]
+    fn rejects_missing_stderr_section() {
+        // Three sections (name, source, expected) but no stderr section.
+        parse_fixture("Name\n\n=======\n\ntype A as 1\n\n=======\n\ntype A = 1;\n");
     }
 
     #[test]
@@ -323,13 +359,14 @@ mod tests {
             parse_fixture("Name\n=======\nsrc\n=======\nout\n=======\nline1\n=======\nline2\n");
         assert_eq!(case.source, "src");
         assert_eq!(case.expected, "out");
-        assert_eq!(case.stderr.as_deref(), Some("line1\n=======\nline2"));
+        assert_eq!(case.stderr, "line1\n=======\nline2");
     }
 
     #[test]
     fn dedents_common_indentation() {
-        let case =
-            parse_fixture("Name\n=======\n    if a then\n        b\n    end\n=======\n    x\n");
+        let case = parse_fixture(
+            "Name\n=======\n    if a then\n        b\n    end\n=======\n    x\n=======\n",
+        );
         assert_eq!(case.source, "if a then\n    b\nend");
         assert_eq!(case.expected, "x");
     }
