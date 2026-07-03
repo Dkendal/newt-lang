@@ -13,3 +13,11 @@ end
 =======
 
 type Foo = 1;
+
+=======
+unittest "alias"
+  ok      Foo <: number
+  ok      Foo == 1
+  ok      not (Foo <: string)
+
+3 assertion(s): 3 passed, 0 failed

@@ -3,3 +3,5 @@ Pipe operator into an identifier becomes a single type argument
 type A as X |> Y
 =======
 type A = Y<X>;
+
+=======

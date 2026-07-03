@@ -7,3 +7,5 @@ type A(x, y, z) as 1
 =======
 
 type A<x, y, z> = 1
+
+=======

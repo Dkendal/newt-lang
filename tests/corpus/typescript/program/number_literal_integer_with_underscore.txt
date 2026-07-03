@@ -3,3 +3,5 @@ Integer literal with underscore separator
 type A as 1_000
 =======
 type A = 1_000;
+
+=======

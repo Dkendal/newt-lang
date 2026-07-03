@@ -12,3 +12,11 @@ type Foo as 1
 =======
 
 type Foo = 1;
+
+=======
+
+unittest "sanity"
+  ok      string <: unknown
+  ok      not (number <: string)
+
+2 assertion(s): 2 passed, 0 failed

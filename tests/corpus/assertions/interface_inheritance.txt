@@ -20,3 +20,11 @@ interface Point {
 interface Point3 extends Point {
     z: number;
 };
+
+=======
+unittest "interfaces"
+  ok      { x: 1, y: 2 } <: Point
+  ok      { x: 1, z: 3 } <: Point3
+  ok      not ({ z: 3 } <: Point3)
+
+3 assertion(s): 3 passed, 0 failed

@@ -7,3 +7,5 @@ export type A as 1
 =======
 
 export type A = 1
+
+=======

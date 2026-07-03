@@ -3,3 +3,5 @@ Primitive string in an intersection
 type A as string & B
 =======
 type A = string & B;
+
+=======

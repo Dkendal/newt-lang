@@ -7,3 +7,5 @@ type A as
     [b, a, let a = 3 in a]
 =======
 type A = [1, 2, 3];
+
+=======

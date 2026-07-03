@@ -3,3 +3,5 @@ Multiple named import specifiers each aliased
 import { A as A1, B as B1 } from 'mod'
 =======
 import type { A as A1, B as B1 } from 'mod';
+
+=======

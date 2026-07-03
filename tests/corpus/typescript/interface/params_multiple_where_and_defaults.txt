@@ -7,3 +7,5 @@ interface Foo(A, B) defaults A = number, B = string where A <: number, B <: stri
 =======
 
 interface Foo<A extends number = number, B extends string = string> {}
+
+=======

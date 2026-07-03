@@ -3,3 +3,5 @@ interface with a type parameter
 interface Foo(A) {}
 =======
 interface Foo<A> {}
+
+=======

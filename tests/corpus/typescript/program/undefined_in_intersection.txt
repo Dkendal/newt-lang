@@ -3,3 +3,5 @@ Primitive undefined in an intersection
 type A as undefined & B
 =======
 type A = undefined & B;
+
+=======

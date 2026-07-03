@@ -3,3 +3,5 @@ Primitive unknown as a type argument
 type A as Foo(unknown)
 =======
 type A = Foo<unknown>;
+
+=======

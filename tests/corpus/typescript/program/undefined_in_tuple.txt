@@ -3,3 +3,5 @@ Primitive undefined as a tuple element
 type A as [undefined, number]
 =======
 type A = [undefined, number];
+
+=======

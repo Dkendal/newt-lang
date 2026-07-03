@@ -7,3 +7,5 @@ tuple mixing primitives, literals, objects, tuples, and functions
 =======
 
 [string, 1, 'a', true, [2, 3], {x: 1}, () => void]
+
+=======

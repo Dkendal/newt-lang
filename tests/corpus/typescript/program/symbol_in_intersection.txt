@@ -3,3 +3,5 @@ Primitive symbol in an intersection
 type A as symbol & B
 =======
 type A = symbol & B;
+
+=======

@@ -3,3 +3,5 @@ Primitive never type alias
 type A as never
 =======
 type A = never;
+
+=======

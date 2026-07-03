@@ -3,3 +3,5 @@ Primitive boolean type alias
 type A as boolean
 =======
 type A = boolean;
+
+=======

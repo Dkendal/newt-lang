@@ -9,3 +9,5 @@ type A = number;
 type B = string;
 
 type C = boolean;
+
+=======

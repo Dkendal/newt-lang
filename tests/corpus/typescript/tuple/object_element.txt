@@ -7,3 +7,5 @@ tuple containing object literal elements
 =======
 
 [{x: 1}, {y: 2}]
+
+=======

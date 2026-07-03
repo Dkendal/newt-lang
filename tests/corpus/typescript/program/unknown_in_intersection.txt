@@ -3,3 +3,5 @@ Primitive unknown in an intersection
 type A as unknown & B
 =======
 type A = unknown & B;
+
+=======

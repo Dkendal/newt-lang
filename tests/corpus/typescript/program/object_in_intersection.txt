@@ -3,3 +3,5 @@ Primitive object in an intersection
 type A as object & B
 =======
 type A = object & B;
+
+=======

@@ -7,3 +7,5 @@ infer mixed with a plain element in a tuple
 =======
 
 [infer A, B, infer C]
+
+=======

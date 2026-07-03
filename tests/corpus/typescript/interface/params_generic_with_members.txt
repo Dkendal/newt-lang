@@ -13,3 +13,5 @@ interface Foo<A extends number> {
     x: A;
     y: A;
 }
+
+=======

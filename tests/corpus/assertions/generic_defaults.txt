@@ -12,3 +12,10 @@ end
 =======
 
 type WithDefault<A, B = string> = [A, B];
+
+=======
+unittest "defaults"
+  ok      WithDefault(number) == [number, string]
+  ok      WithDefault(number, boolean) == [number, boolean]
+
+2 assertion(s): 2 passed, 0 failed

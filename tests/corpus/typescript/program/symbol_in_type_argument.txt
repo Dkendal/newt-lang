@@ -3,3 +3,5 @@ Primitive symbol as a type argument
 type A as Foo(symbol)
 =======
 type A = Foo<symbol>;
+
+=======

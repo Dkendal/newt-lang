@@ -7,3 +7,5 @@ Function type with multiple unnamed params gets generated names
 =======
 
 (arg0: any, arg1: string) => void
+
+=======

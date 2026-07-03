@@ -7,3 +7,5 @@ Function type taking a function-type parameter
 =======
 
 (f: (x: any) => void) => void
+
+=======

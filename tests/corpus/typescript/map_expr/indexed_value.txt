@@ -7,3 +7,5 @@ map k in K do v[k] end
 =======
 
 { [k in K]: v[k] }
+
+=======

@@ -3,3 +3,5 @@ Named import from a double-quoted module string
 import { A } from "mod"
 =======
 import type { A } from 'mod';
+
+=======

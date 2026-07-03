@@ -3,3 +3,5 @@ Literal false type alias
 type A as false
 =======
 type A = false;
+
+=======

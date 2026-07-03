@@ -7,3 +7,5 @@ Function type with a triple-nested function return
 =======
 
 (x: any) => (y: any) => (z: any) => void
+
+=======

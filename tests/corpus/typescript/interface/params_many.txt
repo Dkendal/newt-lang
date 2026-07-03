@@ -7,3 +7,5 @@ interface Foo(A, B, C) {}
 =======
 
 interface Foo<A, B, C> {}
+
+=======

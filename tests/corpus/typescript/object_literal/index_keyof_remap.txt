@@ -7,3 +7,5 @@ Index signature over keyof with an as-remap clause
 =======
 
 {[k in keyof T as r]: T[k]}
+
+=======

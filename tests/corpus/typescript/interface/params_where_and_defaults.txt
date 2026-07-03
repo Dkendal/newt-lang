@@ -7,3 +7,5 @@ interface Foo(A) defaults A = number where A <: number {}
 =======
 
 interface Foo<A extends number = number> {}
+
+=======

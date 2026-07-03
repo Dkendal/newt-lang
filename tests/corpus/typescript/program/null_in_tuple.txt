@@ -3,3 +3,5 @@ Primitive null as a tuple element
 type A as [null, number]
 =======
 type A = [null, number];
+
+=======

@@ -9,3 +9,5 @@ type A = number;
 interface Foo {};
 
 type B = string;
+
+=======

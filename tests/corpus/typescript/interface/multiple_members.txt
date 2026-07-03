@@ -15,3 +15,5 @@ interface Foo {
     y?: string;
     z: boolean;
 }
+
+=======

@@ -7,3 +7,5 @@ map k in A | B do 1 end
 =======
 
 { [k in A | B]: 1 }
+
+=======

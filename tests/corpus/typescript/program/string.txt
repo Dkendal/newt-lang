@@ -3,3 +3,5 @@ Primitive string type alias
 type A as string
 =======
 type A = string;
+
+=======

@@ -7,3 +7,5 @@ Object literal with a nested object value
 =======
 
 {x: {y: 1}}
+
+=======

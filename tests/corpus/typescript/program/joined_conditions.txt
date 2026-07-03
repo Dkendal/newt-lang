@@ -3,3 +3,5 @@ A simple if/else expression becomes a conditional type
 type A as if 1 <: number then 1 else 0 end
 =======
 type A = 1 extends number ? 1 : 0;
+
+=======

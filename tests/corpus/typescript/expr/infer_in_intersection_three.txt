@@ -7,3 +7,5 @@ infer operand within a three-way intersection
 =======
 
 infer A & B & C
+
+=======

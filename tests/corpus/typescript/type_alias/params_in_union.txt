@@ -7,3 +7,5 @@ type A(x, y) as x | y
 =======
 
 type A<x, y> = x | y
+
+=======

@@ -3,3 +3,4 @@ An if expression with an and condition becomes nested conditional types
 type A as if a <: b and c <: d then e else f end
 =======
 type A = a extends b ? c extends d ? e : f : f;
+=======

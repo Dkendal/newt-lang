@@ -6,3 +6,5 @@ interface Bar {}
 interface Foo {};
 
 interface Bar {};
+
+=======

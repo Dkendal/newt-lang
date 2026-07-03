@@ -3,3 +3,5 @@ Primitive void type alias
 type A as void
 =======
 type A = void;
+
+=======

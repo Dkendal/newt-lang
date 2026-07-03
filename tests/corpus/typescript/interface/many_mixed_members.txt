@@ -19,3 +19,5 @@ interface Foo {
     readonly d?: 1;
     [K in T]: number;
 }
+
+=======

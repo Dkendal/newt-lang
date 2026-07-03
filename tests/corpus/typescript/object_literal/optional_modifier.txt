@@ -3,3 +3,4 @@ Optional property modifier
 { x?: 1 }
 =======
 {x?: 1}
+=======

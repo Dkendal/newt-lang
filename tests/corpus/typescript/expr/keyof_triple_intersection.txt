@@ -7,3 +7,5 @@ keyof(A) & keyof(B) & C
 =======
 
 keyof A & keyof B & C
+
+=======

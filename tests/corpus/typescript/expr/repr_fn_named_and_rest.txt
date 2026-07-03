@@ -7,3 +7,5 @@ Function type combining a named param and a rest param
 =======
 
 (x: any, ...rest: any[]) => void
+
+=======

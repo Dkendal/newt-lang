@@ -13,3 +13,5 @@ export interface Foo {
     readonly x: number;
     y?: string;
 }
+
+=======

@@ -7,3 +7,5 @@ export interface Foo(A) {}
 =======
 
 export interface Foo<A> {}
+
+=======

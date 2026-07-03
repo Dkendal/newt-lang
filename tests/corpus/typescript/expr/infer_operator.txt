@@ -7,3 +7,5 @@ The infer prefix operator lowers to the infer keyword
 =======
 
 infer A
+
+=======

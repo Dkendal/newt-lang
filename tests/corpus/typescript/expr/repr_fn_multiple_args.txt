@@ -7,3 +7,5 @@ Function type with multiple named args
 =======
 
 (x: any, y: any, z: any) => void
+
+=======

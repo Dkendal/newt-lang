@@ -7,3 +7,5 @@ interface Foo {
 interface Foo {
     readonly x: number;
 }
+
+=======

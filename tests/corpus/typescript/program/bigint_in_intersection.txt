@@ -3,3 +3,5 @@ Primitive bigint in an intersection
 type A as bigint & B
 =======
 type A = bigint & B;
+
+=======

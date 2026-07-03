@@ -7,3 +7,5 @@ Function type with an unnamed rest arg gets a generated name
 =======
 
 (...rest: any[]) => void
+
+=======

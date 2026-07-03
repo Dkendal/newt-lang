@@ -7,3 +7,5 @@ type A(x, y) where x <: number, y <: string as x
 =======
 
 type A<x extends number, y extends string> = x
+
+=======

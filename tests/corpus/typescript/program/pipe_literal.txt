@@ -3,3 +3,5 @@ Pipe operator with a literal left-hand side
 type A as 1 |> Y
 =======
 type A = Y<1>;
+
+=======

@@ -13,3 +13,13 @@ end
 
 =======
 
+=======
+unittest "structural"
+  ok      1 <: number
+  ok      "hi" <: string
+  ok      (1 | 2) <: number
+  ok      ({ a: 1 } & { b: 2 }) <: { a: number, b: number }
+  ok      [1, 2] <: [number, number]
+  ok      not (number <: string)
+
+6 assertion(s): 6 passed, 0 failed

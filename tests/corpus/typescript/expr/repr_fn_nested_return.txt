@@ -7,3 +7,5 @@ Function type returning a function type
 =======
 
 (x: any) => (y: any) => void
+
+=======

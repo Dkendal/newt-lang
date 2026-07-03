@@ -7,3 +7,5 @@ Parenthesized intersection on the left of a union, normalized
 =======
 
 C | (A & B)
+
+=======

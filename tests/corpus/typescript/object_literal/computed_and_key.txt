@@ -7,3 +7,5 @@ Object literal mixing a computed key and a plain key
 =======
 
 {[K]: T, y: 2}
+
+=======

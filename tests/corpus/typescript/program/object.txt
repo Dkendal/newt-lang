@@ -3,3 +3,5 @@ Primitive object type alias
 type A as object
 =======
 type A = object;
+
+=======

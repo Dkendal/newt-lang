@@ -3,3 +3,5 @@ Primitive object in a union
 type A as object | number
 =======
 type A = object | number;
+
+=======

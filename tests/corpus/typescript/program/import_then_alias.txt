@@ -6,3 +6,5 @@ type A as Foo | number
 import type { Foo } from 'mod';
 
 type A = Foo | number;
+
+=======

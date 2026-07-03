@@ -3,3 +3,5 @@ A single named import specifier
 import { A } from 'mod'
 =======
 import type { A } from 'mod';
+
+=======

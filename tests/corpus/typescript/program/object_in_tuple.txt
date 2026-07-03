@@ -3,3 +3,5 @@ Primitive object as a tuple element
 type A as [object, number]
 =======
 type A = [object, number];
+
+=======

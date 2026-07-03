@@ -7,3 +7,5 @@ infer prefix binds to its operand within a union
 =======
 
 infer A | B
+
+=======

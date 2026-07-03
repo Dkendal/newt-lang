@@ -3,3 +3,5 @@ Primitive symbol in a union
 type A as symbol | number
 =======
 type A = symbol | number;
+
+=======

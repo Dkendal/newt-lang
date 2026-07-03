@@ -3,3 +3,5 @@ Primitive string as a type argument
 type A as Foo(string)
 =======
 type A = Foo<string>;
+
+=======

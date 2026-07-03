@@ -3,3 +3,5 @@ Empty object literal
 {}
 =======
 {}
+
+=======

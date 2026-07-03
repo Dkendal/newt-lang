@@ -5,3 +5,5 @@ defaults A = any
 {}
 =======
 interface Foo<A = any> {}
+
+=======

@@ -3,3 +3,4 @@ Readonly property modifier
 { readonly x: 1 }
 =======
 {readonly x: 1}
+=======

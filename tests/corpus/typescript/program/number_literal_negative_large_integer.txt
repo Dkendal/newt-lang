@@ -3,3 +3,5 @@ Negative large integer literal
 type A as -1000000
 =======
 type A = -1000000;
+
+=======

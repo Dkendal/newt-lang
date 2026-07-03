@@ -3,3 +3,5 @@ Primitive null as a type argument
 type A as Foo(null)
 =======
 type A = Foo<null>;
+
+=======

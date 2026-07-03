@@ -3,3 +3,5 @@ Primitive any type alias
 type A as any
 =======
 type A = any;
+
+=======

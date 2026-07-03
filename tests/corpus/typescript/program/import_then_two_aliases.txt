@@ -9,3 +9,5 @@ import type { Foo } from 'mod';
 type A = Foo;
 
 type B = Foo | number;
+
+=======

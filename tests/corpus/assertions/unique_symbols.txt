@@ -17,3 +17,12 @@ end
 declare const Kind: unique symbol;
 
 declare const Capture: unique symbol;
+
+=======
+unittest "unique symbols"
+  ok      Kind <: symbol
+  ok      Kind <: Kind
+  ok      not (Kind <: Capture)
+  ok      not (symbol <: Kind)
+
+4 assertion(s): 4 passed, 0 failed

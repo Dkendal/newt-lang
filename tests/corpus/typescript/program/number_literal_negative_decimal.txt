@@ -3,3 +3,5 @@ Negative decimal literal with fraction
 type A as -1.5
 =======
 type A = -1.5;
+
+=======

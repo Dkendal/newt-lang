@@ -3,3 +3,4 @@ A top-level alias combining union and intersection
 type A as number & string | boolean
 =======
 type A = boolean | (number & string);
+=======

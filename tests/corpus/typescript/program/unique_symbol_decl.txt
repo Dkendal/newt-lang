@@ -19,3 +19,5 @@ type K = typeof Kind;
 interface Hole<Label> {
     readonly [Kind]: Label;
 };
+
+=======

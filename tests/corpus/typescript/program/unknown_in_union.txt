@@ -3,3 +3,5 @@ Primitive unknown in a union
 type A as unknown | number
 =======
 type A = unknown | number;
+
+=======

@@ -7,3 +7,5 @@ tuple with a union-typed element
 =======
 
 [A | B, C]
+
+=======

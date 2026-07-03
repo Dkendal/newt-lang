@@ -7,3 +7,5 @@ Array of a parenthesized union type
 =======
 
 (number | string)[]
+
+=======

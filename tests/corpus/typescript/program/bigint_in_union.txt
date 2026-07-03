@@ -3,3 +3,5 @@ Primitive bigint in a union
 type A as bigint | number
 =======
 type A = bigint | number;
+
+=======

@@ -3,3 +3,5 @@ A let expression inlines its single binding
 type A as let a = 1 in a
 =======
 type A = 1;
+
+=======

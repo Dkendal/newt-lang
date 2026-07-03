@@ -7,3 +7,5 @@ let x = number in if A <: x then 1 else 2 end
 =======
 
 if A <: number then 1 else 2 end
+
+=======

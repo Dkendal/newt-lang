@@ -3,3 +3,5 @@ Primitive symbol as a tuple element
 type A as [symbol, number]
 =======
 type A = [symbol, number];
+
+=======

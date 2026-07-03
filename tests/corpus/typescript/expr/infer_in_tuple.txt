@@ -7,3 +7,5 @@ infer prefixes on tuple elements
 =======
 
 [infer A, infer B]
+
+=======

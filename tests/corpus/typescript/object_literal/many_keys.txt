@@ -3,3 +3,5 @@ Object literal with multiple keys
 {x: 1, y: 2, z: 3}
 =======
 {x: 1, y: 2, z: 3}
+
+=======

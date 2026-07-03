@@ -3,3 +3,5 @@ Literal true type alias
 type A as true
 =======
 type A = true;
+
+=======

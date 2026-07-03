@@ -7,3 +7,5 @@ Single-quoted string literal renders unchanged
 =======
 
 '1'
+
+=======

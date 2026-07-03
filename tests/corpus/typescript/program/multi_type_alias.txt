@@ -6,3 +6,5 @@ type B as string
 type A = number;
 
 type B = string;
+
+=======

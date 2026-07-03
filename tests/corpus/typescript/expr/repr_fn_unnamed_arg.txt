@@ -7,3 +7,5 @@ Function type with a positional unnamed arg gets a generated name
 =======
 
 (arg0: any) => void
+
+=======

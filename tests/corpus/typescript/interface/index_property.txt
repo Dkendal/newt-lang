@@ -7,3 +7,5 @@ interface Foo {
 interface Foo {
     [K in T]: number;
 }
+
+=======

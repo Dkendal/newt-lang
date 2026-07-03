@@ -7,3 +7,5 @@ type A as let a = string in let b = number in [a, b]
 =======
 
 type A as let a = string, b = number in [a, b]
+
+=======

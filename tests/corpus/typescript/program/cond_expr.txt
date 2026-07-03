@@ -13,3 +13,5 @@ type A<x> =
                 ? 2
                 : never
             : never;
+
+=======

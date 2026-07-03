@@ -3,3 +3,5 @@ Decimal literal with fraction and underscore separator
 type A as 100.000_000
 =======
 type A = 100.000_000;
+
+=======

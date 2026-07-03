@@ -7,3 +7,5 @@ Function type with an unnamed function-type param gets a generated name
 =======
 
 (arg0: (x: any) => void, arg1: B) => void
+
+=======

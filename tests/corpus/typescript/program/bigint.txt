@@ -3,3 +3,5 @@ Primitive bigint type alias
 type A as bigint
 =======
 type A = bigint;
+
+=======

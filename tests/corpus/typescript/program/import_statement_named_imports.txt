@@ -3,3 +3,5 @@ Named imports become a TypeScript type import statement
 import { A, B, C, D as D1 } from 'a'
 =======
 import type { A, B, C, D as D1 } from 'a';
+
+=======

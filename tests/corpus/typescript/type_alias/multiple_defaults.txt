@@ -7,3 +7,5 @@ type A(x, y) defaults x = number, y = string as x
 =======
 
 type A<x = number, y = string> = x
+
+=======

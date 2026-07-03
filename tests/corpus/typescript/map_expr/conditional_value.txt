@@ -7,3 +7,5 @@ map k in K do if k <: string then 1 else 2 end end
 =======
 
 { [k in K]: k extends string ? 1 : 2 }
+
+=======

@@ -3,3 +3,5 @@ A named import with an alias
 import { A as B } from 'mod'
 =======
 import type { A as B } from 'mod';
+
+=======

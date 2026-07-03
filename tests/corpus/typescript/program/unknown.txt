@@ -3,3 +3,5 @@ Primitive unknown type alias
 type A as unknown
 =======
 type A = unknown;
+
+=======

@@ -7,3 +7,5 @@ type A(x) as match x do
 end
 =======
 type A<x> = x extends number ? 1 : x extends string ? 2 : 3;
+
+=======

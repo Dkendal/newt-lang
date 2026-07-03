@@ -3,3 +3,5 @@ Index signature mapped over a key set
 { [k in K]: value }
 =======
 {[k in K]: value}
+
+=======

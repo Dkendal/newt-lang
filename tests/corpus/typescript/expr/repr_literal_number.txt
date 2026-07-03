@@ -7,3 +7,5 @@ Number literal renders unchanged
 =======
 
 1
+
+=======

@@ -3,3 +3,5 @@ Primitive bigint as a tuple element
 type A as [bigint, number]
 =======
 type A = [bigint, number];
+
+=======

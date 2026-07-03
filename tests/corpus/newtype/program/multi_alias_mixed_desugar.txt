@@ -25,3 +25,5 @@ type B as
     end
 
 type C as if a <: b then d else c end
+
+=======

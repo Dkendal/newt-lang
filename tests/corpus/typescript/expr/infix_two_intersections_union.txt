@@ -7,3 +7,5 @@ Union of two parenthesized intersections
 =======
 
 (A & B) | (C & D)
+
+=======

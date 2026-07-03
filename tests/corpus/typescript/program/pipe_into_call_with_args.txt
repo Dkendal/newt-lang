@@ -3,3 +3,5 @@ Pipe operator into a call prepends the piped value as the first argument
 type A as X |> Y(1)
 =======
 type A = Y<X, 1>;
+
+=======

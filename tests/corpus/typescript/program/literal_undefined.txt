@@ -3,3 +3,5 @@ Literal undefined type alias
 type A as undefined
 =======
 type A = undefined;
+
+=======

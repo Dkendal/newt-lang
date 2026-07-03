@@ -3,3 +3,5 @@ empty interface
 interface Foo {}
 =======
 interface Foo {}
+
+=======

@@ -3,3 +3,5 @@ Negative integer literal with a space after the minus sign
 type A as - 1
 =======
 type A = - 1;
+
+=======

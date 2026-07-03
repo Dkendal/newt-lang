@@ -3,3 +3,5 @@ Literal null type alias
 type A as null
 =======
 type A = null;
+
+=======

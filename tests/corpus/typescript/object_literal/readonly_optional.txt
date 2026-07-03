@@ -7,3 +7,5 @@ Property with both readonly and optional modifiers
 =======
 
 {readonly x?: 1}
+
+=======
