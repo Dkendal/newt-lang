@@ -4,8 +4,8 @@ use crate::{
     ast::{
         type_env::{fingerprint, substitute, ResolveCtx},
         Access, ApplyGeneric, Ast, Builtin, BuiltinKeyword, ExtendsExpr, FunctionType, Ident,
-        IntersectionType, MappedType, MappingModifier, ObjectProperty, PropertyName,
-        PrimitiveType, Span, Tuple, TypeLiteral, TypeNumber, TypeString, UnionType,
+        IntersectionType, MappedType, MappingModifier, ObjectProperty, PrimitiveType, PropertyName,
+        Span, Tuple, TypeLiteral, TypeNumber, TypeString, UnionType,
     },
     extends_result::ExtendsResult,
 };
@@ -725,8 +725,7 @@ impl Ast {
     fn classify_key(key: &PropertyName) -> KeyClass<'_> {
         match key {
             PropertyName::LiteralPropertyName(name) => KeyClass::Named(name),
-            PropertyName::Index(index) if index.remapped_as.is_none() => match &index.iterable
-            {
+            PropertyName::Index(index) if index.remapped_as.is_none() => match &index.iterable {
                 Ast::Primitive(PrimitiveType::String, _) => KeyClass::StringIndex,
                 Ast::Primitive(PrimitiveType::Number, _) => KeyClass::NumberIndex,
                 _ => KeyClass::Other,
@@ -1018,10 +1017,9 @@ impl Ast {
                 }
                 for prop in tl.properties.iter() {
                     if let PropertyName::LiteralPropertyName(name) = &prop.key {
-                        if let Some(existing) = properties
-                            .iter_mut()
-                            .find(|p| matches!(&p.key, PropertyName::LiteralPropertyName(n) if n == name))
-                        {
+                        if let Some(existing) = properties.iter_mut().find(
+                            |p| matches!(&p.key, PropertyName::LiteralPropertyName(n) if n == name),
+                        ) {
                             existing.value = Ast::IntersectionType(IntersectionType {
                                 types: vec![existing.value.clone(), prop.value.clone()],
                                 span: prop.span,
@@ -1139,12 +1137,10 @@ impl Ast {
         let mut keys = Vec::with_capacity(literal.properties.len());
         for prop in literal.iter() {
             match &prop.key {
-                PropertyName::LiteralPropertyName(name) => {
-                    keys.push(Ast::TypeString(TypeString {
-                        ty: name.clone(),
-                        span: literal.span,
-                    }))
-                }
+                PropertyName::LiteralPropertyName(name) => keys.push(Ast::TypeString(TypeString {
+                    ty: name.clone(),
+                    span: literal.span,
+                })),
                 // A non-plain key can't be enumerated structurally.
                 _ => return None,
             }

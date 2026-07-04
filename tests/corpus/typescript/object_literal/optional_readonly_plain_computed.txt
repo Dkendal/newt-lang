@@ -2,10 +2,10 @@ Object literal mixing optional and readonly modifiers on plain and computed keys
 
 =======
 
-{ readonly a: 1, b?: 2, readonly c?: 3, readonly [K]: T }
+{ readonly a: 1, b?: 2, readonly c?: 3, readonly [Symbol.toStringTag]: T }
 
 =======
 
-{readonly a: 1, b?: 2, readonly c?: 3, readonly [K]: T}
+{readonly a: 1, b?: 2, readonly c?: 3, readonly [Symbol.toStringTag]: T}
 
 =======

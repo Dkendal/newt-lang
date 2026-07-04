@@ -2,10 +2,10 @@ Object literal combining plain, computed, and index keys
 
 =======
 
-{x: 1, [K]: T, [k in S]: value}
+{x: 1, [k in S]: value}
 
 =======
 
-{x: 1, [K]: T, [k in S]: value}
+{x: 1, [k in S]: value}
 
 =======

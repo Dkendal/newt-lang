@@ -2,10 +2,10 @@ Optional modifier on a computed key
 
 =======
 
-{ [K]?: T }
+{ [Symbol.toStringTag]?: T }
 
 =======
 
-{[K]?: T}
+{[Symbol.toStringTag]?: T}
 
 =======

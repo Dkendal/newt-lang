@@ -645,6 +645,43 @@ impl Ast {
         self.is_object_wrapper_for("BigInt")
     }
 
+    fn is_well_known_symbol(&self) -> bool {
+        if let Ast::Access(Access {
+            lhs,
+            rhs,
+            is_dot: true,
+            ..
+        }) = self
+        {
+            if let (Ast::Ident(left), Ast::Ident(right)) = (&**lhs, &**rhs) {
+                if left.name == "Symbol"
+                    && matches!(
+                        right.name.as_str(),
+                        "hasInstance"
+                            | "isConcatSpreadable"
+                            | "match"
+                            | "replace"
+                            | "search"
+                            | "species"
+                            | "split"
+                            | "toPrimitive"
+                            | "toStringTag"
+                            | "unscopables"
+                            | "iterator"
+                            | "asyncIterator"
+                            | "matchAll"
+                            | "dispose"
+                            | "asyncDispose"
+                            | "metadata"
+                    )
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     pub fn get_object_wrapper(&self) -> Option<Ast> {
         let name = match self {
             Ast::Primitive(p, _) => {
@@ -744,6 +781,11 @@ impl Ast {
     #[must_use]
     pub fn is_ident(&self) -> bool {
         matches!(self, Self::Ident(_))
+    }
+
+    #[must_use]
+    pub fn is_ident_with_name(&self, name: &String) -> bool {
+        matches!(self, Self::Ident(Ident { name: n, .. }) if n == name)
     }
 
     /// Compile-time-only statements that contribute no TypeScript output, so
@@ -1006,7 +1048,9 @@ impl PropertyName {
     {
         match self {
             PropertyName::Index(index) => PropertyName::Index(index.map(f)),
-            PropertyName::ComputedPropertyName(id) => PropertyName::ComputedPropertyName(id.clone()),
+            PropertyName::ComputedPropertyName(id) => {
+                PropertyName::ComputedPropertyName(id.clone())
+            }
             _ => self.clone(),
         }
     }

@@ -4,4 +4,10 @@ Returns an error when computed property is not valid
 =======
 {[{}]: string}
 =======
-error
+Error: A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.
+   ╭─[ <stdin>:1:4 ]
+   │
+ 1 │ { [{}]: string }
+   │    ─┬
+   │     ╰── A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.
+───╯

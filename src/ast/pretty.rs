@@ -7,8 +7,8 @@ use crate::{
         cond_expr, match_expr, Access, ApplyGeneric, Ast, Builtin, BuiltinKeyword, ExtendsExpr,
         ExtendsInfixOp, ExtendsPrefixOp, FunctionType, Ident, ImportClause, ImportSpecifier,
         ImportStatement, InfixOp, Interface, IntersectionType, MappedType, MappingModifier,
-        ObjectProperty, PropertyName, Parameter, Path, PrimitiveType, Program,
-        PropertyKeyIndex, Tuple, TypeAlias, TypeLiteral, TypeParameter, UnionType,
+        ObjectProperty, Parameter, Path, PrimitiveType, Program, PropertyKeyIndex, PropertyName,
+        Tuple, TypeAlias, TypeLiteral, TypeParameter, UnionType,
     },
     pretty::{parens, string_literal, surround},
     typescript,
@@ -515,7 +515,21 @@ impl typescript::Pretty for PropertyName {
         match self {
             PropertyName::Index(index) => surround(index.to_ts(), "[", "]").group(),
             PropertyName::LiteralPropertyName(key) => D::text(key.clone()),
-            PropertyName::ComputedPropertyName(id) => surround(id.to_ts(), "[", "]").group(),
+            PropertyName::ComputedPropertyName(expr) => {
+                let mut inner = D::nil();
+
+                if expr.is_well_known_symbol() {
+                    if let Ast::Access(Access { rhs, .. }) = expr {
+                        if let Ast::Ident(Ident { name, .. }) = &**rhs {
+                            inner = inner.append("Symbol.").append(name.clone());
+                        }
+                    }
+                } else {
+                    inner = inner.append(expr.to_ts());
+                }
+
+                return surround(inner, "[", "]").group();
+            }
         }
     }
 }

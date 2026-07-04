@@ -66,20 +66,12 @@ impl Ast {
                         for prop in &type_literal.properties {
                             match &prop.key {
                                 PropertyName::ComputedPropertyName(expr) => {
-                                    match expr {
-                                        Ast::Access(access_expr) => {
-                                            // ok
-                                            // todo!();
-                                        }
-                                        computed_property_expr => {
-                                            dbg!(computed_property_expr);
-                                            if let Some(span) = malformed_condition_span(&computed_property_expr) {
-                                                out.push(Diagnostic {
-                                                    span,
-                                                    message: "TODO computed property name message"
-                                                        .into(),
-                                                });
-                                            }
+                                    if !expr.is_well_known_symbol() {
+                                        if let Some(span) = malformed_condition_span(&expr) {
+                                            out.push(Diagnostic {
+                                                span,
+                                                message: "A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.".into(),
+                                            });
                                         }
                                     }
                                 }
