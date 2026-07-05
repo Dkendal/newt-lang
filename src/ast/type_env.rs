@@ -303,7 +303,7 @@ fn bind_params(params: &[Param], args: &[Ast]) -> HashMap<String, Ast> {
 
 /// The top-level statement nodes of a program (unwrapping the `Statement`
 /// wrapper), or the node itself if it isn't a program.
-fn top_level_nodes(program: &Ast) -> impl Iterator<Item = &Ast> {
+pub(crate) fn top_level_nodes(program: &Ast) -> impl Iterator<Item = &Ast> {
     let statements = match program {
         Ast::Program(program) => program.statements.as_slice(),
         other => std::slice::from_ref(other),

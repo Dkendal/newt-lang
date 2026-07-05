@@ -1170,3 +1170,5 @@ pub(crate) mod type_env;
 mod desugar;
 
 mod walk;
+
+pub mod unresolved;
