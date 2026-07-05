@@ -32,8 +32,6 @@ export type At(A, K)
 
 export type Key as string | number | symbol
 
-// type ReadonlyArray(T) as T[]
-
 export type List(A)
     defaults
         A = any
@@ -41,8 +39,6 @@ export type List(A)
         ReadonlyArray(A)
 
 // TODO allow for types in unittest blocks that aren't emitted
-// TODO raise on unresolved types
-// TODO include built-in types
 type User as {
     info: {
         name: string,

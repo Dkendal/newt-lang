@@ -100,6 +100,8 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   `V | undefined` (tsc `--strict`). Covered by `tests/conformance/indexed_access.nt`.
   STILL OPEN: numeric keys `T[number]`, `T['length']`, array/tuple element
   access, and unions-of-keys / `keyof`-driven keys remain indeterminate (`Both`).
+  Also open: intersection-shaped object sides (`T['k']` where `T` resolves to an
+  intersection of object types) are not reduced either.
 - [ ] **G3.** `keyof` of primitives/arrays/tuples/unions/intersections/`any` not
   reduced (only `keyof` of a single object literal).
 - [ ] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` not equated with `T[]`.
