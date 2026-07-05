@@ -39,6 +39,54 @@ pub fn eprint(source_name: &str, source: &str, span: Span, message: &str) {
     eprintln!("{}", render(source_name, source, span, message, true));
 }
 
+/// Severity of a rendered diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Severity {
+    Warning,
+    Error,
+}
+
+impl Severity {
+    fn kind(self) -> ReportKind<'static> {
+        match self {
+            Severity::Warning => ReportKind::Warning,
+            Severity::Error => ReportKind::Error,
+        }
+    }
+}
+
+/// Render a diagnostic with one message and any number of labeled spans (one
+/// per use site). The first label's span anchors the report header.
+pub fn render_labeled(
+    severity: Severity,
+    source_name: &str,
+    source: &str,
+    message: &str,
+    labels: &[(Span, String)],
+    color: bool,
+) -> String {
+    let primary = labels
+        .first()
+        .map(|(span, _)| clamp(*span, source.len()))
+        .unwrap_or(0..0);
+
+    let mut report = Report::build(severity.kind(), (source_name.to_string(), primary))
+        .with_config(
+            Config::new()
+                .with_index_type(IndexType::Byte)
+                .with_color(color),
+        )
+        .with_message(message);
+
+    for (span, label) in labels {
+        let range = clamp(*span, source.len());
+        report =
+            report.with_label(Label::new((source_name.to_string(), range)).with_message(label));
+    }
+
+    report_to_string(&report.finish(), source_name, source)
+}
+
 fn render(source_name: &str, source: &str, span: Span, message: &str, color: bool) -> String {
     report_to_string(
         &build_report(source_name, source, span, message, color),
@@ -105,5 +153,49 @@ mod tests {
     fn clamps_backwards_spans() {
         let out = render_to_string("x.nt", "abcdef", Span::new(4, 2), "boom");
         assert!(out.contains("boom"), "{out}");
+    }
+
+    #[test]
+    fn renders_warning_with_multiple_labels() {
+        let source = "type A as Foo\ntype B as Foo\n";
+        let first = source.find("Foo").unwrap();
+        let second = source.rfind("Foo").unwrap();
+        let labels = vec![
+            (
+                Span::new(first, first + 3),
+                "cannot be resolved to a definition".to_string(),
+            ),
+            (
+                Span::new(second, second + 3),
+                "cannot be resolved to a definition".to_string(),
+            ),
+        ];
+        let out = render_labeled(
+            Severity::Warning,
+            "test.nt",
+            source,
+            "cannot resolve type `Foo`",
+            &labels,
+            false,
+        );
+        assert!(out.contains("Warning"), "{out}");
+        assert!(out.contains("cannot resolve type `Foo`"), "{out}");
+        assert!(out.contains("test.nt:1:11"), "{out}");
+        // Both use sites are labeled.
+        assert_eq!(
+            out.matches("cannot be resolved to a definition").count(),
+            2,
+            "{out}"
+        );
+        assert!(!out.contains('\x1b'), "{out}");
+    }
+
+    #[test]
+    fn renders_error_severity() {
+        let source = "type A as Foo\n";
+        let at = source.find("Foo").unwrap();
+        let labels = vec![(Span::new(at, at + 3), "boom".to_string())];
+        let out = render_labeled(Severity::Error, "x.nt", source, "bad", &labels, false);
+        assert!(out.contains("Error"), "{out}");
     }
 }
