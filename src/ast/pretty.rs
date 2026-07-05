@@ -431,13 +431,13 @@ impl typescript::Pretty for Ast {
             Ast::UniqueSymbolDecl(sym) => {
                 D::text(format!("declare const {}: unique symbol", sym.name))
             }
-            node @ (Ast::ExtendsPrefixOp(ExtendsPrefixOp { .. })
-            | Ast::MatchExpr(match_expr::MatchExpr { .. })
-            | Ast::CondExpr(cond_expr::CondExpr { .. })
-            | Ast::ExtendsInfixOp(ExtendsInfixOp { .. })) => {
-                unreachable!("Ast should be desugared before this point {:#?}", node)
-            }
             Ast::FunctionType(ty) => ty.to_ts(),
+            node @ (Ast::ExtendsPrefixOp(_)
+            | Ast::MatchExpr(_)
+            | Ast::CondExpr(_)
+            | Ast::ExtendsInfixOp(_)) => {
+                panic!("{}", RenderError::UnreachableSyntaxSugar(node.clone()))
+            }
         }
     }
 }
@@ -618,4 +618,11 @@ impl typescript::Pretty for TypeParameter {
             .append(constraint)
             .append(default_value)
     }
+}
+
+use thiserror::Error;
+#[derive(Error, Debug)]
+enum RenderError {
+    #[error("AST should be desugared before this point {0:#?}")]
+    UnreachableSyntaxSugar(Ast),
 }
