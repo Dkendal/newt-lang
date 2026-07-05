@@ -1712,3 +1712,28 @@ jj commit -m "Add --exact-optional-property-types flag"
 - [ ] **Step 3:** Implement in `reduce_access_leaf` (or helpers beside it); preserve termination caps and the only-sharpen-Both invariant.
 - [ ] **Step 4:** `cargo nextest run` fully green; `mise run tc` ends "agree on every assertion"; the ts-toolbelt example still passes.
 - [ ] **Step 5:** Update TODO.md G2. `cargo fmt`, `jj commit -m "Reduce numeric, length, and union/intersection indexed access"`.
+
+---
+
+### Task 10: G3 keyof reduction + strict array numeric keys
+
+**Files:**
+- Modify: `src/ast/assignability.rs` (`eval_keyof`/`keyof_string_keys` ~line 1141; `index_array`; the access-key path in `index_type`)
+- Modify: `tests/conformance/indexed_access.nt` and/or create `tests/conformance/keyof.nt`
+- Modify: `src/test_harness.rs` (mirror probes)
+- Modify: `TODO.md` (G3: record done/remaining)
+
+**Part A — `index_array` strictness (review carry-over):** a negative or fractional
+numeric-literal key on an array (`E[][-1]`, `E[][1.5]`) is a TypeScript error, not
+element access. Stop reducing those (return `None` so the relation stays `Both` and
+the assertion fails — "both fail" is agreement with tsgo's error, same treatment as
+out-of-bounds tuple indices). Keep non-negative integer literals reducing to `E`.
+
+**Part B — G3 keyof (verify EVERY case against tsgo first; match tsgo where this list is wrong):**
+- `keyof (A | B)` → `keyof A & keyof B` — for object literals this is the intersection of key sets; emit the union type of the shared literal keys.
+- `keyof (A & B)` → `keyof A | keyof B` (union of key sets).
+- `keyof unknown` → `never`; `keyof never` → `string | number | symbol`.
+- keyof as an indexed-access KEY: `T[keyof T]` and `T[keyof U]` reduce by first reducing the keyof to a literal-key union, then distributing via the existing union-key path (Task 9). All-or-nothing as before.
+- OUT of scope (needs apparent-member modeling, G7): `keyof` of primitives, arrays, tuples, and object-literal keys that are numeric/symbol-named beyond what `keyof_string_keys` already handles. These stay unreduced. `keyof any` is already desugared upstream.
+
+**Steps (same discipline as Tasks 8/9):** conformance probes RED-first (single-file run), harness unit tests RED, implement, all gates green (`cargo nextest run`, `mise run tc` fully agreeing, ts-toolbelt example still ok), TODO.md G3 updated, `cargo fmt`, `jj commit -m "Reduce keyof over unions/intersections and keyof-driven access keys"` (Part A may be its own preceding commit `jj commit -m "Reject negative and fractional array indices"`).
