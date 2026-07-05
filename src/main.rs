@@ -14,6 +14,10 @@ struct Args {
     /// Stop evaluating `unittest` assertions at the first failure.
     #[clap(long)]
     fail_fast: bool,
+    /// Treat unresolved type references as errors: render them with error
+    /// severity and exit non-zero (evaluation and rendering still run).
+    #[clap(long)]
+    deny_unresolved: bool,
     /// Emit TypeScript type-level assertions for each `unittest` assert, prefixed
     /// with the helper types they need.
     #[clap(long)]
@@ -78,7 +82,39 @@ fn main() {
                 std::process::exit(1);
             }
 
-            let simplified = ast.simplify();
+            // Rewrite global sugar aliases (`Array(T)` → `T[]`, …) before the
+            // unresolved pass so those spellings never count as references,
+            // then report every type reference the file can't resolve.
+            // Warnings never block evaluation or rendering; with
+            // `--deny-unresolved` they turn the exit code non-zero below.
+            let desugared = ast.desugar_globals();
+
+            let unresolved = newtype::ast::unresolved::unresolved_references(&desugared);
+            let severity = if args.deny_unresolved {
+                newtype::report::Severity::Error
+            } else {
+                newtype::report::Severity::Warning
+            };
+            for reference in &unresolved {
+                let labels: Vec<_> = reference
+                    .spans
+                    .iter()
+                    .map(|span| (*span, "cannot be resolved to a definition".to_string()))
+                    .collect();
+                eprintln!(
+                    "{}",
+                    newtype::report::render_labeled(
+                        severity,
+                        &source_name,
+                        input,
+                        &format!("cannot resolve type `{}`", reference.name),
+                        &labels,
+                        true,
+                    )
+                );
+            }
+
+            let simplified = desugared.simplify();
 
             // Evaluate `unittest` assertions after simplification but before
             // rendering. Failures are reported to stderr; rendering still
@@ -141,8 +177,10 @@ fn main() {
                 println!("{}", out);
             }
 
-            // Non-zero exit on any assertion failure, after rendering completes.
-            if report.has_failures() {
+            // Non-zero exit on any assertion failure — or, with
+            // `--deny-unresolved`, on any unresolved reference — after
+            // rendering completes.
+            if report.has_failures() || (args.deny_unresolved && !unresolved.is_empty()) {
                 std::process::exit(1);
             }
         }
