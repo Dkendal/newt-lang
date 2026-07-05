@@ -1657,3 +1657,28 @@ the conformance harness.
 cargo fmt
 jj commit -m "Add --exact-optional-property-types flag"
 ```
+
+---
+
+### Task 8: Reduce top-level indexed access at relation leaves (G2, partial)
+
+**Files:**
+- Modify: `src/ast/assignability.rs` (the `(A::Access(..), _) => T::Both` arm at ~line 235; extend `reduce_indexed_access` at ~line 1504)
+- Create: `tests/conformance/indexed_access.nt`
+- Modify: `TODO.md` (G2 entry: mark string-literal-key access done, note `T[number]`/`T['length']`/array access still open)
+
+**Interfaces:**
+- Consumes: `ResolveCtx::env()` (`src/ast/type_env.rs:443`), `TypeEnv::resolve_head`, the existing `reduce_indexed_access(body, ctx)`.
+- Produces: relation operands that are string-literal indexed accesses (`T['k']`, nested `T['a']['b']`) reduce to the property's type before the structural match, on BOTH sides of the relation. Unresolvable accesses still evaluate `Both`.
+
+**Semantics (tsgo `--strict` is the oracle):**
+- `T['k']` where `T` resolves (via the env or literally) to an object literal / interface shape with plain string key `k`: reduce to that property's value type.
+- Optional property `x?: V`: `T['x']` reduces to `V | undefined` (tsc under `--strict` without `exactOptionalPropertyTypes`; verify with a conformance probe — if tsgo disagrees, match tsgo and record it in the probe file).
+- The access's object side may itself be an access — reduce innermost-first (recurse or loop to fixpoint with a small depth cap; a self-referential alias must not loop forever).
+- Everything else (numeric keys, `['length']`, arrays/tuples, unions of keys, `keyof`-driven keys) stays unreduced → `Both`, as today. Update G2 in TODO.md accordingly, do not delete it.
+
+- [ ] **Step 1: Write conformance probes** — `tests/conformance/indexed_access.nt` with tsgo-verifiable assertions: basic `User['id'] <: number` (and `== number`), nested object access, access via a generic alias (`At`-style substitution), optional-property access vs `V | undefined`, and a negative (`not (User['id'] <: string)`). Run `mise run tc tests/conformance/indexed_access.nt` BEFORE the fix: newtype should FAIL/indeterminate where tsgo passes (the DISAGREE rows are the RED evidence — record them).
+- [ ] **Step 2: Rust unit tests** — mirror the probes in `src/test_harness.rs` tests (assert pass/fail counts), RED first.
+- [ ] **Step 3: Implement** — extend `reduce_indexed_access` (recursive object-side reduction, optional-prop `| undefined` union) and call it on both operands where relations are evaluated so the `Access => Both` arm only catches genuinely unresolvable accesses. Keep the `Both` fallback.
+- [ ] **Step 4: Verify** — unit tests GREEN; full `cargo nextest run` green; `mise run tc` ends "agree on every assertion" with zero SETUP ERROR/DISAGREE.
+- [ ] **Step 5: Update TODO.md G2**, `cargo fmt`, `jj commit -m "Reduce string-literal indexed access at relation leaves"`.
