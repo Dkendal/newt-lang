@@ -86,6 +86,23 @@ fn collect_globals(program: &Ast) -> HashSet<String> {
     names
 }
 
+/// The names declared by `?X` infer patterns anywhere inside `ast` (used to
+/// scope a conditional's condition/pattern over its success branch).
+fn infer_bindings(ast: &Ast) -> HashSet<String> {
+    use std::cell::RefCell;
+
+    let names = RefCell::new(HashSet::new());
+    ast.prewalk((), &|node, ()| {
+        if let Ast::Infer(inner) = &node {
+            if let Ast::Ident(Ident { name, .. }) = inner.as_ref() {
+                names.borrow_mut().insert(name.clone());
+            }
+        }
+        (node, ())
+    });
+    names.into_inner()
+}
+
 /// Group flat `(name, span)` sightings into one entry per name, preserving
 /// first-sighting order (which is source order for a top-down walk).
 fn group(refs: Vec<(String, Span)>) -> Vec<UnresolvedRef> {
@@ -263,26 +280,32 @@ impl Collector {
                 }
             }
 
-            // Binders are handled in Task 4; visit children without scoping
-            // for now so nothing is silently skipped.
             Ast::MappedType(mapped) => {
                 self.visit(&mapped.iterable);
-                if let Some(remap) = &mapped.remapped_as {
-                    self.visit(remap);
-                }
-                self.visit(&mapped.body);
+                self.scoped(HashSet::from([mapped.index.clone()]), |collector| {
+                    if let Some(remap) = &mapped.remapped_as {
+                        collector.visit(remap);
+                    }
+                    collector.visit(&mapped.body);
+                });
             }
 
             Ast::LetExpr(let_expr) => {
-                for value in let_expr.bindings.values() {
-                    self.visit(value);
-                }
-                self.visit(&let_expr.body);
+                let names = let_expr.bindings.keys().cloned().collect();
+                self.scoped(names, |collector| {
+                    for value in let_expr.bindings.values() {
+                        collector.visit(value);
+                    }
+                    collector.visit(&let_expr.body);
+                });
             }
 
             Ast::IfExpr(if_expr) => {
-                self.visit(&if_expr.condition);
-                self.visit(&if_expr.then_branch);
+                let infers = infer_bindings(&if_expr.condition);
+                self.scoped(infers, |collector| {
+                    collector.visit(&if_expr.condition);
+                    collector.visit(&if_expr.then_branch);
+                });
                 if let Some(else_branch) = &if_expr.else_branch {
                     self.visit(else_branch);
                 }
@@ -290,8 +313,11 @@ impl Collector {
 
             Ast::CondExpr(cond) => {
                 for arm in &cond.arms {
-                    self.visit(&arm.condition);
-                    self.visit(&arm.body);
+                    let infers = infer_bindings(&arm.condition);
+                    self.scoped(infers, |collector| {
+                        collector.visit(&arm.condition);
+                        collector.visit(&arm.body);
+                    });
                 }
                 self.visit(&cond.else_arm);
             }
@@ -299,16 +325,22 @@ impl Collector {
             Ast::MatchExpr(match_expr) => {
                 self.visit(&match_expr.value);
                 for arm in &match_expr.arms {
-                    self.visit(&arm.pattern);
-                    self.visit(&arm.body);
+                    let infers = infer_bindings(&arm.pattern);
+                    self.scoped(infers, |collector| {
+                        collector.visit(&arm.pattern);
+                        collector.visit(&arm.body);
+                    });
                 }
                 self.visit(&match_expr.else_arm);
             }
 
             Ast::ExtendsExpr(extends) => {
                 self.visit(&extends.lhs);
-                self.visit(&extends.rhs);
-                self.visit(&extends.then_branch);
+                let infers = infer_bindings(&extends.rhs);
+                self.scoped(infers, |collector| {
+                    collector.visit(&extends.rhs);
+                    collector.visit(&extends.then_branch);
+                });
                 self.visit(&extends.else_branch);
             }
 
@@ -339,13 +371,15 @@ impl Collector {
                 self.visit(key);
                 self.visit(&property.value);
             }
-            // `[K in Iter]: T` — handled with scoping in Task 4.
+            // `[K in Iter]: T` — the key is in scope for the remap and value.
             PropertyName::Index(index) => {
                 self.visit(&index.iterable);
-                if let Some(remap) = &index.remapped_as {
-                    self.visit(remap);
-                }
-                self.visit(&property.value);
+                self.scoped(HashSet::from([index.key.clone()]), |collector| {
+                    if let Some(remap) = &index.remapped_as {
+                        collector.visit(remap);
+                    }
+                    collector.visit(&property.value);
+                });
             }
             PropertyName::LiteralPropertyName(_) => self.visit(&property.value),
         }
@@ -454,5 +488,78 @@ mod tests {
         assert_eq!(found.len(), 1);
         let span = found[0].spans[0];
         assert_eq!(&src[span.start()..span.end()], "Foo");
+    }
+
+    #[test]
+    fn type_params_are_in_scope_for_body_where_and_defaults() {
+        let src = "type F(A, B) defaults B = A where A <: B as [A, B]";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn interface_params_are_in_scope() {
+        assert_eq!(refs("interface Box(T) { value: T }"), vec![]);
+    }
+
+    #[test]
+    fn infer_binds_in_if_condition_and_then_branch() {
+        let src = "type Elem(T) as if T <: Array(?U) then U else never end";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn infer_does_not_leak_into_else_branch() {
+        let src = "type Elem(T) as if T <: Array(?U) then U else U end";
+        assert_eq!(refs(src), vec![("U".to_string(), 1)]);
+    }
+
+    #[test]
+    fn match_arm_infer_binds_in_that_arm_only() {
+        let src = "type F(T) as match T do Array(?U) -> U, else -> never end";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn cond_arm_infer_binds_in_that_arm() {
+        let src = "type F(T) as cond do T <: Array(?U) -> U, else -> never end";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn mapped_type_index_binds_in_body_and_remap() {
+        let src = "type M(O) as map K in keyof O do O[K] end";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn index_signature_key_binds_in_value() {
+        let src = "type M(O) as { [K in keyof O]: O[K] }";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn let_bindings_are_in_scope_for_body_and_values() {
+        let src = "type A as let a = 1, b = a in [a, b]";
+        assert_eq!(refs(src), vec![]);
+    }
+
+    #[test]
+    fn let_bindings_do_not_leak() {
+        assert_eq!(
+            refs("type A as [let a = 1 in a, a]"),
+            vec![("a".to_string(), 1)]
+        );
+    }
+
+    #[test]
+    fn dot_access_rhs_is_not_a_reference() {
+        // `T.foo`'s `foo` is a property name; only `T` must resolve.
+        assert_eq!(refs("type A(T) as T.foo"), vec![]);
+    }
+
+    #[test]
+    fn shadowing_resolves_to_the_inner_binder() {
+        let src = "type T as 1\ntype F(T) as T";
+        assert_eq!(refs(src), vec![]);
     }
 }
