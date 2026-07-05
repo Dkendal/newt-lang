@@ -171,6 +171,27 @@ Reports are ordered by the first use site's source position (deterministic).
 - Conformance harness (`mise run tc`) re-run to confirm the desugared forms
   (e.g. `Array(?U)` patterns becoming `(?U)[]`) still agree with tsgo.
 
+## `--exact-optional-property-types` flag
+
+A second CLI flag mirroring TypeScript's `exactOptionalPropertyTypes`. The
+engine's default already matches tsgo `--strict` without that option: an
+optional target property `x?: T` is widened to `T | undefined`
+(`src/ast/assignability.rs`, `property_relation`), so `{x: T | undefined}`
+and `{x: undefined}` sources are accepted. With
+`--exact-optional-property-types`, that widening is disabled: the source
+property's type must be assignable to `T` itself.
+
+Unaffected in both modes (already TS-accurate): an optional *source*
+property is never assignable to a required target property (so
+`{x?: T} <: {x: T | undefined}` is false regardless — the "equivalence" is
+one-directional in TypeScript), and a target property missing from the
+source is fine when optional.
+
+Plumbing: the flag threads from the CLI through `test_harness::Config` into
+`ResolveCtx` (a new `exact_optional_property_types: bool`, default false),
+which `property_relation` consults. Conformance is unaffected: the default
+matches tsgo `--strict` (which does not include `exactOptionalPropertyTypes`).
+
 ## Future work (separate spec)
 
 **Real module loading.** Imports should be fully resolved: locating the

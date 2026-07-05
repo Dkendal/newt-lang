@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Desugar built-in sugar aliases (`Array(T)` → `T[]`, `ReadonlyArray(T)` → `readonly T[]`, `Readonly(tuple/array)` → `readonly …`, `keyof any` → `string | number | symbol`) before resolution, then statically warn (via ariadne) on every remaining type reference that can't resolve — with a `--deny-unresolved` flag to promote warnings to errors.
+**Goal:** Desugar built-in sugar aliases (`Array(T)` → `T[]`, `ReadonlyArray(T)` → `readonly T[]`, `Readonly(tuple/array)` → `readonly …`, `keyof any` → `string | number | symbol`) before resolution, then statically warn (via ariadne) on every remaining type reference that can't resolve — with a `--deny-unresolved` flag to promote warnings to errors — and add an `--exact-optional-property-types` flag gating the `x?: T` ⊇ `T | undefined` widening.
 
 **Architecture:** Two new `src/ast/` submodules. `desugar.rs` rewrites sugar bottom-up (modeled on `rewrite_unique_symbols`, because `Ast::map` does not recurse into `UnitTest`/`Assert`/`Interface`), and is called at the front of `Ast::simplify`. `unresolved.rs` is an explicit recursive visitor with a scope stack that collects unresolved `Ident`s / `ApplyGeneric` heads, grouped by name. `report.rs` gains multi-label warning rendering; `main.rs` wires the pass in after parse+validate.
 
@@ -1436,4 +1436,224 @@ semantics — fix the rewrite (Task 2), don't adjust the conformance fixtures.
 ```bash
 cargo fmt
 jj commit -m "Verify unresolved warnings end to end; clean up ts-toolbelt example"
+```
+
+---
+
+### Task 7: `--exact-optional-property-types` flag
+
+**Files:**
+- Modify: `src/ast/type_env.rs` (`ResolveCtx`, line ~416)
+- Modify: `src/ast/assignability.rs` (`property_relation`, line ~831)
+- Modify: `src/test_harness.rs` (`Config`, `run`, `evaluate`)
+- Modify: `src/main.rs` (flag)
+- Modify: `tests/cli.rs` (integration test)
+
+**Interfaces:**
+- Consumes: `ResolveCtx::{empty, new}` (`src/ast/type_env.rs`), `test_harness::Config { fail_fast }`, the Task 5 CLI test harness `run(source, args)` in `tests/cli.rs`.
+- Produces: `ResolveCtx::with_exact_optional_property_types(self, bool) -> Self` and `ResolveCtx::exact_optional_property_types(&self) -> bool`; `test_harness::Config` gains `pub exact_optional_property_types: bool`.
+
+Semantics (TS-accurate; the default already matches tsgo `--strict`):
+- Default: an optional target `x?: T` accepts a source property typed `T | undefined` (including plain `undefined`) — the existing widening at `src/ast/assignability.rs:842`.
+- With the flag: the widening is disabled; the source property type must be assignable to `T` itself.
+- Unchanged in both modes: an optional *source* property is never assignable to a required target (`{x?: T} <: {x: T | undefined}` stays false), and a source may omit an optional target property.
+
+- [ ] **Step 1: Write the failing harness tests**
+
+Append to the `tests` module in `src/test_harness.rs`:
+
+```rust
+    /// Like `run_src` but with `exact_optional_property_types` enabled.
+    fn run_src_exact(src: &str) -> (Report, String) {
+        let program = parse_newtype_program(src).unwrap().simplify();
+        let mut out = Vec::new();
+        let report = run(
+            &program,
+            src,
+            "<test>",
+            Config {
+                exact_optional_property_types: true,
+                ..Config::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        (report, String::from_utf8(out).unwrap())
+    }
+
+    #[test]
+    fn optional_target_accepts_undefined_by_default() {
+        let src = "unittest \"t\" do\n\
+            \x20 assert { x: number | undefined } <: { x?: number }\n\
+            \x20 assert { x: undefined } <: { x?: number }\n\
+            \x20 assert { x: number } <: { x?: number }\n\
+            \x20 assert {} <: { x?: number }\n\
+            \x20 assert not ({ x?: number } <: { x: number | undefined })\n\
+            end";
+        let (report, out) = run_src(src, false);
+        assert_eq!(report, Report { passed: 5, failed: 0 }, "{out}");
+    }
+
+    #[test]
+    fn exact_optional_rejects_undefined_sources() {
+        let src = "unittest \"t\" do\n\
+            \x20 assert not ({ x: number | undefined } <: { x?: number })\n\
+            \x20 assert not ({ x: undefined } <: { x?: number })\n\
+            \x20 assert { x: number } <: { x?: number }\n\
+            \x20 assert {} <: { x?: number }\n\
+            \x20 assert not ({ x?: number } <: { x: number | undefined })\n\
+            end";
+        let (report, out) = run_src_exact(src);
+        assert_eq!(report, Report { passed: 5, failed: 0 }, "{out}");
+    }
+```
+
+(Optional-property syntax `x?: number` is exercised by
+`tests/corpus/typescript/object_literal/optional_modifier_postfix.txt`; if the
+inline object spelling differs, mirror that fixture.)
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cargo nextest run optional_target_accepts exact_optional_rejects`
+Expected: compile error — `Config` has no field `exact_optional_property_types`.
+
+- [ ] **Step 3: Thread the flag through `Config` and `ResolveCtx`**
+
+`src/test_harness.rs` — extend `Config`:
+
+```rust
+/// Configuration for a harness run.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Config {
+    /// Stop at the first failing assertion instead of evaluating the rest.
+    pub fail_fast: bool,
+    /// Mirror TypeScript's `exactOptionalPropertyTypes`: an optional target
+    /// property `x?: T` no longer accepts `T | undefined` sources.
+    pub exact_optional_property_types: bool,
+}
+```
+
+Pass the config into `evaluate` — change the signature and the call site in `run`:
+
+```rust
+            match evaluate(&assert.claim, &env, config) {
+```
+
+```rust
+fn evaluate(claim: &Ast, env: &TypeEnv, config: Config) -> Outcome {
+```
+
+and inside `evaluate`, where the context is built (line ~203):
+
+```rust
+    let ctx = ResolveCtx::new(env)
+        .with_exact_optional_property_types(config.exact_optional_property_types);
+```
+
+`src/ast/type_env.rs` — add the field to `ResolveCtx` and default it to
+`false` in **both** constructors (`empty()` line ~424 and `new()` just below):
+
+```rust
+pub struct ResolveCtx<'a> {
+    env: Option<&'a TypeEnv>,
+    assumptions: RefCell<HashSet<(String, String)>>,
+    exact_optional_property_types: bool,
+}
+```
+
+```rust
+            exact_optional_property_types: false,
+```
+
+(one line added inside each constructor's struct literal), plus:
+
+```rust
+    /// Mirror TypeScript's `exactOptionalPropertyTypes` for assignability
+    /// checks made through this context.
+    pub fn with_exact_optional_property_types(mut self, on: bool) -> Self {
+        self.exact_optional_property_types = on;
+        self
+    }
+
+    pub fn exact_optional_property_types(&self) -> bool {
+        self.exact_optional_property_types
+    }
+```
+
+If `ResolveCtx` has other constructors or `Clone`/derive impls the compiler
+flags, initialize the new field to `false` there too (it must be inherited
+wherever an existing ctx is passed along — the field travels with the
+borrowed ctx, so recursive checks need no changes).
+
+`src/ast/assignability.rs` — gate the widening in `property_relation`
+(line ~842):
+
+```rust
+        // An optional target property `x?: T` has effective type `T | undefined`
+        // under --strict without `exactOptionalPropertyTypes`, so the source
+        // value need only be assignable to `T | undefined`. With
+        // `exactOptionalPropertyTypes` the widening is disabled and the source
+        // must be assignable to `T` itself.
+        if target.optional && !ctx.exact_optional_property_types() {
+```
+
+(the body of the `if` is unchanged).
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cargo nextest run optional_target_accepts exact_optional_rejects`
+Expected: both PASS. Then `cargo nextest run` — full suite PASS (the default
+path is behavior-identical).
+
+- [ ] **Step 5: Add the CLI flag and integration test**
+
+`src/main.rs` — add to `Args` after `deny_unresolved`:
+
+```rust
+    /// Mirror TypeScript's `exactOptionalPropertyTypes`: an optional property
+    /// `x?: T` no longer accepts `T | undefined` sources in assertions.
+    #[clap(long)]
+    exact_optional_property_types: bool,
+```
+
+and extend the harness config in `main`:
+
+```rust
+                test_harness::Config {
+                    fail_fast: args.fail_fast,
+                    exact_optional_property_types: args.exact_optional_property_types,
+                },
+```
+
+Append to `tests/cli.rs`:
+
+```rust
+#[test]
+fn exact_optional_property_types_flag_changes_optional_assignability() {
+    let src = "unittest \"t\" do\n  assert { x: number | undefined } <: { x?: number }\nend";
+    let (ok_default, _) = run(src, &[]);
+    assert!(ok_default, "widening holds by default");
+    let (ok_exact, stderr) = run(src, &["--exact-optional-property-types"]);
+    assert!(!ok_exact, "the widened source must be rejected:\n{stderr}");
+}
+```
+
+Run: `cargo nextest run --test cli`
+Expected: all cli tests PASS.
+
+- [ ] **Step 6: Conformance sanity check**
+
+```bash
+mise run tc
+```
+
+Expected: no `DISAGREE` rows — the default path matches tsgo `--strict`
+(which does not enable `exactOptionalPropertyTypes`), and the flag is off in
+the conformance harness.
+
+- [ ] **Step 7: Format and commit**
+
+```bash
+cargo fmt
+jj commit -m "Add --exact-optional-property-types flag"
 ```
