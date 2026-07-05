@@ -983,6 +983,33 @@ mod tests {
     }
 
     #[test]
+    fn keyof_shared_key_intersection_stays_indeterminate() {
+        // A key NAME shared between intersection members may collapse the
+        // intersection to `never` in tsgo (conflicting value types make the
+        // property `never`, e.g. `1 & 's'`), turning `keyof` into
+        // `string | number | symbol`. The engine does not model that collapse,
+        // so a shared-key intersection must stay indeterminate (`Both`) — a
+        // definite reduction to the key union would be a wrong-definite
+        // (`not ('x' <: keyof C)` would pass while tsgo says `'x'` IS a key).
+        let (report, stderr) = run_src(
+            "type C as { a: 1 } & { a: 's' }\n\
+            unittest \"t\" do\n\
+            \x20 assert not ('x' <: keyof C)\n\
+            \x20 assert keyof C == 'a'\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 0,
+                failed: 2
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
     fn keyof_unknown_and_never_reduce() {
         // keyof unknown = never; keyof never = string | number | symbol.
         let (report, stderr) = run_src(

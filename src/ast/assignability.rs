@@ -1173,12 +1173,12 @@ impl Ast {
     /// * `keyof (A | B)` = `keyof A & keyof B`: for object literals, the
     ///   INTERSECTION of the members' key sets (the shared plain keys).
     /// * `keyof (A & B)` = `keyof A | keyof B`: the UNION of the members' key
-    ///   sets. NOTE: this does not model an intersection that collapses to
-    ///   `never` because a shared key has conflicting property types — tsgo then
-    ///   yields `keyof never` (`string | number | symbol`) — so such a case is
-    ///   reduced here to the union of keys, disagreeing with tsgo. That is the
-    ///   same unmodelled gap as intersection-to-never for conflicting object
-    ///   properties elsewhere in the engine.
+    ///   sets — but ONLY when the members' key sets are pairwise DISJOINT. A key
+    ///   name shared between members may collapse the intersection to `never` in
+    ///   tsgo (conflicting value types make the property `never`, e.g.
+    ///   `{a: 1} & {a: 's'}`), turning `keyof` into `string | number | symbol`;
+    ///   the engine does not model that collapse, so a shared key name yields
+    ///   `None` (indeterminate) instead of a wrong-definite key union.
     /// * `keyof unknown` = `never`; `keyof never` = `string | number | symbol`.
     ///
     /// `None` when the argument is not one of these enumerable forms (a
@@ -1216,29 +1216,26 @@ impl Ast {
             }
 
             // `keyof (A & B)` = `keyof A | keyof B`: the union of the members'
-            // key sets. All-or-nothing: every member must reduce.
+            // key sets. All-or-nothing: every member must reduce, and the key
+            // sets must be pairwise disjoint — a shared key name may collapse
+            // the intersection to `never` in tsgo (conflicting value types),
+            // which is not modelled here, so it stays indeterminate.
             Ast::IntersectionType(IntersectionType { types, .. }) => {
                 let flat = Self::flatten_intersection_members(types);
                 let mut acc: Vec<String> = vec![];
                 for member in &flat {
                     for name in Self::keyof_key_names(member, ctx)? {
-                        if !acc.contains(&name) {
-                            acc.push(name);
+                        if acc.contains(&name) {
+                            return None;
                         }
+                        acc.push(name);
                     }
                 }
                 Some(Self::names_to_key_union(acc, span))
             }
 
             _ => {
-                let keys = Self::keyof_string_keys(target, ctx)?;
-                let names = keys
-                    .into_iter()
-                    .map(|k| match k {
-                        Ast::TypeString(TypeString { ty, .. }) => ty,
-                        _ => unreachable!("keyof_string_keys yields TypeString nodes"),
-                    })
-                    .collect();
+                let names = Self::keyof_key_names(target, ctx)?;
                 Some(Self::names_to_key_union(names, span))
             }
         }

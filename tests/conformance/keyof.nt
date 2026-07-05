@@ -14,11 +14,14 @@
 // OUT of scope (stay indeterminate; NOT probed here so this file fully agrees):
 //   * keyof of primitives / arrays / tuples (needs apparent-member modelling,
 //     G7): e.g. `keyof string[]`, `keyof number` stay `Both`.
-//   * keyof (A & B) where the intersection COLLAPSES to `never` because a shared
-//     key has conflicting property types (e.g. { b: 2 } & { b: 3 }): tsgo gives
-//     `keyof never` = string | number | symbol, but the engine does not model
-//     intersection-to-never for conflicting object properties, so this is left
-//     unmodelled and not asserted here.
+//   * keyof (A & B) where members SHARE a key name (e.g. { b: 2 } & { b: 3 }):
+//     conflicting value types collapse the intersection to `never` in tsgo,
+//     making `keyof` = string | number | symbol, and the engine does not model
+//     that collapse. The engine therefore keeps ANY shared-key intersection
+//     indeterminate (`Both`) rather than reducing to a possibly-wrong key
+//     union — sound (the assert fails on our side while tsgo may pass), so it
+//     is not probed here. Only pairwise-DISJOINT key sets reduce (probed
+//     below).
 //   * T[keyof U] where U has a key ABSENT from T (e.g. A[keyof B], B ⊄ A): a
 //     type error in tsgo (Property does not exist), left unreduced (`Both`).
 

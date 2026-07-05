@@ -125,10 +125,11 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   STILL OPEN: `keyof` of primitives/arrays/tuples and object-literal keys that
   are numeric- or symbol-named beyond `keyof_string_keys` — these need
   apparent-member modelling (see G7) and stay `Both`. Also unmodelled: `keyof (A
-  & B)` where the intersection COLLAPSES to `never` because a shared key has
-  conflicting property types — tsgo gives `keyof never` (`string | number |
-  symbol`), but the engine reduces to the union of keys (the same
-  intersection-to-never gap noted elsewhere). `keyof any` is desugared upstream.
+  & B)` where members SHARE a key name — conflicting value types collapse the
+  intersection to `never` in tsgo (making `keyof` = `string | number | symbol`),
+  which the engine does not model, so any shared-key intersection stays
+  indeterminate (`Both`) instead of reducing (only pairwise-disjoint key sets
+  reduce). `keyof any` is desugared upstream.
 - [ ] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` not equated with `T[]`.
 - [ ] **G5.** The `Array(?U)` infer pattern does not match tuple types.
 - [ ] **G6.** Tuple-typed rest parameter `(...a: [A, B]) => …` not expanded.
