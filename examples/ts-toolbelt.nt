@@ -1,63 +1,57 @@
-export type Assign(L, Ls, depth, ignore, fill)
-    defaults
-        depth = 'flat',
-        ignore = BuiltIn,
-        fill = never,
-    where
-        L <: List,
-        Ls <: List(List),
-        depth <: Depth,
-        ignore <: object,
-        fill <: any
-    as
-        L
-        |> OAssign(Ls, depth, ignore, fill)
-        |> Cast(List)
-
-type Exact(A, W) as
-    if W <: unknown then
-        if A <: W then
-            if A <: Narrowable then
-                A
-            else
-                map K in keyof(A) do
-                    if K <: keyof(W) then
-                        Exact(A[K], W[K])
-                    end
-                end
-            end
-        else
-            W
-        end
-    end
-
 export type At(A, K)
     where
         A <: any,
         K <: Key
     as
-        let a_k =
-            if K <: keyof(A) then
-                A[K]
-            else
-                undefined
-            end
-        in
-
-        cond do
-            A <: List =>
-                if number <: A.length then
-                    if K <: number | `${number}` then
-                        A[never] | undefined
-                    else
-                        undefined
-                    end
+        if A <: List then
+            if number <: A['length'] then
+                if K <: number | `${number}` then
+                    A[never] | undefined
                 else
-                    a_k
-                end,
+                    undefined
+                end
+            else
+                if K <: keyof A then
+                    A[K]
+                else
+                    undefined
+                end
+            end
+        else
+            if unknown <: A then
+                unknown
+            else
+                if K <: keyof A then
+                    A[K]
+                else
+                    undefined
+                end
+            end
+        end
 
-          unknown <: A => unknown,
 
-          else => a_k
-      end
+export type Key as string | number | symbol
 
+// type ReadonlyArray(T) as T[]
+
+export type List(A)
+    defaults
+        A = any
+    as
+        ReadonlyArray(A)
+
+// TODO allow for types in unittest blocks that aren't emitted
+// TODO raise on unresolved types
+// TODO include built-in types
+type User as {
+    info: {
+        name: string,
+        age: number,
+        payment: {}
+    },
+    id: number
+}
+
+unittest "At(A, K)" do
+    assert At(User, 'id') <: number
+end
