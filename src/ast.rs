@@ -645,7 +645,7 @@ impl Ast {
         self.is_object_wrapper_for("BigInt")
     }
 
-    fn is_well_known_symbol(&self) -> bool {
+    pub fn is_well_known_symbol(&self) -> bool {
         if let Ast::Access(Access {
             lhs,
             rhs,
@@ -1160,8 +1160,6 @@ pub(crate) mod match_expr;
 pub(crate) mod cond_expr;
 
 pub(crate) mod let_expr;
-
-mod pretty;
 
 pub mod validate;
 
