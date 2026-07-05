@@ -1,0 +1,56 @@
+// Conformance probes for string-literal indexed access at relation leaves (G2).
+// Every assertion below is expected to agree with tsgo --strict.
+//
+// Scope: string-literal keys only. Numeric keys, ['length'], arrays/tuples,
+// and unions of keys are intentionally out of scope and stay indeterminate.
+
+type User as {
+    info: {
+        name: string,
+        age: number
+    },
+    id: number
+}
+
+unittest "basic string-literal indexed access" do
+    // Property type is looked up and related structurally.
+    assert User['id'] <: number
+    assert User['id'] == number
+    assert number <: User['id']
+    // Negative: the property is a number, not a string.
+    assert not (User['id'] <: string)
+end
+
+unittest "nested object indexed access reduces innermost-first" do
+    assert User['info'] <: { name: string, age: number }
+    assert User['info']['name'] <: string
+    assert User['info']['name'] == string
+    assert User['info']['age'] <: number
+    assert not (User['info']['name'] <: number)
+end
+
+// Access through a generic alias that substitutes the key into an access body.
+type Get(O, K) where O <: object, K <: keyof O as O[K]
+
+unittest "indexed access via generic alias" do
+    assert Get(User, 'id') <: number
+    assert Get(User, 'id') == number
+    assert Get(User, 'info') <: { name: string, age: number }
+end
+
+// Optional-property access. Under --strict (no exactOptionalPropertyTypes)
+// tsc widens O['x'] of an optional `x?: V` to `V | undefined`. This probe
+// records tsgo's actual behavior; the engine must match it.
+type Opt as {
+    x?: number,
+    y: string
+}
+
+unittest "optional-property indexed access includes undefined" do
+    assert Opt['x'] <: number | undefined
+    assert Opt['x'] == number | undefined
+    assert not (Opt['x'] <: number)
+    // A required property is not widened.
+    assert Opt['y'] <: string
+    assert Opt['y'] == string
+end

@@ -62,6 +62,23 @@ impl Ast {
         type A = Ast;
         type T = ExtendsResult;
 
+        // Reduce top-level string-literal indexed accesses (`T["k"]`, nested
+        // `T["a"]["b"]`) on either operand to the referenced property's type
+        // before relating. Only fully-resolved accesses are substituted in;
+        // anything the reducer cannot resolve (numeric/`keyof` keys, arrays,
+        // unresolved objects, cycles) yields `None` and falls through to the
+        // structural match (ultimately the `Access => Both` arm). Gated on an
+        // environment, since property lookup resolves named object references.
+        if ctx.env().is_some() {
+            let lhs = Self::reduce_access_leaf(self, ctx);
+            let rhs = Self::reduce_access_leaf(other, ctx);
+            if lhs.is_some() || rhs.is_some() {
+                let l = lhs.as_ref().unwrap_or(self);
+                let r = rhs.as_ref().unwrap_or(other);
+                return l.is_assignable_to_ctx(r, ctx);
+            }
+        }
+
         // Resolve named references against the environment first. If either side
         // names a definition, expand it and recurse — guarding the relation so a
         // recursive definition encountered while proving itself is taken to hold.
@@ -1530,5 +1547,80 @@ impl Ast {
         }
 
         body.clone()
+    }
+
+    /// Reduce a string-literal indexed access at a relation leaf to the named
+    /// property's type. The object side is reduced innermost-first so nested
+    /// `T["a"]["b"]` resolves, the (env-resolved) object must be an object
+    /// literal / interface shape, and the key must be a plain string literal
+    /// naming one of its properties. An optional property `x?: V` widens to
+    /// `V | undefined`, mirroring tsc under `--strict` (no
+    /// `exactOptionalPropertyTypes`).
+    ///
+    /// Returns `Some(ty)` only when the access fully resolves to a non-access
+    /// type. Non-accesses, numeric/`keyof`/union keys, unresolved objects,
+    /// missing keys, and self-/mutually-referential access cycles return `None`,
+    /// leaving the operand for structural handling (typically `Both`). The
+    /// `None`-on-unresolved-access contract guarantees the caller cannot loop:
+    /// a reduced operand is always a non-access, so re-entry reduces to `None`.
+    fn reduce_access_leaf(node: &Ast, ctx: &ResolveCtx) -> Option<Ast> {
+        /// One reduction step of `O["k"]`, resolving the object side
+        /// innermost-first (bounded by `depth` against pathological nesting).
+        fn one_step(node: &Ast, ctx: &ResolveCtx, depth: usize) -> Option<Ast> {
+            if depth > 32 {
+                return None;
+            }
+            let Ast::Access(Access { lhs, rhs, span, .. }) = node else {
+                return None;
+            };
+            let Ast::TypeString(TypeString { ty: key_name, .. }) = rhs.as_ref() else {
+                return None;
+            };
+
+            let obj = one_step(lhs, ctx, depth + 1).unwrap_or_else(|| (**lhs).clone());
+            let resolved = ctx
+                .env()
+                .and_then(|env| env.resolve_head(&obj))
+                .unwrap_or(obj);
+            let Ast::TypeLiteral(literal) = &resolved else {
+                return None;
+            };
+
+            for prop in literal.iter() {
+                if let PropertyName::LiteralPropertyName(name) = &prop.key {
+                    if name == key_name {
+                        if prop.optional {
+                            return Some(Ast::UnionType(UnionType {
+                                types: vec![
+                                    prop.value.clone(),
+                                    Ast::Primitive(PrimitiveType::Undefined, *span),
+                                ],
+                                span: *span,
+                            }));
+                        }
+                        return Some(prop.value.clone());
+                    }
+                }
+            }
+
+            None
+        }
+
+        // Drive to a fixpoint: a resolved property value may itself be an access
+        // chain. Stop on a non-access result, on lack of progress, or at the cap
+        // (a cycle), returning `None` in the unresolved cases.
+        let mut current = one_step(node, ctx, 0)?;
+        let mut steps = 0;
+        while matches!(current, Ast::Access(_)) {
+            steps += 1;
+            if steps > 32 {
+                return None;
+            }
+            match one_step(&current, ctx, 0) {
+                Some(next) if next != current => current = next,
+                _ => return None,
+            }
+        }
+        Some(current)
     }
 }

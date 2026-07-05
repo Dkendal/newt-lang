@@ -93,8 +93,13 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 ### Feature / parser gaps (newtype returns *indeterminate*; not wrong answers)
 
 - [ ] **G1.** Any relation involving `any` is intentionally indeterminate.
-- [ ] **G2.** Top-level indexed access `T['k']` / `T[number]` / `T['length']`
-  not reduced (only inside a homomorphic mapped body).
+- [~] **G2.** Top-level indexed access. DONE: string-literal keys `T['k']` and
+  nested `T['a']['b']` are now reduced at both relation operands before the
+  structural match (`reduce_access_leaf` in `src/ast/assignability.rs`, called at
+  the top of `is_assignable_to_ctx`); optional properties `x?: V` widen to
+  `V | undefined` (tsc `--strict`). Covered by `tests/conformance/indexed_access.nt`.
+  STILL OPEN: numeric keys `T[number]`, `T['length']`, array/tuple element
+  access, and unions-of-keys / `keyof`-driven keys remain indeterminate (`Both`).
 - [ ] **G3.** `keyof` of primitives/arrays/tuples/unions/intersections/`any` not
   reduced (only `keyof` of a single object literal).
 - [ ] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` not equated with `T[]`.

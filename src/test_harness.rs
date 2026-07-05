@@ -759,4 +759,77 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn string_literal_indexed_access_reduces_at_relation_leaves() {
+        // `T["k"]` on either operand reduces to the property's type before the
+        // structural match, so these are definite (not indeterminate `Both`).
+        let (report, stderr) = run_src(
+            "type User as { info: { name: string, age: number }, id: number }\n\
+            unittest \"t\" do\n\
+            \x20 assert User['id'] <: number\n\
+            \x20 assert User['id'] == number\n\
+            \x20 assert number <: User['id']\n\
+            \x20 assert not (User['id'] <: string)\n\
+            \x20 assert User['info']['name'] <: string\n\
+            \x20 assert User['info']['name'] == string\n\
+            \x20 assert not (User['info']['name'] <: number)\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 7,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn indexed_access_via_generic_alias_reduces() {
+        // The substituted access body `O[K]` reduces after the alias resolves.
+        let (report, stderr) = run_src(
+            "type User as { id: number }\n\
+            type Get(O, K) where O <: object, K <: keyof O as O[K]\n\
+            unittest \"t\" do\n\
+            \x20 assert Get(User, 'id') <: number\n\
+            \x20 assert Get(User, 'id') == number\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 2,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn optional_property_indexed_access_widens_to_undefined() {
+        // `x?: V` accessed as `T["x"]` widens to `V | undefined` (tsc --strict).
+        let (report, stderr) = run_src(
+            "type Opt as { x?: number, y: string }\n\
+            unittest \"t\" do\n\
+            \x20 assert Opt['x'] <: number | undefined\n\
+            \x20 assert Opt['x'] == number | undefined\n\
+            \x20 assert not (Opt['x'] <: number)\n\
+            \x20 assert Opt['y'] <: string\n\
+            \x20 assert Opt['y'] == string\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 5,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
 }
