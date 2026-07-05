@@ -210,9 +210,9 @@ pub fn run_case(rule: Rule, path: &Path) {
 /// when the source is valid.
 pub fn render_diagnostics(rule: Rule, source: &str) -> String {
     parse_source(rule, source)
-        .validate()
+        .validate("<stdin>", source)
         .iter()
-        .map(|d| d.to_report_string("<stdin>", source))
+        .map(|report| crate::report::report_to_string(report, "<stdin>", source))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -265,7 +265,7 @@ pub fn run_equivalence_case(rule: Rule, path: &Path) {
     // would panic on the malformed construct the CLI rejects), so the
     // equivalence comparison is meaningful only for well-formed snippets.
     let source_ast = parse_source(rule, &case.source);
-    if !source_ast.validate().is_empty() {
+    if !source_ast.validate("<stdin>", &case.source).is_empty() {
         return;
     }
 

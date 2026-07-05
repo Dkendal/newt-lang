@@ -3,62 +3,64 @@
 //! Simplification lowers `if`/`cond`/`match` into extends-expressions and, on
 //! malformed input, panics deep inside [`crate::ast::if_expr::expand_to_extends`]
 //! with an AST dump. This pass runs first and turns those invariants into
-//! readable [`Diagnostic`]s anchored to the offending source span, so the CLI
-//! can report an error and exit cleanly instead of panicking.
+//! readable [`ariadne::Report`]s anchored to the offending source span, so the
+//! CLI can report an error and exit cleanly instead of panicking.
 
 use std::cell::RefCell;
+
+use ariadne::{Config, IndexType, Label, Report, ReportKind};
+
+use crate::report::ReportSpan;
 
 use super::if_expr::malformed_condition_span;
 use super::*;
 
-/// A single static-validation error: a message anchored to a source [`Span`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Diagnostic {
-    pub span: Span,
-    pub message: String,
-}
-
-impl Diagnostic {
-    /// Render this diagnostic against `source` (reported under `source_name`)
-    /// as a source-highlighted, underlined report — without color, so the
-    /// output is deterministic and string-comparable.
-    pub fn to_report_string(&self, source_name: &str, source: &str) -> String {
-        crate::report::render_to_string(source_name, source, self.span, &self.message)
-    }
-}
-
 impl Ast {
-    /// Collect every [`Diagnostic`] in the parsed program, in source order.
-    /// Runs on the AST *before* `simplify`, since simplification of malformed
-    /// input panics.
-    pub fn validate(&self) -> Vec<Diagnostic> {
-        let diagnostics = RefCell::new(Vec::new());
-        // `postwalk` visits every node; the diagnostics accumulate through the
+    /// Collect an error [`Report`] for every static-validation failure in the
+    /// parsed program, in source order, anchored into `source` under
+    /// `source_name`. Runs on the AST *before* `simplify`, since
+    /// simplification of malformed input panics. Reports are built without
+    /// color so their rendering is deterministic and string-comparable.
+    pub fn validate(&self, source_name: &str, source: &str) -> Vec<Report<'static, ReportSpan>> {
+        let reports = RefCell::new(Vec::new());
+        let report = |span: Span, message: &str| {
+            // Clamp to the source so a synthesized or stale span cannot make
+            // ariadne index out of bounds or see a backwards range.
+            let start = span.start.min(source.len());
+            let end = span.end.min(source.len()).max(start);
+            reports.borrow_mut().push(
+                Report::build(ReportKind::Error, (source_name.to_string(), start..end))
+                    .with_config(
+                        Config::new()
+                            .with_index_type(IndexType::Byte)
+                            .with_color(false),
+                    )
+                    .with_message(message)
+                    .with_label(
+                        Label::new((source_name.to_string(), start..end)).with_message(message),
+                    )
+                    .finish(),
+            );
+        };
+        // `postwalk` visits every node; the reports accumulate through the
         // shared `RefCell` (its threaded context is per-branch, not cumulative).
         self.postwalk((), &|node, ctx| {
             {
                 let node: &Ast = &node;
-                let out: &mut Vec<Diagnostic> = &mut diagnostics.borrow_mut();
                 match node {
                     Ast::CondExpr(cond) => {
                         for arm in &cond.arms {
                             if let Some(span) = malformed_condition_span(&arm.condition) {
-                                out.push(Diagnostic {
+                                report(
                                     span,
-                                    message:
-                                        "Left hand side of condition branch is missing comparison."
-                                            .into(),
-                                });
+                                    "Left hand side of condition branch is missing comparison.",
+                                );
                             }
                         }
                     }
                     Ast::IfExpr(if_expr) => {
                         if let Some(span) = malformed_condition_span(&if_expr.condition) {
-                            out.push(Diagnostic {
-                                span,
-                                message: "Left hand side of condition is missing comparison."
-                                    .into(),
-                            });
+                            report(span, "Left hand side of condition is missing comparison.");
                         }
                     }
 
@@ -68,10 +70,7 @@ impl Ast {
                                 PropertyName::ComputedPropertyName(expr) => {
                                     if !expr.is_well_known_symbol() {
                                         if let Some(span) = malformed_condition_span(&expr) {
-                                            out.push(Diagnostic {
-                                                span,
-                                                message: "A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.".into(),
-                                            });
+                                            report(span, "A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.");
                                         }
                                     }
                                 }
@@ -84,6 +83,6 @@ impl Ast {
             };
             (node, ctx)
         });
-        diagnostics.into_inner()
+        reports.into_inner()
     }
 }

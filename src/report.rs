@@ -10,9 +10,26 @@
 use crate::ast::Span;
 use ariadne::{Config, IndexType, Label, Report, ReportKind, Source};
 
-/// Render a diagnostic to a `String` **without color**, suitable for writers
-/// that are captured and string-compared (corpus fixtures, the test harness
-/// report) or for embedding in panic messages.
+/// The ariadne span type used by every report in this codebase: the source
+/// name paired with a byte range into that source.
+pub type ReportSpan = (String, std::ops::Range<usize>);
+
+/// Render a built [`Report`] against its source to a trimmed `String`.
+pub fn report_to_string(
+    report: &Report<'_, ReportSpan>,
+    source_name: &str,
+    source: &str,
+) -> String {
+    let mut buf: Vec<u8> = Vec::new();
+    report
+        .write((source_name.to_string(), Source::from(source)), &mut buf)
+        .expect("writing an ariadne report to an in-memory buffer cannot fail");
+
+    let rendered = String::from_utf8_lossy(&buf).into_owned();
+    rendered.trim_end().to_string()
+}
+
+/// Render a diagnostic to a `String` **without color**.
 pub fn render_to_string(source_name: &str, source: &str, span: Span, message: &str) -> String {
     render(source_name, source, span, message, false)
 }
@@ -23,9 +40,22 @@ pub fn eprint(source_name: &str, source: &str, span: Span, message: &str) {
 }
 
 fn render(source_name: &str, source: &str, span: Span, message: &str, color: bool) -> String {
+    report_to_string(
+        &build_report(source_name, source, span, message, color),
+        source_name,
+        source,
+    )
+}
+
+fn build_report(
+    source_name: &str,
+    source: &str,
+    span: Span,
+    message: &str,
+    color: bool,
+) -> Report<'static, ReportSpan> {
     let range = clamp(span, source.len());
 
-    let mut buf: Vec<u8> = Vec::new();
     Report::build(ReportKind::Error, (source_name.to_string(), range.clone()))
         .with_config(
             Config::new()
@@ -35,11 +65,6 @@ fn render(source_name: &str, source: &str, span: Span, message: &str, color: boo
         .with_message(message)
         .with_label(Label::new((source_name.to_string(), range)).with_message(message))
         .finish()
-        .write((source_name.to_string(), Source::from(source)), &mut buf)
-        .expect("writing an ariadne report to an in-memory buffer cannot fail");
-
-    let rendered = String::from_utf8_lossy(&buf).into_owned();
-    rendered.trim_end().to_string()
 }
 
 /// Clamp a span to the source length (a synthesized or stale span must not

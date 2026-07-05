@@ -67,10 +67,13 @@ fn main() {
             // (e.g. an `if`/`cond` condition that is a bare value instead of a
             // comparison) would otherwise panic during `simplify`. Report each
             // diagnostic against the source and exit non-zero.
-            let diagnostics = ast.validate();
+            let diagnostics = ast.validate(&source_name, input);
             if !diagnostics.is_empty() {
                 for diagnostic in &diagnostics {
-                    eprintln!("{}", diagnostic.to_report_string(&source_name, input));
+                    eprintln!(
+                        "{}",
+                        newtype::report::report_to_string(diagnostic, &source_name, input)
+                    );
                 }
                 std::process::exit(1);
             }
