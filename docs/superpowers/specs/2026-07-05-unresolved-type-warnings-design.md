@@ -26,8 +26,11 @@ A reference is a bare `Ident` in type position or the `Ident` head of an
   same set `TypeEnv::from_program` registers),
 - a name brought in by an `import` statement — a named specifier's local name
   (the alias if present, otherwise the exported name) or a namespace import's
-  alias. Imports fully resolve the names they bind; evaluation still treats
-  them as indeterminate, but they do not warn — or
+  alias. This exemption is **temporary**: real module loading is a planned
+  follow-up project (see Future work), after which an import only resolves if
+  its module is actually found and loaded, and its types evaluate concretely.
+  Until then imported names do not warn, but evaluation still treats them as
+  indeterminate — or
 - a name bound in the current lexical scope:
   - type parameters of the enclosing `type`/`interface` (in scope for `where`
     constraints, parameter defaults, and the body),
@@ -59,8 +62,11 @@ Warning: cannot resolve type `ReadonlyArray`
    │
 41 │         ReadonlyArray(A)
    │         ──────┬──────
-   │               ╰──────── not defined in this file
+   │               ╰──────── cannot be resolved to a definition
 ```
+
+The label says "cannot be resolved to a definition" rather than "not defined
+in this file" — resolution will not stay file-local once module loading lands.
 
 Reports are ordered by the first use site's source position (deterministic).
 
@@ -121,3 +127,14 @@ Reports are ordered by the first use site's source position (deterministic).
   `ReadonlyArray` only.
 - Conformance harness (`mise run tc`) is unaffected: warnings do not change
   evaluation or the generated TypeScript.
+
+## Future work (separate spec)
+
+**Real module loading.** Imports should be fully resolved: locating the
+imported `.nt` module, parsing it, and registering its exports (transitively,
+with cycle handling) into the `TypeEnv`, so an imported generic type expands
+to its concrete definition and evaluates in asserts. Once that lands, this
+pass tightens: an imported name resolves only if the loader actually found
+the module and the module exports it — a failed import warns like any other
+unresolved reference, and the temporary blanket import exemption above is
+removed.
