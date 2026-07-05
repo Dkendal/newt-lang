@@ -1682,3 +1682,33 @@ jj commit -m "Add --exact-optional-property-types flag"
 - [ ] **Step 3: Implement** — extend `reduce_indexed_access` (recursive object-side reduction, optional-prop `| undefined` union) and call it on both operands where relations are evaluated so the `Access => Both` arm only catches genuinely unresolvable accesses. Keep the `Both` fallback.
 - [ ] **Step 4: Verify** — unit tests GREEN; full `cargo nextest run` green; `mise run tc` ends "agree on every assertion" with zero SETUP ERROR/DISAGREE.
 - [ ] **Step 5: Update TODO.md G2**, `cargo fmt`, `jj commit -m "Reduce string-literal indexed access at relation leaves"`.
+
+---
+
+### Task 9: Complete G2 — numeric/`length` indexed access, union keys, union/intersection object sides
+
+**Files:**
+- Modify: `src/ast/assignability.rs` (extend `reduce_access_leaf` from Task 8)
+- Modify: `tests/conformance/indexed_access.nt` (extend the probe file)
+- Modify: `src/test_harness.rs` (mirror new probes as unit tests)
+- Modify: `TODO.md` (G2: close what's done; anything remaining moves to a precise note or G3)
+
+**Interfaces:**
+- Consumes: Task 8's `reduce_access_leaf` (Option-returning, recursive innermost-first, depth/step caps) and `ResolveCtx::env()`.
+- Produces: the same reduction hook now also handles the cases below. `Both` remains the fallback for anything else (notably `keyof`-driven keys, which belong to G3).
+
+**Semantics (verify EVERY case against tsgo before trusting this list; where tsgo disagrees, match tsgo and record it in the probe file comments):**
+- Tuple object side `[A, B]`: `T[0]` → `A` (numeric-literal key); `T['length']` → the literal `2`; `T[number]` → `A | B`.
+- Array object side `E[]` (incl. `readonly E[]`): `T[number]` → `E`; `T['length']` → `number`. Numeric-literal keys on plain arrays (`T[0]`) also yield `E` in TS.
+- Union KEY: `T['a' | 'b']` → `T['a'] | T['b']` (distribute over the key union; every branch must itself reduce, else the whole access stays unreduced → `Both`).
+- Union OBJECT side: `(X | Y)['k']` → `X['k'] | Y['k']` (again all-or-nothing).
+- Intersection OBJECT side: `(X & Y)['k']` → the property type from whichever members carry `k`; if several carry it, the intersection of their property types. All-or-nothing per the same rule: if no member carries `k`, unreduced.
+- Optional-property widening (`| undefined`) continues to apply per-property exactly as in Task 8, after member lookup.
+- OUT of scope: `T[keyof T]` and any key that only becomes literal after `keyof` reduction (G3); generic/unresolvable object sides stay `Both` as before.
+
+**Steps (same discipline as Task 8):**
+- [ ] **Step 1:** Extend `tests/conformance/indexed_access.nt` with probes for every case above (positive, negative, and an out-of-scope `keyof`-key probe expected to stay indeterminate on the newtype side while tsgo passes — wait: that would be a DISAGREE. Instead, keep out-of-scope probes OUT of the conformance file and document them as a comment; the conformance file must end fully agreeing). Run single-file conformance BEFORE implementing; record the DISAGREE rows as RED evidence.
+- [ ] **Step 2:** Mirror as `src/test_harness.rs` unit tests; verify RED.
+- [ ] **Step 3:** Implement in `reduce_access_leaf` (or helpers beside it); preserve termination caps and the only-sharpen-Both invariant.
+- [ ] **Step 4:** `cargo nextest run` fully green; `mise run tc` ends "agree on every assertion"; the ts-toolbelt example still passes.
+- [ ] **Step 5:** Update TODO.md G2. `cargo fmt`, `jj commit -m "Reduce numeric, length, and union/intersection indexed access"`.
