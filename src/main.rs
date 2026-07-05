@@ -18,6 +18,10 @@ struct Args {
     /// severity and exit non-zero (evaluation and rendering still run).
     #[clap(long)]
     deny_unresolved: bool,
+    /// Mirror TypeScript's `exactOptionalPropertyTypes`: an optional property
+    /// `x?: T` no longer accepts `T | undefined` sources in assertions.
+    #[clap(long)]
+    exact_optional_property_types: bool,
     /// Emit TypeScript type-level assertions for each `unittest` assert, prefixed
     /// with the helper types they need.
     #[clap(long)]
@@ -125,6 +129,7 @@ fn main() {
                 &source_name,
                 test_harness::Config {
                     fail_fast: args.fail_fast,
+                    exact_optional_property_types: args.exact_optional_property_types,
                 },
                 &mut std::io::stderr(),
             )

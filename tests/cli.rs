@@ -63,3 +63,12 @@ fn deny_unresolved_with_clean_program_exits_zero() {
     let (ok, stderr) = run("type Foo as 1\ntype A as Foo", &["--deny-unresolved"]);
     assert!(ok, "{stderr}");
 }
+
+#[test]
+fn exact_optional_property_types_flag_changes_optional_assignability() {
+    let src = "unittest \"t\" do\n  assert { x: number | undefined } <: { x?: number }\nend";
+    let (ok_default, _) = run(src, &[]);
+    assert!(ok_default, "widening holds by default");
+    let (ok_exact, stderr) = run(src, &["--exact-optional-property-types"]);
+    assert!(!ok_exact, "the widened source must be rejected:\n{stderr}");
+}

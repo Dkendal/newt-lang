@@ -416,6 +416,7 @@ pub fn fingerprint(ast: &Ast) -> String {
 pub struct ResolveCtx<'a> {
     env: Option<&'a TypeEnv>,
     assumptions: RefCell<HashSet<(String, String)>>,
+    exact_optional_property_types: bool,
 }
 
 impl<'a> ResolveCtx<'a> {
@@ -425,6 +426,7 @@ impl<'a> ResolveCtx<'a> {
         Self {
             env: None,
             assumptions: RefCell::new(HashSet::new()),
+            exact_optional_property_types: false,
         }
     }
 
@@ -433,12 +435,24 @@ impl<'a> ResolveCtx<'a> {
         Self {
             env: Some(env),
             assumptions: RefCell::new(HashSet::new()),
+            exact_optional_property_types: false,
         }
     }
 
     /// The environment, if any.
     pub(crate) fn env(&self) -> Option<&TypeEnv> {
         self.env
+    }
+
+    /// Mirror TypeScript's `exactOptionalPropertyTypes` for assignability
+    /// checks made through this context.
+    pub fn with_exact_optional_property_types(mut self, on: bool) -> Self {
+        self.exact_optional_property_types = on;
+        self
+    }
+
+    pub fn exact_optional_property_types(&self) -> bool {
+        self.exact_optional_property_types
     }
 
     /// Record `pair` as assumed-assignable for the duration of a sub-proof.

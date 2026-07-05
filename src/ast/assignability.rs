@@ -840,10 +840,11 @@ impl Ast {
         }
 
         // An optional target property `x?: T` has effective type `T | undefined`
-        // under --strict (no `exactOptionalPropertyTypes`), so the source value
-        // need only be assignable to `T | undefined`. This admits a present-but-
-        // `undefined` value and a `T | undefined`-typed source alike.
-        if target.optional {
+        // under --strict without `exactOptionalPropertyTypes`, so the source
+        // value need only be assignable to `T | undefined`. With
+        // `exactOptionalPropertyTypes` the widening is disabled and the source
+        // must be assignable to `T` itself.
+        if target.optional && !ctx.exact_optional_property_types() {
             let undefined = Ast::Primitive(PrimitiveType::Undefined, target.value.as_span());
             let widened = Ast::UnionType(UnionType {
                 types: vec![target.value.clone(), undefined],

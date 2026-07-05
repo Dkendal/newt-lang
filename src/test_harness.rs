@@ -29,6 +29,9 @@ use crate::extends_result::ExtendsResult;
 pub struct Config {
     /// Stop at the first failing assertion instead of evaluating the rest.
     pub fail_fast: bool,
+    /// Mirror TypeScript's `exactOptionalPropertyTypes`: an optional target
+    /// property `x?: T` no longer accepts `T | undefined` sources.
+    pub exact_optional_property_types: bool,
 }
 
 /// Summary of a harness run.
@@ -102,7 +105,7 @@ pub fn run(
             let span = claim_span(source, assert.span);
             let claim_src = slice_or(source, span, "<claim>");
 
-            match evaluate(&assert.claim, &env) {
+            match evaluate(&assert.claim, &env, config) {
                 Outcome::Pass => {
                     report.passed += 1;
                     writeln!(out, "  ok      {claim_src}")?;
@@ -166,7 +169,7 @@ pub fn run(
 /// operands) and then reduced over the [`ExtendsResult`] algebra, matching the
 /// desugaring an `if` condition uses: `==`/`!=` become mutual assignability,
 /// `and`/`or` fold, and `not` swaps the relation. Only a definite `true` passes.
-fn evaluate(claim: &Ast, env: &TypeEnv) -> Outcome {
+fn evaluate(claim: &Ast, env: &TypeEnv, config: Config) -> Outcome {
     match claim {
         Ast::TrueKeyword(_) => return Outcome::Pass,
         Ast::FalseKeyword(_) => {
@@ -200,7 +203,8 @@ fn evaluate(claim: &Ast, env: &TypeEnv) -> Outcome {
         );
     }
 
-    let ctx = ResolveCtx::new(env);
+    let ctx = ResolveCtx::new(env)
+        .with_exact_optional_property_types(config.exact_optional_property_types);
 
     // A generic application whose argument violates a `where` constraint is an
     // ill-typed program (TypeScript TS2344), not a relation that evaluates to a
@@ -366,7 +370,17 @@ mod tests {
     fn run_src(src: &str, fail_fast: bool) -> (Report, String) {
         let program = parse_newtype_program(src).unwrap().simplify();
         let mut out = Vec::new();
-        let report = run(&program, src, "<test>", Config { fail_fast }, &mut out).unwrap();
+        let report = run(
+            &program,
+            src,
+            "<test>",
+            Config {
+                fail_fast,
+                ..Config::default()
+            },
+            &mut out,
+        )
+        .unwrap();
         (report, String::from_utf8(out).unwrap())
     }
 
@@ -667,6 +681,64 @@ mod tests {
                 passed: 6,
                 failed: 0
             }
+        );
+    }
+
+    /// Like `run_src` but with `exact_optional_property_types` enabled.
+    fn run_src_exact(src: &str) -> (Report, String) {
+        let program = parse_newtype_program(src).unwrap().simplify();
+        let mut out = Vec::new();
+        let report = run(
+            &program,
+            src,
+            "<test>",
+            Config {
+                exact_optional_property_types: true,
+                ..Config::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        (report, String::from_utf8(out).unwrap())
+    }
+
+    #[test]
+    fn optional_target_accepts_undefined_by_default() {
+        let src = "unittest \"t\" do\n\
+            \x20 assert { x: number | undefined } <: { x?: number }\n\
+            \x20 assert { x: undefined } <: { x?: number }\n\
+            \x20 assert { x: number } <: { x?: number }\n\
+            \x20 assert {} <: { x?: number }\n\
+            \x20 assert not ({ x?: number } <: { x: number | undefined })\n\
+            end";
+        let (report, out) = run_src(src, false);
+        assert_eq!(
+            report,
+            Report {
+                passed: 5,
+                failed: 0
+            },
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn exact_optional_rejects_undefined_sources() {
+        let src = "unittest \"t\" do\n\
+            \x20 assert not ({ x: number | undefined } <: { x?: number })\n\
+            \x20 assert not ({ x: undefined } <: { x?: number })\n\
+            \x20 assert { x: number } <: { x?: number }\n\
+            \x20 assert {} <: { x?: number }\n\
+            \x20 assert not ({ x?: number } <: { x: number | undefined })\n\
+            end";
+        let (report, out) = run_src_exact(src);
+        assert_eq!(
+            report,
+            Report {
+                passed: 5,
+                failed: 0
+            },
+            "{out}"
         );
     }
 
