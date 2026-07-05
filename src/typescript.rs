@@ -17,13 +17,18 @@ use crate::{
 /// Render the object side of an indexed access `O[K]`, parenthesizing `O` when
 /// it is a lower-precedence type constructor. An index access binds tighter than
 /// a union/intersection (`(X | Y)["k"]` must keep its parens, else it reparses as
-/// `X | Y["k"]`), a function type, a conditional, or a `readonly` array, so those
-/// operands are wrapped.
+/// `X | Y["k"]`), a function type, a conditional, a `keyof`/builtin operator
+/// (`(keyof A)["x"]` would reparse as `keyof (A["x"])`), or a `readonly` array,
+/// so those operands are wrapped — mirroring the `Ast::Array` render arm.
 fn access_object_doc(lhs: &Ast) -> D<'_, ()> {
     let needs_parens = lhs.is_set_op()
         || matches!(
             lhs,
-            Ast::FunctionType(_) | Ast::ExtendsExpr(_) | Ast::Infer(_) | Ast::Readonly(_)
+            Ast::FunctionType(_)
+                | Ast::ExtendsExpr(_)
+                | Ast::Infer(_)
+                | Ast::Builtin(_)
+                | Ast::Readonly(_)
         );
     if needs_parens {
         parens(lhs.to_ts())

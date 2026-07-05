@@ -1,0 +1,12 @@
+A keyof object side of an indexed access keeps its parens
+(otherwise `keyof A['x']` reparses as `keyof (A['x'])`)
+
+=======
+
+(keyof(A))['x']
+
+=======
+
+(keyof A)['x']
+
+=======
