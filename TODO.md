@@ -93,17 +93,29 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 ### Feature / parser gaps (newtype returns *indeterminate*; not wrong answers)
 
 - [ ] **G1.** Any relation involving `any` is intentionally indeterminate.
-- [~] **G2.** Top-level indexed access. DONE: string-literal keys `T['k']` and
-  nested `T['a']['b']` are now reduced at both relation operands before the
-  structural match (`reduce_access_leaf` in `src/ast/assignability.rs`, called at
-  the top of `is_assignable_to_ctx`); optional properties `x?: V` widen to
-  `V | undefined` (tsc `--strict`). Covered by `tests/conformance/indexed_access.nt`.
-  STILL OPEN: numeric keys `T[number]`, `T['length']`, array/tuple element
-  access, and unions-of-keys / `keyof`-driven keys remain indeterminate (`Both`).
-  Also open: intersection-shaped object sides (`T['k']` where `T` resolves to an
-  intersection of object types) are not reduced either.
+- [x] **G2.** Top-level indexed access. DONE: reduced at both relation operands
+  before the structural match (`reduce_access_leaf` → `index_type` in
+  `src/ast/assignability.rs`, called at the top of `is_assignable_to_ctx`).
+  Covered cases: string-literal keys `T['k']` and nested `T['a']['b']`
+  (optional `x?: V` widens to `V | undefined` under tsc `--strict`); tuple
+  numeric-literal keys `T[0]`, `T['length']` (literal arity), `T[number]`
+  (element union); array `E[]`/`readonly E[]` `T[number]`/`T[0]` → `E`,
+  `T['length']` → `number`; union KEYS `T['a'|'b']` (distribute, all-or-nothing);
+  union object sides `(X|Y)['k']` (distribute, all-or-nothing); intersection
+  object sides `(X&Y)['k']` (property types of the members carrying `k`,
+  intersected). The TS renderer now parenthesizes a set-op/function/conditional/
+  readonly object side (`access_object_doc` in `src/typescript.rs`). Covered by
+  `tests/conformance/indexed_access.nt` and `src/test_harness.rs`.
+  STILL OPEN (moved to G3): `keyof`-driven keys, e.g. `T[keyof T]`, and any key
+  that only becomes a literal/union after `keyof` reduction, stay indeterminate
+  (`Both`). Out-of-bounds tuple indices and accesses to a key absent from a
+  union member are TS *errors*, so they are intentionally left unreduced.
 - [ ] **G3.** `keyof` of primitives/arrays/tuples/unions/intersections/`any` not
-  reduced (only `keyof` of a single object literal).
+  reduced (only `keyof` of a single object literal). Also covers `keyof`-driven
+  indexed-access keys handed over from G2: `T[keyof T]` and any indexed access
+  whose key only resolves to a literal/union after `keyof` reduction stay
+  indeterminate until `keyof` reduction lands here, at which point
+  `index_type` (in `src/ast/assignability.rs`) already handles the resulting key.
 - [ ] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` not equated with `T[]`.
 - [ ] **G5.** The `Array(?U)` infer pattern does not match tuple types.
 - [ ] **G6.** Tuple-typed rest parameter `(...a: [A, B]) => …` not expanded.

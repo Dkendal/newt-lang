@@ -1564,7 +1564,7 @@ impl Ast {
     /// `None`-on-unresolved-access contract guarantees the caller cannot loop:
     /// a reduced operand is always a non-access, so re-entry reduces to `None`.
     fn reduce_access_leaf(node: &Ast, ctx: &ResolveCtx) -> Option<Ast> {
-        /// One reduction step of `O["k"]`, resolving the object side
+        /// One reduction step of `O[K]`, resolving the object side
         /// innermost-first (bounded by `depth` against pathological nesting).
         fn one_step(node: &Ast, ctx: &ResolveCtx, depth: usize) -> Option<Ast> {
             if depth > 32 {
@@ -1573,37 +1573,9 @@ impl Ast {
             let Ast::Access(Access { lhs, rhs, span, .. }) = node else {
                 return None;
             };
-            let Ast::TypeString(TypeString { ty: key_name, .. }) = rhs.as_ref() else {
-                return None;
-            };
 
             let obj = one_step(lhs, ctx, depth + 1).unwrap_or_else(|| (**lhs).clone());
-            let resolved = ctx
-                .env()
-                .and_then(|env| env.resolve_head(&obj))
-                .unwrap_or(obj);
-            let Ast::TypeLiteral(literal) = &resolved else {
-                return None;
-            };
-
-            for prop in literal.iter() {
-                if let PropertyName::LiteralPropertyName(name) = &prop.key {
-                    if name == key_name {
-                        if prop.optional {
-                            return Some(Ast::UnionType(UnionType {
-                                types: vec![
-                                    prop.value.clone(),
-                                    Ast::Primitive(PrimitiveType::Undefined, *span),
-                                ],
-                                span: *span,
-                            }));
-                        }
-                        return Some(prop.value.clone());
-                    }
-                }
-            }
-
-            None
+            Ast::index_type(&obj, rhs, ctx, *span, depth + 1)
         }
 
         // Drive to a fixpoint: a resolved property value may itself be an access
@@ -1622,5 +1594,160 @@ impl Ast {
             }
         }
         Some(current)
+    }
+
+    /// Reduce a single indexed access `obj[key]` to the referenced member type,
+    /// or `None` when it cannot be resolved definitely (leaving the operand
+    /// indeterminate). `obj` is resolved to its definition head before dispatch;
+    /// `key` is likewise resolved so a named literal-union alias distributes.
+    ///
+    /// Handled object sides: object literals (string / numeric-name keys, with
+    /// optional-property `| undefined` widening), tuples (numeric-literal keys,
+    /// `"length"` → literal arity, `number` → element union), arrays incl.
+    /// `readonly` (numeric keys and `number` → element, `"length"` → `number`),
+    /// unions (distribute — all-or-nothing), and intersections (property types
+    /// from whichever object-literal members carry the key, intersected). A
+    /// union KEY distributes over the object (all-or-nothing). Anything else —
+    /// notably a `keyof`-driven key or an unresolvable object — yields `None`.
+    fn index_type(obj: &Ast, key: &Ast, ctx: &ResolveCtx, span: Span, depth: usize) -> Option<Ast> {
+        if depth > 32 {
+            return None;
+        }
+
+        // Resolve a named key one step so a literal-union alias distributes.
+        let key_resolved = ctx.env().and_then(|env| env.resolve_head(key));
+        let key = key_resolved.as_ref().unwrap_or(key);
+
+        // A union KEY distributes over the object: `T["a" | "b"]` →
+        // `T["a"] | T["b"]`. All-or-nothing: every branch must itself reduce.
+        if let Ast::UnionType(UnionType { types, .. }) = key {
+            let mut parts = Vec::with_capacity(types.len());
+            for k in types {
+                parts.push(Self::index_type(obj, k, ctx, span, depth + 1)?);
+            }
+            return Some(Self::union_of(parts, span));
+        }
+
+        let resolved = ctx
+            .env()
+            .and_then(|env| env.resolve_head(obj))
+            .unwrap_or_else(|| obj.clone());
+
+        match &resolved {
+            Ast::TypeLiteral(tl) => Self::index_object_literal(tl, key, span),
+            Ast::Tuple(tuple) => Self::index_tuple(tuple, key, span),
+            Ast::Array(element) => Self::index_array(element, key, span),
+            // A `readonly` array/tuple indexes identically for reads.
+            Ast::Readonly(inner) => Self::index_type(inner, key, ctx, span, depth + 1),
+            // A union object side distributes: `(X | Y)["k"]` →
+            // `X["k"] | Y["k"]`, all-or-nothing (a member lacking the key is a
+            // type error in TS, so the whole access stays unreduced).
+            Ast::UnionType(UnionType { types, .. }) => {
+                let mut parts = Vec::with_capacity(types.len());
+                for member in types {
+                    parts.push(Self::index_type(member, key, ctx, span, depth + 1)?);
+                }
+                Some(Self::union_of(parts, span))
+            }
+            // An intersection object side carries the union of its members'
+            // properties: gather the property type from every object-literal
+            // member that carries the key and intersect them. If no member
+            // carries it, the access is unreduced; if any member is not a
+            // resolvable object literal, bail (we cannot be sure).
+            Ast::IntersectionType(IntersectionType { types, .. }) => {
+                let flat = Self::flatten_intersection_members(types);
+                let mut parts = vec![];
+                for member in &flat {
+                    let member = ctx
+                        .env()
+                        .and_then(|env| env.resolve_head(member))
+                        .unwrap_or_else(|| member.clone());
+                    let Ast::TypeLiteral(tl) = &member else {
+                        return None;
+                    };
+                    if let Some(value) = Self::index_object_literal(tl, key, span) {
+                        parts.push(value);
+                    }
+                }
+                match parts.len() {
+                    0 => None,
+                    1 => Some(parts.into_iter().next().unwrap()),
+                    _ => Some(Ast::IntersectionType(IntersectionType {
+                        types: parts,
+                        span,
+                    })),
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Look up `key` on an object literal `tl`, returning the property's type
+    /// (widened to `V | undefined` for an optional property under --strict
+    /// without `exactOptionalPropertyTypes`). `key` must be a string or
+    /// numeric literal naming a plain property; a missing or non-literal key
+    /// yields `None`.
+    fn index_object_literal(tl: &TypeLiteral, key: &Ast, span: Span) -> Option<Ast> {
+        let key_name = match key {
+            Ast::TypeString(TypeString { ty, .. }) => ty.clone(),
+            Ast::TypeNumber(TypeNumber { ty, .. }) => ty.clone(),
+            _ => return None,
+        };
+        for prop in tl.iter() {
+            if let PropertyName::LiteralPropertyName(name) = &prop.key {
+                if *name == key_name {
+                    if prop.optional {
+                        return Some(Ast::UnionType(UnionType {
+                            types: vec![
+                                prop.value.clone(),
+                                Ast::Primitive(PrimitiveType::Undefined, span),
+                            ],
+                            span,
+                        }));
+                    }
+                    return Some(prop.value.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Look up `key` on a tuple `[A, B, …]`: a numeric-literal key selects the
+    /// element at that in-bounds index, `"length"` yields the literal arity, and
+    /// the `number` primitive yields the union of all element types (`never` for
+    /// the empty tuple). Anything else yields `None`.
+    fn index_tuple(tuple: &Tuple, key: &Ast, span: Span) -> Option<Ast> {
+        match key {
+            Ast::TypeNumber(TypeNumber { ty, .. }) => {
+                let index = Self::number_value(ty)?;
+                if index.fract() != 0.0 || index < 0.0 {
+                    return None;
+                }
+                tuple.items.get(index as usize).cloned()
+            }
+            Ast::TypeString(TypeString { ty, .. }) if ty == "length" => {
+                Some(Ast::TypeNumber(TypeNumber {
+                    ty: tuple.items.len().to_string(),
+                    span,
+                }))
+            }
+            Ast::Primitive(PrimitiveType::Number, _) => {
+                Some(Self::union_of(tuple.items.clone(), span))
+            }
+            _ => None,
+        }
+    }
+
+    /// Look up `key` on an array `E[]`: a numeric-literal key or the `number`
+    /// primitive yields the element type `E`, and `"length"` yields `number`.
+    /// Anything else yields `None`.
+    fn index_array(element: &Ast, key: &Ast, span: Span) -> Option<Ast> {
+        match key {
+            Ast::TypeNumber(_) | Ast::Primitive(PrimitiveType::Number, _) => Some(element.clone()),
+            Ast::TypeString(TypeString { ty, .. }) if ty == "length" => {
+                Some(Ast::Primitive(PrimitiveType::Number, span))
+            }
+            _ => None,
+        }
     }
 }

@@ -14,6 +14,24 @@ use crate::{
     typescript,
 };
 
+/// Render the object side of an indexed access `O[K]`, parenthesizing `O` when
+/// it is a lower-precedence type constructor. An index access binds tighter than
+/// a union/intersection (`(X | Y)["k"]` must keep its parens, else it reparses as
+/// `X | Y["k"]`), a function type, a conditional, or a `readonly` array, so those
+/// operands are wrapped.
+fn access_object_doc(lhs: &Ast) -> D<'_, ()> {
+    let needs_parens = lhs.is_set_op()
+        || matches!(
+            lhs,
+            Ast::FunctionType(_) | Ast::ExtendsExpr(_) | Ast::Infer(_) | Ast::Readonly(_)
+        );
+    if needs_parens {
+        parens(lhs.to_ts())
+    } else {
+        lhs.to_ts()
+    }
+}
+
 pub trait Pretty {
     fn render_pretty_ts(&self, width: usize) -> String {
         let mut w = Vec::new();
@@ -232,14 +250,13 @@ impl typescript::Pretty for Ast {
                     .as_ident()
                     .expect("rhs of dot access should be an ident");
 
-                lhs.to_ts()
+                access_object_doc(lhs)
                     .append(D::text("["))
                     .append(string_literal(rhs.name.as_str()))
                     .append(D::text("]"))
                     .group()
             }
-            Ast::Access(Access { lhs, rhs, .. }) => lhs
-                .to_ts()
+            Ast::Access(Access { lhs, rhs, .. }) => access_object_doc(lhs)
                 .append(D::text("["))
                 .append(rhs.to_ts())
                 .append(D::text("]"))

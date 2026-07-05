@@ -832,4 +832,107 @@ mod tests {
             "stderr: {stderr}"
         );
     }
+
+    #[test]
+    fn tuple_indexed_access_reduces() {
+        // Numeric-literal keys, ['length'] (literal arity), and [number]
+        // (element union) all reduce to definite results.
+        let (report, stderr) = run_src(
+            "type Pair as [string, number]\n\
+            unittest \"t\" do\n\
+            \x20 assert Pair[0] <: string\n\
+            \x20 assert Pair[0] == string\n\
+            \x20 assert Pair[1] == number\n\
+            \x20 assert not (Pair[0] <: number)\n\
+            \x20 assert Pair['length'] == 2\n\
+            \x20 assert not (Pair['length'] <: 3)\n\
+            \x20 assert Pair[number] == string | number\n\
+            \x20 assert number <: Pair[number]\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 8,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn array_indexed_access_reduces() {
+        // `E[]` and `readonly E[]`: [number]/[0] -> E, ['length'] -> number.
+        let (report, stderr) = run_src(
+            "type Arr as string[]\n\
+            type RArr as readonly number[]\n\
+            unittest \"t\" do\n\
+            \x20 assert Arr[number] == string\n\
+            \x20 assert Arr[0] == string\n\
+            \x20 assert Arr['length'] == number\n\
+            \x20 assert not (Arr[number] <: number)\n\
+            \x20 assert RArr[number] == number\n\
+            \x20 assert RArr[0] <: number\n\
+            \x20 assert RArr['length'] == number\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 7,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn union_key_indexed_access_distributes() {
+        // `T['a' | 'b']` -> `T['a'] | T['b']`.
+        let (report, stderr) = run_src(
+            "type Rec as { a: string, b: number }\n\
+            unittest \"t\" do\n\
+            \x20 assert Rec['a' | 'b'] == string | number\n\
+            \x20 assert string <: Rec['a' | 'b']\n\
+            \x20 assert not (Rec['a' | 'b'] <: string)\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 3,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn union_and_intersection_object_side_indexed_access() {
+        // `(X | Y)['k']` distributes; `(X & Y)['k']` intersects member types.
+        let (report, stderr) = run_src(
+            "type X as { k: string }\n\
+            type Y as { k: number }\n\
+            type Zk as { m: boolean }\n\
+            unittest \"t\" do\n\
+            \x20 assert (X | Y)['k'] == string | number\n\
+            \x20 assert not ((X | Y)['k'] <: string)\n\
+            \x20 assert (X & Y)['k'] == never\n\
+            \x20 assert (X & Zk)['k'] == string\n\
+            \x20 assert not ((X & Zk)['k'] <: number)\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 5,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
 }

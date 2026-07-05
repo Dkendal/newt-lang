@@ -1,8 +1,17 @@
-// Conformance probes for string-literal indexed access at relation leaves (G2).
+// Conformance probes for indexed access at relation leaves (G2).
 // Every assertion below is expected to agree with tsgo --strict.
 //
-// Scope: string-literal keys only. Numeric keys, ['length'], arrays/tuples,
-// and unions of keys are intentionally out of scope and stay indeterminate.
+// Scope: string-literal keys, tuple numeric-literal / ['length'] / [number]
+// keys, array [number] / [0] / ['length'] keys (incl. readonly arrays), union
+// keys (distribute), and union / intersection object sides (distribute).
+//
+// OUT of scope (stay indeterminate; NOT probed here so this file fully agrees):
+//   * keyof-driven keys, e.g. `T[keyof T]` (G3).
+//   * accesses to a key absent from a union member, e.g. `(X | W)['k']` where
+//     `W` lacks `k`: this is a *type error* in tsgo (Property 'k' does not exist
+//     on 'W | X'), so it must NOT be asserted here; per the all-or-nothing rule
+//     the engine leaves it unreduced (`Both`).
+//   * generic / unresolvable object sides.
 
 type User as {
     info: {
@@ -53,4 +62,93 @@ unittest "optional-property indexed access includes undefined" do
     // A required property is not widened.
     assert Opt['y'] <: string
     assert Opt['y'] == string
+end
+
+// ---------------------------------------------------------------------------
+// Tuple object side. `[A, B]` carries numeric-literal element keys, a literal
+// `length`, and a `number` index yielding the element union. All verified
+// against tsgo --strict.
+type Pair as [string, number]
+
+unittest "tuple numeric-literal indexed access" do
+    assert Pair[0] <: string
+    assert Pair[0] == string
+    assert Pair[1] <: number
+    assert Pair[1] == number
+    assert not (Pair[0] <: number)
+end
+
+unittest "tuple length is the literal arity" do
+    assert Pair['length'] <: 2
+    assert Pair['length'] == 2
+    assert not (Pair['length'] <: 3)
+end
+
+unittest "tuple number index is the element union" do
+    assert Pair[number] <: string | number
+    assert Pair[number] == string | number
+    assert string <: Pair[number]
+    assert number <: Pair[number]
+end
+
+// ---------------------------------------------------------------------------
+// Array object side. `E[]` reduces `[number]`/`[0]` to `E` and `['length']` to
+// `number`. `readonly E[]` behaves identically for reads.
+type Arr as string[]
+type RArr as readonly number[]
+
+unittest "array indexed access" do
+    assert Arr[number] <: string
+    assert Arr[number] == string
+    assert Arr[0] <: string
+    assert Arr[0] == string
+    assert Arr['length'] <: number
+    assert Arr['length'] == number
+    assert not (Arr[number] <: number)
+end
+
+unittest "readonly array indexed access" do
+    assert RArr[number] <: number
+    assert RArr[number] == number
+    assert RArr[0] <: number
+    assert RArr['length'] <: number
+    assert RArr['length'] == number
+end
+
+// ---------------------------------------------------------------------------
+// Union KEY: `T['a' | 'b']` distributes to `T['a'] | T['b']`. All-or-nothing:
+// every branch must itself reduce.
+type Rec as { a: string, b: number }
+
+unittest "union key distributes over the object" do
+    assert Rec['a' | 'b'] <: string | number
+    assert Rec['a' | 'b'] == string | number
+    assert string <: Rec['a' | 'b']
+    assert not (Rec['a' | 'b'] <: string)
+end
+
+// ---------------------------------------------------------------------------
+// Union OBJECT side: `(X | Y)['k']` distributes to `X['k'] | Y['k']`.
+type X as { k: string }
+type Y as { k: number }
+
+unittest "union object side distributes the access" do
+    assert (X | Y)['k'] <: string | number
+    assert (X | Y)['k'] == string | number
+    assert not ((X | Y)['k'] <: string)
+end
+
+// ---------------------------------------------------------------------------
+// Intersection OBJECT side: `(X & Y)['k']` yields the intersection of the
+// property types from the members that carry `k`. If only one member carries
+// it, that member's type. `string & number` is uninhabited (`never`).
+type Zk as { m: boolean }
+
+unittest "intersection object side intersects member property types" do
+    // Both members carry `k`: string & number, which is never.
+    assert (X & Y)['k'] == never
+    // Only X carries `k`; Z contributes nothing.
+    assert (X & Zk)['k'] <: string
+    assert (X & Zk)['k'] == string
+    assert not ((X & Zk)['k'] <: number)
 end
