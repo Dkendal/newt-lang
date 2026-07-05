@@ -1166,17 +1166,111 @@ impl Ast {
         Some(keys)
     }
 
-    /// Evaluate `keyof arg` to a single relatable type: the union of its
-    /// string-named keys (a bare key when there is one, `never` for the empty
-    /// object). `None` when the argument is not an enumerable object literal.
+    /// Evaluate `keyof arg` to a single relatable type. For an object literal
+    /// this is the union of its string-named keys (a bare key when there is one,
+    /// `never` for the empty object). Additional reducible forms:
+    ///
+    /// * `keyof (A | B)` = `keyof A & keyof B`: for object literals, the
+    ///   INTERSECTION of the members' key sets (the shared plain keys).
+    /// * `keyof (A & B)` = `keyof A | keyof B`: the UNION of the members' key
+    ///   sets. NOTE: this does not model an intersection that collapses to
+    ///   `never` because a shared key has conflicting property types — tsgo then
+    ///   yields `keyof never` (`string | number | symbol`) — so such a case is
+    ///   reduced here to the union of keys, disagreeing with tsgo. That is the
+    ///   same unmodelled gap as intersection-to-never for conflicting object
+    ///   properties elsewhere in the engine.
+    /// * `keyof unknown` = `never`; `keyof never` = `string | number | symbol`.
+    ///
+    /// `None` when the argument is not one of these enumerable forms (a
+    /// primitive, array, tuple, unresolved reference, index signature, …),
+    /// leaving the relation indeterminate.
     fn eval_keyof(arg: &Ast, ctx: &ResolveCtx) -> Option<Ast> {
-        let keys = Self::keyof_string_keys(arg, ctx)?;
         let span = arg.as_span();
-        Some(match keys.len() {
+        let resolved = ctx.env().and_then(|env| env.resolve_head(arg));
+        let target = resolved.as_ref().unwrap_or(arg);
+
+        match target {
+            // `keyof unknown` is the empty key set.
+            Ast::UnknownKeyword(_) => Some(Ast::NeverKeyword(span)),
+
+            // `keyof never` is every possible key domain.
+            Ast::NeverKeyword(_) => Some(Ast::UnionType(UnionType {
+                types: vec![
+                    Ast::Primitive(PrimitiveType::String, span),
+                    Ast::Primitive(PrimitiveType::Number, span),
+                    Ast::Primitive(PrimitiveType::Symbol, span),
+                ],
+                span,
+            })),
+
+            // `keyof (A | B)` = `keyof A & keyof B`: the intersection of the
+            // members' key sets. All-or-nothing: every member must reduce.
+            Ast::UnionType(UnionType { types, .. }) => {
+                let mut members = types.iter();
+                let mut acc = Self::keyof_key_names(members.next()?, ctx)?;
+                for member in members {
+                    let names = Self::keyof_key_names(member, ctx)?;
+                    acc.retain(|n| names.contains(n));
+                }
+                Some(Self::names_to_key_union(acc, span))
+            }
+
+            // `keyof (A & B)` = `keyof A | keyof B`: the union of the members'
+            // key sets. All-or-nothing: every member must reduce.
+            Ast::IntersectionType(IntersectionType { types, .. }) => {
+                let flat = Self::flatten_intersection_members(types);
+                let mut acc: Vec<String> = vec![];
+                for member in &flat {
+                    for name in Self::keyof_key_names(member, ctx)? {
+                        if !acc.contains(&name) {
+                            acc.push(name);
+                        }
+                    }
+                }
+                Some(Self::names_to_key_union(acc, span))
+            }
+
+            _ => {
+                let keys = Self::keyof_string_keys(target, ctx)?;
+                let names = keys
+                    .into_iter()
+                    .map(|k| match k {
+                        Ast::TypeString(TypeString { ty, .. }) => ty,
+                        _ => unreachable!("keyof_string_keys yields TypeString nodes"),
+                    })
+                    .collect();
+                Some(Self::names_to_key_union(names, span))
+            }
+        }
+    }
+
+    /// The plain string key names of `arg` (an object literal or a reference to
+    /// one), in declaration order. `None` when `arg` is not an enumerable object
+    /// literal (mirrors `keyof_string_keys`).
+    fn keyof_key_names(arg: &Ast, ctx: &ResolveCtx) -> Option<Vec<String>> {
+        let keys = Self::keyof_string_keys(arg, ctx)?;
+        Some(
+            keys.into_iter()
+                .map(|k| match k {
+                    Ast::TypeString(TypeString { ty, .. }) => ty,
+                    _ => unreachable!("keyof_string_keys yields TypeString nodes"),
+                })
+                .collect(),
+        )
+    }
+
+    /// Build the relatable key type from a set of plain key names: `never` for
+    /// the empty set, a bare `TypeString` for a singleton, else a union.
+    fn names_to_key_union(names: Vec<String>, span: Span) -> Ast {
+        let mut keys: Vec<Ast> = names
+            .into_iter()
+            .map(|ty| Ast::TypeString(TypeString { ty, span }))
+            .collect();
+        match keys.len() {
             0 => Ast::NeverKeyword(span),
-            1 => keys.into_iter().next().unwrap(),
+            1 => keys.pop().unwrap(),
             _ => Ast::UnionType(UnionType { types: keys, span }),
-        })
+        }
     }
 
     /// Expand a mapped type `{ [K in T]: V }` to the equivalent object literal,
@@ -1617,6 +1711,20 @@ impl Ast {
         // Resolve a named key one step so a literal-union alias distributes.
         let key_resolved = ctx.env().and_then(|env| env.resolve_head(key));
         let key = key_resolved.as_ref().unwrap_or(key);
+
+        // A `keyof` KEY (`T[keyof T]`, `T[keyof U]`) reduces to its literal-key
+        // union first, then re-enters — distributing through the union-key path
+        // below. All-or-nothing: if the keyof does not reduce, the whole access
+        // stays unreduced.
+        if let Ast::Builtin(Builtin {
+            name: BuiltinKeyword::Keyof,
+            argument,
+            ..
+        }) = key
+        {
+            let reduced = Self::eval_keyof(argument, ctx)?;
+            return Self::index_type(obj, &reduced, ctx, span, depth + 1);
+        }
 
         // A union KEY distributes over the object: `T["a" | "b"]` →
         // `T["a"] | T["b"]`. All-or-nothing: every branch must itself reduce.

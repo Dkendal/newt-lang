@@ -303,7 +303,20 @@ impl typescript::Pretty for Ast {
             Ast::Infer(value) => D::text("infer").append(D::space()).append(value.to_ts()),
 
             Ast::Builtin(Builtin { name, argument, .. }) => {
-                name.to_ts().append(" ").append(argument.to_ts())
+                // `keyof` (and the other type operators) bind tighter than a
+                // union/intersection, function type, or conditional, so a
+                // low-precedence operand must keep its parens — else
+                // `keyof (A | B)` reparses as `(keyof A) | B`.
+                let arg_doc = if argument.is_set_op()
+                    || matches!(
+                        argument.as_ref(),
+                        Ast::FunctionType(_) | Ast::ExtendsExpr(_) | Ast::Infer(_)
+                    ) {
+                    parens(argument.to_ts())
+                } else {
+                    argument.to_ts()
+                };
+                name.to_ts().append(" ").append(arg_doc)
             }
 
             Ast::ExtendsExpr(ExtendsExpr {

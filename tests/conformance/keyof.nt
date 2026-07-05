@@ -1,0 +1,86 @@
+// Conformance probes for `keyof` reduction over unions/intersections and
+// keyof-driven indexed-access keys (G3). Every assertion below is expected to
+// agree with tsgo --strict; each was verified against tsgo 7.0.
+//
+// Scope (this file):
+//   * keyof (A | B) = keyof A & keyof B: the INTERSECTION of the members' key
+//     sets (for object literals, the shared plain string keys).
+//   * keyof (A & B) = keyof A | keyof B: the UNION of the members' key sets,
+//     for intersections that do NOT collapse (disjoint / compatible keys).
+//   * keyof unknown = never; keyof never = string | number | symbol.
+//   * T[keyof T] / T[keyof U]: the keyof key reduces to its literal-key union,
+//     then distributes through the union-key path (all-or-nothing).
+//
+// OUT of scope (stay indeterminate; NOT probed here so this file fully agrees):
+//   * keyof of primitives / arrays / tuples (needs apparent-member modelling,
+//     G7): e.g. `keyof string[]`, `keyof number` stay `Both`.
+//   * keyof (A & B) where the intersection COLLAPSES to `never` because a shared
+//     key has conflicting property types (e.g. { b: 2 } & { b: 3 }): tsgo gives
+//     `keyof never` = string | number | symbol, but the engine does not model
+//     intersection-to-never for conflicting object properties, so this is left
+//     unmodelled and not asserted here.
+//   * T[keyof U] where U has a key ABSENT from T (e.g. A[keyof B], B ⊄ A): a
+//     type error in tsgo (Property does not exist), left unreduced (`Both`).
+
+type A as { a: 1, b: 2 }
+type B as { b: 3, c: 4 }
+
+unittest "keyof union is the intersection of key sets" do
+    // keyof A = 'a'|'b', keyof B = 'b'|'c' -> intersection is 'b'.
+    assert keyof (A | B) == 'b'
+    assert keyof (A | B) <: 'b'
+    assert 'b' <: keyof (A | B)
+    assert not ('a' <: keyof (A | B))
+end
+
+type A2 as { a: 1, b: 2, c: 3 }
+type B2 as { b: 4, c: 5, d: 6 }
+
+unittest "keyof union with two shared keys" do
+    // Shared keys are 'b' and 'c'.
+    assert keyof (A2 | B2) == 'b' | 'c'
+    assert 'b' <: keyof (A2 | B2)
+    assert 'c' <: keyof (A2 | B2)
+    assert not ('a' <: keyof (A2 | B2))
+    assert not ('d' <: keyof (A2 | B2))
+end
+
+// Intersection with disjoint keys does not collapse to never.
+type P as { a: 1, b: 2 }
+type Q as { c: 3, d: 4 }
+
+unittest "keyof intersection is the union of key sets" do
+    assert keyof (P & Q) == 'a' | 'b' | 'c' | 'd'
+    assert 'a' <: keyof (P & Q)
+    assert 'd' <: keyof (P & Q)
+    assert not ('e' <: keyof (P & Q))
+end
+
+unittest "keyof unknown is never" do
+    assert keyof unknown == never
+    assert keyof unknown <: never
+end
+
+unittest "keyof never is string | number | symbol" do
+    assert keyof never == string | number | symbol
+    assert string <: keyof never
+    assert number <: keyof never
+end
+
+unittest "T[keyof T] reduces via keyof-driven key" do
+    // keyof A = 'a'|'b' -> A['a'|'b'] = 1 | 2.
+    assert A[keyof A] == 1 | 2
+    assert 1 <: A[keyof A]
+    assert 2 <: A[keyof A]
+    assert not (A[keyof A] <: 1)
+end
+
+// T[keyof U] where every key of U is also a key of T.
+type Big as { a: 10, b: 20, c: 30 }
+type Sub as { a: 1, b: 2 }
+
+unittest "T[keyof U] with U keys a subset of T" do
+    assert Big[keyof Sub] == 10 | 20
+    assert 10 <: Big[keyof Sub]
+    assert not (Big[keyof Sub] <: 10)
+end

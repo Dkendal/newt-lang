@@ -106,16 +106,29 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   intersected). The TS renderer now parenthesizes a set-op/function/conditional/
   readonly object side (`access_object_doc` in `src/typescript.rs`). Covered by
   `tests/conformance/indexed_access.nt` and `src/test_harness.rs`.
-  STILL OPEN (moved to G3): `keyof`-driven keys, e.g. `T[keyof T]`, and any key
-  that only becomes a literal/union after `keyof` reduction, stay indeterminate
-  (`Both`). Out-of-bounds tuple indices and accesses to a key absent from a
-  union member are TS *errors*, so they are intentionally left unreduced.
-- [ ] **G3.** `keyof` of primitives/arrays/tuples/unions/intersections/`any` not
-  reduced (only `keyof` of a single object literal). Also covers `keyof`-driven
-  indexed-access keys handed over from G2: `T[keyof T]` and any indexed access
-  whose key only resolves to a literal/union after `keyof` reduction stay
-  indeterminate until `keyof` reduction lands here, at which point
-  `index_type` (in `src/ast/assignability.rs`) already handles the resulting key.
+  `keyof`-driven keys (`T[keyof T]`) are now reduced too — see G3. Out-of-bounds
+  tuple indices, negative/fractional tuple indices, and accesses to a key absent
+  from a union member are TS *errors*, so they are intentionally left unreduced.
+  NOTE: negative/fractional numeric-literal indices on an ARRAY (`E[][-1]`,
+  `E[][1.5]`) are NOT errors in tsgo — they yield the element type — so
+  `index_array` correctly keeps reducing them (verified against tsgo 7.0).
+- [~] **G3.** `keyof` reduction extended (`eval_keyof` in
+  `src/ast/assignability.rs`). DONE: `keyof (A | B)` = `keyof A & keyof B` (the
+  intersection of the members' key sets); `keyof (A & B)` = `keyof A | keyof B`
+  (the union of key sets, for non-collapsing intersections); `keyof unknown` =
+  `never`; `keyof never` = `string | number | symbol`; and `keyof`-driven
+  indexed-access keys — `T[keyof T]` / `T[keyof U]` reduce the keyof key to its
+  literal-key union and distribute through the existing union-key path
+  (all-or-nothing). The TS renderer now parenthesizes a low-precedence `keyof`
+  operand (`keyof (A | B)` no longer reparses as `(keyof A) | B`). Covered by
+  `tests/conformance/keyof.nt` and `src/test_harness.rs`.
+  STILL OPEN: `keyof` of primitives/arrays/tuples and object-literal keys that
+  are numeric- or symbol-named beyond `keyof_string_keys` — these need
+  apparent-member modelling (see G7) and stay `Both`. Also unmodelled: `keyof (A
+  & B)` where the intersection COLLAPSES to `never` because a shared key has
+  conflicting property types — tsgo gives `keyof never` (`string | number |
+  symbol`), but the engine reduces to the union of keys (the same
+  intersection-to-never gap noted elsewhere). `keyof any` is desugared upstream.
 - [ ] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` not equated with `T[]`.
 - [ ] **G5.** The `Array(?U)` infer pattern does not match tuple types.
 - [ ] **G6.** Tuple-typed rest parameter `(...a: [A, B]) => …` not expanded.

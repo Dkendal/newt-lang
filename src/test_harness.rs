@@ -935,4 +935,96 @@ mod tests {
             "stderr: {stderr}"
         );
     }
+
+    #[test]
+    fn keyof_union_is_the_intersection_of_key_sets() {
+        // keyof (A | B) = keyof A & keyof B: the shared plain keys.
+        let (report, stderr) = run_src(
+            "type A as { a: 1, b: 2 }\n\
+            type B as { b: 3, c: 4 }\n\
+            unittest \"t\" do\n\
+            \x20 assert keyof (A | B) == 'b'\n\
+            \x20 assert 'b' <: keyof (A | B)\n\
+            \x20 assert not ('a' <: keyof (A | B))\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 3,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn keyof_intersection_is_the_union_of_key_sets() {
+        // keyof (P & Q) = keyof P | keyof Q (disjoint keys, no never-collapse).
+        let (report, stderr) = run_src(
+            "type P as { a: 1, b: 2 }\n\
+            type Q as { c: 3, d: 4 }\n\
+            unittest \"t\" do\n\
+            \x20 assert keyof (P & Q) == 'a' | 'b' | 'c' | 'd'\n\
+            \x20 assert 'a' <: keyof (P & Q)\n\
+            \x20 assert not ('e' <: keyof (P & Q))\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 3,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn keyof_unknown_and_never_reduce() {
+        // keyof unknown = never; keyof never = string | number | symbol.
+        let (report, stderr) = run_src(
+            "unittest \"t\" do\n\
+            \x20 assert keyof unknown == never\n\
+            \x20 assert keyof never == string | number | symbol\n\
+            \x20 assert string <: keyof never\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 3,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn keyof_driven_indexed_access_reduces() {
+        // T[keyof T] and T[keyof U] reduce the keyof key then distribute.
+        let (report, stderr) = run_src(
+            "type A as { a: 1, b: 2 }\n\
+            type Big as { a: 10, b: 20, c: 30 }\n\
+            type Sub as { a: 1, b: 2 }\n\
+            unittest \"t\" do\n\
+            \x20 assert A[keyof A] == 1 | 2\n\
+            \x20 assert 1 <: A[keyof A]\n\
+            \x20 assert not (A[keyof A] <: 1)\n\
+            \x20 assert Big[keyof Sub] == 10 | 20\n\
+            end",
+            false,
+        );
+        assert_eq!(
+            report,
+            Report {
+                passed: 4,
+                failed: 0
+            },
+            "stderr: {stderr}"
+        );
+    }
 }
