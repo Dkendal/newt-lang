@@ -15,9 +15,34 @@ carries a `TODO raise on unresolved types` for exactly this.
 
 ## Behavior
 
-A **static whole-program pass** runs after parsing (on the pre-`simplify` AST)
-and reports every type reference that cannot resolve to a definition in the
-file.
+Two cooperating pieces:
+
+1. **Global sugar desugaring (new, pre-resolution).** Some built-in
+   TypeScript types are alternate spellings of forms the engine already
+   understands. These are rewritten bottom-up across the whole tree —
+   including `unittest` bodies, `assert` claims, and `interface` definitions —
+   *before* any identifier resolution, so they are never treated as type
+   references at all:
+
+   - `Array(T)` → `T[]`
+   - `ReadonlyArray(T)` → `readonly T[]`
+   - `Readonly(T)` → `readonly T`, only when `T` is a tuple or array type
+     (TypeScript's mapped-type `Readonly<T>` over objects is not implemented)
+   - `keyof any` → `string | number | symbol`
+
+   The rewrite runs at the front of `simplify()` (so evaluation and rendering
+   both see the core forms) and again before the warning pass in the CLI.
+   Leftover spellings the rewrite doesn't cover — `Array` with the wrong
+   arity, a bare `Array` ident, `Readonly` of a non-tuple/array — fall
+   through to the warning pass as unresolved references.
+
+   Rendering consequence: `Array(x)` now renders as `x[]` rather than
+   `Array<x>` (equivalent TypeScript); the one corpus fixture asserting the
+   old spelling is updated.
+
+2. **A static whole-program warning pass** runs after parsing and desugaring
+   (before `simplify`) and reports every type reference that cannot resolve
+   to a definition in the file.
 
 A reference is a bare `Ident` in type position or the `Ident` head of an
 `ApplyGeneric`. It resolves if it names:
@@ -30,7 +55,11 @@ A reference is a bare `Ident` in type position or the `Ident` head of an
   follow-up project (see Future work), after which an import only resolves if
   its module is actually found and loaded, and its types evaluate concretely.
   Until then imported names do not warn, but evaluation still treats them as
-  indeterminate — or
+  indeterminate,
+- a name the assignability engine understands semantically without a
+  definition: the `Object` and `Function` interfaces and the object wrappers
+  `Boolean`, `Number`, `String`, `Symbol`, `BigInt` (all special-cased in the
+  engine; `assert () => void <: Function` genuinely evaluates today) — or
 - a name bound in the current lexical scope:
   - type parameters of the enclosing `type`/`interface` (in scope for `where`
     constraints, parameter defaults, and the body),
@@ -43,9 +72,11 @@ A reference is a bare `Ident` in type position or the `Ident` head of an
 
 Deliberately **not** exempt:
 
-- **TypeScript built-ins.** No allowlist: `ReadonlyArray`, `Array`, `Record`,
-  etc. all warn until defined in (or imported into) the file. (A future
-  "include built-in types" feature may change this; out of scope here.)
+- **Other TypeScript built-ins.** Beyond the desugared aliases and the
+  engine-known names above, there is no allowlist: `Record`, `Pick`,
+  `Promise`, etc. all warn until defined in (or imported into) the file. (A
+  future "include built-in types" feature may change this; out of scope
+  here.)
 
 Scanned positions: type alias bodies, parameter defaults and `where`
 constraint bounds, interface bodies and `extends` clauses, and `assert` claims
@@ -57,12 +88,12 @@ One ariadne report per **distinct unresolved name**, `ReportKind::Warning`,
 with one label per use site, written to stderr before the unittest report:
 
 ```
-Warning: cannot resolve type `ReadonlyArray`
-   ╭─[ examples/ts-toolbelt.nt:41:9 ]
+Warning: cannot resolve type `Pick`
+   ╭─[ example.nt:41:9 ]
    │
-41 │         ReadonlyArray(A)
-   │         ──────┬──────
-   │               ╰──────── cannot be resolved to a definition
+41 │         Pick(User, 'id')
+   │         ────┬───
+   │             ╰───── cannot be resolved to a definition
 ```
 
 The label says "cannot be resolved to a definition" rather than "not defined
@@ -81,6 +112,11 @@ Reports are ordered by the first use site's source position (deterministic).
 
 ## Implementation shape
 
+- **New module `src/ast/desugar.rs`**: `Ast::desugar_globals(&self) -> Ast`,
+  an explicit bottom-up rewrite modeled on `rewrite_unique_symbols` (with its
+  own `UnitTest`/`Assert`/`Interface` arms, since `Ast::map` does not recurse
+  into those). Called at the front of `Ast::simplify` and by the CLI before
+  the warning pass.
 - **New module `src/ast/unresolved.rs`** exporting something like
   `pub fn unresolved_references(program: &Ast) -> Vec<UnresolvedRef>` where
   `UnresolvedRef { name: String, spans: Vec<Span> }` (grouped by name, spans in
@@ -123,10 +159,17 @@ Reports are ordered by the first use site's source position (deterministic).
 - **CLI/harness-level test**: a program with `ReadonlyArray` used but
   undefined produces a warning on stderr and exit code 0; with
   `--deny-unresolved`, nonzero.
-- **End-to-end motivating case**: `examples/ts-toolbelt.nt` warns on
-  `ReadonlyArray` only.
-- Conformance harness (`mise run tc`) is unaffected: warnings do not change
-  evaluation or the generated TypeScript.
+- **Desugaring unit tests**: each alias rewrites (in alias bodies, interface
+  definitions, and assert claims); `Readonly` of a non-tuple/array and
+  wrong-arity `Array` are left alone; `keyof any` becomes
+  `string | number | symbol`. The `params_in_application` corpus fixture's
+  expected output changes from `Array<x>` to `x[]`.
+- **End-to-end motivating case**: `examples/ts-toolbelt.nt` — `ReadonlyArray(A)`
+  desugars to `readonly A[]`, so `List` resolves, the `At(User, 'id') <: number`
+  assert evaluates definitively (expected: passes), and no warning is
+  emitted. Stale TODO comments in the example are updated.
+- Conformance harness (`mise run tc`) re-run to confirm the desugared forms
+  (e.g. `Array(?U)` patterns becoming `(?U)[]`) still agree with tsgo.
 
 ## Future work (separate spec)
 
