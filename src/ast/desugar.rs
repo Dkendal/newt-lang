@@ -47,6 +47,11 @@ impl Ast {
                     .extends
                     .as_ref()
                     .map(|e| Rc::new(e.desugar_globals())),
+                params: interface
+                    .params
+                    .iter()
+                    .map(|param| param.map(|ty| ty.desugar_globals()))
+                    .collect(),
                 ..interface.clone()
             }),
             other => other.map(|child| child.desugar_globals()),
@@ -170,6 +175,12 @@ mod tests {
         assert!(ts.contains("xs: number[]"), "{ts}");
         // Assert claims are evaluated, not rendered; check the evaluated result
         // separately below.
+    }
+
+    #[test]
+    fn desugars_inside_interface_type_parameter_constraints() {
+        let ts = desugar_ts("interface I(T) where T <: Array(number) { x: T }");
+        assert!(ts.contains("T extends number[]"), "{ts}");
     }
 
     #[test]
