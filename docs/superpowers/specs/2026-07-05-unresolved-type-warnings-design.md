@@ -23,7 +23,11 @@ A reference is a bare `Ident` in type position or the `Ident` head of an
 `ApplyGeneric`. It resolves if it names:
 
 - a top-level `type` alias, `interface`, or `unique symbol` declaration (the
-  same set `TypeEnv::from_program` registers), or
+  same set `TypeEnv::from_program` registers),
+- a name brought in by an `import` statement — a named specifier's local name
+  (the alias if present, otherwise the exported name) or a namespace import's
+  alias. Imports fully resolve the names they bind; evaluation still treats
+  them as indeterminate, but they do not warn — or
 - a name bound in the current lexical scope:
   - type parameters of the enclosing `type`/`interface` (in scope for `where`
     constraints, parameter defaults, and the body),
@@ -36,12 +40,9 @@ A reference is a bare `Ident` in type position or the `Ident` head of an
 
 Deliberately **not** exempt:
 
-- **Imported names.** An `import` does not resolve a name — imports must be
-  fully resolved within the file to count, so uses of imported types warn like
-  any other unresolved reference.
 - **TypeScript built-ins.** No allowlist: `ReadonlyArray`, `Array`, `Record`,
-  etc. all warn until defined in the file. (A future "include built-in types"
-  feature may change this; out of scope here.)
+  etc. all warn until defined in (or imported into) the file. (A future
+  "include built-in types" feature may change this; out of scope here.)
 
 Scanned positions: type alias bodies, parameter defaults and `where`
 constraint bounds, interface bodies and `extends` clauses, and `assert` claims
@@ -87,8 +88,10 @@ Reports are ordered by the first use site's source position (deterministic).
   where possible, and the module carries a test that exercises each binder
   form.
 - Top-level definition collection mirrors `TypeEnv::from_program` (idents,
-  interfaces, unique symbols). Duplication is acceptable at this size; if it
-  drifts, extract a shared helper.
+  interfaces, unique symbols), plus the local names bound by each
+  `ImportStatement` (named specifiers' aliases/exported names, namespace
+  aliases). Duplication is acceptable at this size; if it drifts, extract a
+  shared helper.
 - **`src/report.rs`** gains warning support: `build_report`/`render`/`eprint`
   take a `ReportKind` (or grow `_warning` variants), keeping the existing
   error helpers' signatures for current callers.
@@ -108,8 +111,9 @@ Reports are ordered by the first use site's source position (deterministic).
 - **Unit tests in `src/ast/unresolved.rs`**: an undefined name warns (bare and
   as generic head, and in generic argument position); each binder form does
   not warn (type params incl. `where`/defaults, `infer` in sugar and core
-  forms, mapped-type index, `let`, `match` binders); imported names warn;
-  shadowing resolves; grouping/ordering of multiple use sites.
+  forms, mapped-type index, `let`, `match` binders); imported names do not
+  warn (named, aliased, and namespace imports); shadowing resolves;
+  grouping/ordering of multiple use sites.
 - **CLI/harness-level test**: a program with `ReadonlyArray` used but
   undefined produces a warning on stderr and exit code 0; with
   `--deny-unresolved`, nonzero.
