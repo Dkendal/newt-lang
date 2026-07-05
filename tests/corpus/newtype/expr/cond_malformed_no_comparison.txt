@@ -10,7 +10,7 @@ end
 
 =======
 
-Error: Left hand side of condition branch is missing comparison.
+[E0001] Error: Syntax error
    ╭─[ <stdin>:2:5 ]
    │
  2 │     a -> b,

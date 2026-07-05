@@ -4,10 +4,12 @@ Returns an error when computed property is not valid
 =======
 {[{}]: string}
 =======
-Error: A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.
+[E0002] Error: Syntax error
    ╭─[ <stdin>:1:4 ]
    │
  1 │ { [{}]: string }
    │    ─┬
-   │     ╰── A computed property may only be a well known symbol. In typescript a computed key may be a value expression that is assignable to `any | string | number | symbol`, but newt does not support value expressions.
+   │     ╰── A computed property key may only be a well known symbol.
+   │
+   │ Help: See https://www.typescriptlang.org/docs/handbook/symbols.html#well-known-symbols
 ───╯

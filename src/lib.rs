@@ -22,6 +22,7 @@ pub mod runtime;
 pub mod test_codegen;
 pub mod test_harness;
 pub mod typescript;
+pub mod validation_error;
 
 #[cfg(test)]
 mod test_support;
