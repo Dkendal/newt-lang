@@ -184,6 +184,32 @@ mod tests {
     }
 
     #[test]
+    fn array_of_infer_is_parenthesized_in_conditional() {
+        use crate::typescript::Pretty;
+        let src = "type ElemA(T) as if T <: Array(?U) then U else never end";
+        let ts = crate::parser::parse_newtype_program(src)
+            .unwrap()
+            .simplify()
+            .render_pretty_ts(120);
+        assert!(ts.contains("(infer U)[]"), "{ts}");
+    }
+
+    #[test]
+    fn array_of_function_type_is_parenthesized() {
+        assert_eq!(
+            desugar_ts("type A as Array(() => void)"),
+            "type A = (() => void)[];\n\n"
+        );
+    }
+
+    #[test]
+    fn array_of_keyof_is_parenthesized() {
+        let ts = desugar_ts("type A as Array(keyof {a: 1})");
+        assert!(ts.contains("(keyof"), "{ts}");
+        assert!(ts.contains(")[]"), "{ts}");
+    }
+
+    #[test]
     fn desugared_claim_evaluates() {
         let src = "unittest \"t\" do\n  assert [1] <: Array(number)\n  assert [1] <: ReadonlyArray(number)\nend";
         let program = parse_newtype_program(src).unwrap().simplify();

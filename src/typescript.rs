@@ -254,7 +254,17 @@ impl typescript::Pretty for Ast {
                 D::text("[").append(items).append(D::text("]"))
             }
             Ast::Array(node) => {
-                let doc = if node.is_set_op() {
+                let needs_parens = node.is_set_op()
+                    || matches!(
+                        node.as_ref(),
+                        Ast::Infer(_)
+                            | Ast::FunctionType(_)
+                            | Ast::ExtendsExpr(_)
+                            | Ast::Builtin(_)
+                            | Ast::Readonly(_)
+                    );
+
+                let doc = if needs_parens {
                     parens(node.to_ts())
                 } else {
                     node.to_ts()
