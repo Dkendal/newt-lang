@@ -1167,4 +1167,6 @@ mod assignability;
 
 pub(crate) mod type_env;
 
+mod desugar;
+
 mod walk;

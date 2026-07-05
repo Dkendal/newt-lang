@@ -6,6 +6,6 @@ type A(x) as Array(x)
 
 =======
 
-type A<x> = Array<x>
+type A<x> = x[]
 
 =======

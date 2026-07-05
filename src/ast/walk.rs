@@ -110,14 +110,18 @@ impl Ast {
 
         let identity = |node, ctx| (node, ctx);
 
-        // First rewrite references to declared `unique symbol`s across the whole
-        // program (including `assert` claims, which the desugaring traverse below
-        // does not reach), then desugar conditionals in type-alias bodies.
-        let symbols = self.unique_symbols();
+        // Rewrite global sugar aliases (`Array(T)` → `T[]`, …) before anything
+        // resolves identifiers, then rewrite references to declared `unique
+        // symbol`s across the whole program (including `assert` claims, which
+        // the desugaring traverse below does not reach), then desugar
+        // conditionals in type-alias bodies.
+        let desugared = self.desugar_globals();
+
+        let symbols = desugared.unique_symbols();
         let rewritten = if symbols.is_empty() {
-            self.clone()
+            desugared
         } else {
-            self.rewrite_unique_symbols(&symbols)
+            desugared.rewrite_unique_symbols(&symbols)
         };
 
         let (tree, _) = rewritten.traverse(bindings, &identity, &|ast, ctx| {
