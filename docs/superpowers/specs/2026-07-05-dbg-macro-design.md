@@ -48,19 +48,26 @@ harness.
 
 ## Pipeline position
 
-The pass runs in `main.rs` **after `simplify()` and before
+The pass runs in `main.rs` **before `simplify()` and before
 `test_harness::run`**:
 
 ```
 parse → validate → desugar_globals → unresolved-refs warnings
-      → simplify
       → dbg! pass   ← new
+      → simplify
       → test_harness::run → render TS / test codegen → source map
 ```
 
-- After `simplify()`: sugar (`if`/`cond`/`match`/`let`) is gone, so what the
-  pass evaluates matches what the assert harness would see. Original spans
-  survive simplification, so reports point at the source as written.
+- Before `simplify()`: the desugarers reject non-TypeScript nodes
+  (`ExtendsExpr::new` panics on a `MacroCall` operand), so a `dbg!` inside an
+  `if`/`cond`/`match`/`let` body must be stripped before desugaring runs.
+  (The design originally placed the pass after `simplify()`; that ordering
+  crashed on `dbg!` inside `if` branches and was corrected.)
+- Post-desugar semantics are preserved on the evaluation side: the pass
+  builds its `TypeEnv` from the *simplified* cleaned program and simplifies
+  each collected step before normalizing it, so reported types match what the
+  assert harness would see. Original spans survive, so reports point at the
+  source as written.
 - Before the harness/renderer: the pass erases `MacroCall` nodes, which
   nothing downstream handles (`typescript.rs` treats a surviving `MacroCall`
   as unreachable).
@@ -94,9 +101,9 @@ contains `MacroCall` nodes:
    mid-pipeline `dbg!` boundary or a hand-written application ends the chain).
    Step spans are the nodes' own spans — a pipe-created application's span
    already covers the source from the pipeline start through that step.
-2. **Evaluate & report.** Build the `TypeEnv` from the cleaned program, then
-   for each work item in source order, normalize each step and print its
-   Debug report.
+2. **Evaluate & report.** Build the `TypeEnv` from the **simplified** cleaned
+   program, then for each work item in source order, simplify and normalize
+   each step and print its Debug report.
 
 Other macros (`assert_equal!`, `unquote!`) are out of scope and keep their
 current behavior. The buggy dead `MacroCall::eval` match (strips `!` then
@@ -104,12 +111,13 @@ matches names that still contain `!`) is corrected in passing.
 
 ### 3. Normalization
 
-`pub(crate) fn normalize(ast, ctx) -> Ast`: a bottom-up fixpoint loop of
-`simplify()`, `TypeEnv::resolve_head`, and the existing private reducers in
-`src/ast/assignability.rs` (`reduce_conditional`, `reduce_indexed_access`,
-keyof reduction), with a depth/iteration cap so recursive aliases terminate.
-Reducers get `pub(crate)` visibility; no behavior change to the assignability
-engine. A step that stops reducing (unresolvable reference, recursion cap)
+`pub fn normalize(ast, ctx) -> Ast`: a bottom-up fixpoint loop of
+`TypeEnv::resolve_head` and the existing private reducers in
+`src/ast/assignability.rs` (`reduce_conditional`, `reduce_access_leaf`,
+`eval_keyof`), with an iteration cap so recursive aliases terminate.
+(As built, `normalize` lives inside `assignability.rs` itself, so the
+reducers keep their private visibility.) No behavior change to the
+assignability engine. A step that stops reducing (unresolvable reference, recursion cap)
 prints as far as it got.
 
 ### 4. Reporting (`src/report.rs`)
@@ -133,6 +141,8 @@ A `render_debug` helper (or `Severity::Debug` variant) mapping to
   `a |> b |> dbg!()`, mid-pipeline `a |> dbg!() |> b`, `dbg!` around a
   hand-written application (single step), and alias normalization
   (`dbg!(Partial(User))` prints the expanded object type).
-- Parser: insta snapshot for `|> dbg!()`; corpus TS fixture confirming
-  `dbg!(X)` renders as `X`.
+- Parser: direct assertion tests for `|> dbg!()` in `tests/parser.rs`. (A
+  corpus TS fixture for `dbg!(X)` is infeasible: the corpus harness renders
+  without running the debug pass, so a surviving `MacroCall` would panic —
+  the render-equality unit tests in `dbg_expr.rs` cover the same claim.)
 - Conformance (`mise run tc`) unaffected by construction; run it to confirm.
