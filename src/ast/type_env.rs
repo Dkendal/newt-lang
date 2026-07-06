@@ -173,7 +173,7 @@ impl TypeEnv {
             def.body.clone()
         } else {
             let bindings = bind_params(&def.params, args);
-            distribute_or_substitute(&def.body, &bindings)
+            distribute_or_substitute(&def.body, &bindings, self.dbg())
         };
 
         let id = self.arena.borrow_mut().insert(body.clone());
@@ -218,7 +218,7 @@ impl TypeEnv {
                                 else {
                                     continue;
                                 };
-                                let bound = substitute(constraint, &bindings);
+                                let bound = substitute(constraint, &bindings, None);
                                 if value.is_assignable_to_ctx(&bound, ctx) == ExtendsResult::False {
                                     errors.borrow_mut().push(ArityError {
                                         span: node.as_span(),
@@ -307,7 +307,7 @@ fn bind_params(params: &[Param], args: &[Ast]) -> HashMap<String, Ast> {
             None => match &param.default {
                 // A default may use earlier parameters, so substitute what we
                 // have bound so far.
-                Some(default) => substitute(default, &bindings),
+                Some(default) => substitute(default, &bindings, None),
                 None => continue,
             },
         };
@@ -362,7 +362,15 @@ fn interface_def(interface: &Interface) -> Def {
 /// the results are unioned (`ToArray<A | B>` ≡ `ToArray<A> | ToArray<B>`).
 /// Otherwise the body is substituted directly. A wrapped check type (e.g.
 /// `[T] extends …`) is not a naked parameter, so it does not distribute.
-fn distribute_or_substitute(body: &Ast, bindings: &HashMap<String, Ast>) -> Ast {
+///
+/// `sink` is threaded through to [`substitute`] for the `dbg!` bare-parameter
+/// hook (Task 3); it is `Some` only from [`TypeEnv::instantiate`], `None` from
+/// every other caller (arity/constraint checking, parameter defaults).
+fn distribute_or_substitute(
+    body: &Ast,
+    bindings: &HashMap<String, Ast>,
+    sink: Option<&DbgSink>,
+) -> Ast {
     if let Ast::ExtendsExpr(ExtendsExpr { lhs, span, .. }) = body {
         if let Ast::Ident(Ident { name, .. }) = lhs.as_ref() {
             // The naked parameter distributes over the union members it is bound
@@ -381,7 +389,7 @@ fn distribute_or_substitute(body: &Ast, bindings: &HashMap<String, Ast>) -> Ast 
                     .map(|member| {
                         let mut member_bindings = bindings.clone();
                         member_bindings.insert(name.clone(), member.clone());
-                        substitute(body, &member_bindings)
+                        substitute(body, &member_bindings, sink)
                     })
                     .collect();
                 return Ast::UnionType(UnionType {
@@ -392,18 +400,38 @@ fn distribute_or_substitute(body: &Ast, bindings: &HashMap<String, Ast>) -> Ast 
         }
     }
 
-    substitute(body, bindings)
+    substitute(body, bindings, sink)
 }
 
 /// Substitute bound type arguments for parameter names throughout `body`.
-pub(crate) fn substitute(body: &Ast, bindings: &HashMap<String, Ast>) -> Ast {
-    let (tree, _) = body.prewalk(bindings.clone(), &|ast, bindings| match ast {
-        Ast::Ident(ref id) => {
-            let replacement = bindings.get(&id.name).cloned().unwrap_or(ast);
-            (replacement, bindings)
-        }
-        _ => (ast, bindings),
-    });
+///
+/// `sink` is the `dbg!` observation sink (Task 3): when a replaced parameter
+/// `Ident`'s span is watched (a bare `dbg!(K)` in a definition body), the
+/// replacement is observed at the *watch* span (the identifier's), not the
+/// argument's own span — this is how `dbg!(K)` reports the concrete argument
+/// bound to `K` at each call site. Every caller but
+/// [`TypeEnv::instantiate`] passes `None`, so substitution elsewhere (`where`
+/// constraint checks, parameter defaults) never touches the sink.
+pub(crate) fn substitute(
+    body: &Ast,
+    bindings: &HashMap<String, Ast>,
+    sink: Option<&DbgSink>,
+) -> Ast {
+    let (tree, _) = body.prewalk(
+        (bindings.clone(), sink),
+        &|ast, (bindings, sink)| match ast {
+            Ast::Ident(ref id) => match bindings.get(&id.name) {
+                Some(replacement) => {
+                    if let Some(sink) = sink {
+                        sink.observe_replacement(id.span, replacement);
+                    }
+                    (replacement.clone(), (bindings, sink))
+                }
+                None => (ast, (bindings, sink)),
+            },
+            _ => (ast, (bindings, sink)),
+        },
+    );
 
     tree
 }

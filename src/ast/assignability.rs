@@ -1193,7 +1193,23 @@ impl Ast {
     /// primitive, array, tuple, unresolved reference, index signature, …),
     /// leaving the relation indeterminate.
     fn eval_keyof(arg: &Ast, ctx: &ResolveCtx) -> Option<Ast> {
-        let span = arg.as_span();
+        // Read-only `dbg!` observation hook: the `keyof` argument as
+        // received, before resolution.
+        if let Some(sink) = ctx.env().and_then(|env| env.dbg()) {
+            sink.observe(arg);
+        }
+
+        // The synthesized result gets its own span, deliberately NOT aliasing
+        // `arg`'s: reusing the argument's span (as the rest of this function
+        // used to) makes the *computed* key type indistinguishable, to the
+        // `dbg!` watch-span index, from a fresh observation of the watched
+        // argument itself — a `dbg!(User)` under a `keyof` would then double-
+        // fire (once for `User`, once for the derived key union carrying the
+        // same coordinates). `Span` is excluded from `Ast`'s `PartialEq`
+        // (see its `impl PartialEq for Span`), so this is invisible to every
+        // other consumer; only the `dbg!` sink's exact-span lookup can tell
+        // the difference.
+        let span = Span::new(0, 0);
         let resolved = ctx.env().and_then(|env| env.resolve_head(arg));
         let target = resolved.as_ref().unwrap_or(arg);
 
@@ -1318,7 +1334,7 @@ impl Ast {
             // one-step reduction of a homomorphic `O[K]` indexed access.
             let mut bindings = HashMap::new();
             bindings.insert(mt.index.clone(), key.clone());
-            let body = substitute(&mt.body, &bindings);
+            let body = substitute(&mt.body, &bindings, None);
             let value = Self::reduce_indexed_access(&body, ctx);
 
             properties.push(ObjectProperty {
@@ -1417,6 +1433,12 @@ impl Ast {
             span,
         } = e;
 
+        // Read-only `dbg!` observation hook: the check type as received,
+        // before any resolution. Must not affect the branch selected.
+        if let Some(sink) = ctx.env().and_then(|env| env.dbg()) {
+            sink.observe(lhs);
+        }
+
         // Resolve a named check type one step (e.g. an alias) before matching.
         let check = ctx
             .env()
@@ -1430,7 +1452,7 @@ impl Ast {
                     .into_iter()
                     .map(|(name, types)| (name, Self::union_of(types, *span)))
                     .collect();
-                return substitute(then_branch, &resolved);
+                return substitute(then_branch, &resolved, None);
             }
             return (**else_branch).clone();
         }
@@ -1773,6 +1795,13 @@ impl Ast {
     fn index_type(obj: &Ast, key: &Ast, ctx: &ResolveCtx, span: Span, depth: usize) -> Option<Ast> {
         if depth > 32 {
             return None;
+        }
+
+        // Read-only `dbg!` observation hook: the object side and the key as
+        // received, before either is resolved.
+        if let Some(sink) = ctx.env().and_then(|env| env.dbg()) {
+            sink.observe(obj);
+            sink.observe(key);
         }
 
         // Resolve a named key one step so a literal-union alias distributes.

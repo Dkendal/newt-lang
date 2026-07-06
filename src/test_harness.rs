@@ -202,6 +202,14 @@ pub fn run(
 /// Drain `sink` (if any) and render each newly-observed watched span as a
 /// `Debug` report to `out`. A no-op when `sink` is `None` (no `dbg!` watches
 /// for this run).
+///
+/// `Ast::normalize` re-enters the same reducers (`reduce_conditional`,
+/// `index_type`, `eval_keyof`) that carry `dbg!` observation hooks, so
+/// rendering an already-drained event would otherwise itself generate new
+/// events — landing them in the *next* flush (misattributed to the following
+/// claim) or, for the last claim, never being drained (silently lost). The
+/// sink is paused for the duration of the normalize/render loop so this
+/// presentation-only pass cannot append to the log.
 fn flush_dbg_events(
     sink: Option<&DbgSink>,
     ctx: &ResolveCtx,
@@ -210,7 +218,9 @@ fn flush_dbg_events(
     out: &mut dyn Write,
 ) -> io::Result<()> {
     let Some(sink) = sink else { return Ok(()) };
-    for event in sink.drain() {
+    let events = sink.drain();
+    let _guard = sink.pause();
+    for event in events {
         let rendered = event.observed.normalize(ctx).render_pretty_ts(80);
         writeln!(
             out,
@@ -497,6 +507,85 @@ mod tests {
         assert_eq!(out.matches("Debug").count(), 2, "{out}");
         let (_, out2) = run_src_dbg(src2);
         assert_eq!(out2.matches("Debug").count(), 1, "{out2}");
+    }
+
+    // --- Task 3: reducer + substitution demand hooks ---------------------
+
+    #[test]
+    fn dbg_fires_with_live_bindings_and_dead_branches_stay_silent() {
+        let src = "type User as { id: number, name: string }\n\
+            type At(A, K) as if K <: keyof A then dbg!(A[K]) else dbg!(never) end\n\
+            unittest \"t\" do\n  assert At(User, 'id') <: number\nend";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (1, 0), "{out}");
+        // The taken branch fires with the substituted, demanded node…
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        // …and the value reflects the live binding (A[K] with A=User, K='id').
+        assert!(out.contains("= number"), "{out}");
+        // The dead else-branch (dbg!(never)) printed nothing:
+        assert!(!out.contains("= never"), "{out}");
+    }
+
+    #[test]
+    fn bare_parameter_dbg_reports_the_argument() {
+        let src = "type Probe(K) as dbg!(K)\n\
+            unittest \"t\" do\n  assert Probe('id') <: string\nend";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (1, 0), "{out}");
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        assert!(out.contains("'id'"), "{out}");
+    }
+
+    #[test]
+    fn distinct_instantiations_each_fire() {
+        let src = "type Probe(K) as dbg!(K)\n\
+            unittest \"t\" do\n  assert Probe('a') <: string\n  assert Probe('b') <: string\nend";
+        let (_, out) = run_src_dbg(src);
+        assert_eq!(out.matches("Debug").count(), 2, "{out}");
+    }
+
+    #[test]
+    fn keyof_operand_dbg_fires() {
+        let src = "type User as { id: number }\n\
+            unittest \"t\" do\n  assert 'id' <: keyof dbg!(User)\nend";
+        let (_, out) = run_src_dbg(src);
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+    }
+
+    /// Regression test for the flush-time renormalization hazard (Task 2's
+    /// review comment): `flush_dbg_events` renders each drained event via
+    /// `Ast::normalize`, which re-enters `reduce_conditional`/`index_type`/
+    /// `eval_keyof` — the very reducers Task 3 instruments. Two marks whose
+    /// hooks fire during *real* evaluation (not merely as a side effect of
+    /// display normalization) must still show up exactly once each, correctly
+    /// attributed to the claim that demanded them — not duplicated by the
+    /// renormalization, and not misattributed to a later claim's flush (or,
+    /// for the last claim, silently dropped after the process exits).
+    #[test]
+    fn flush_time_renormalization_does_not_duplicate_or_misattribute() {
+        // Two *distinct* bindings for `A` (User vs. Thing), so the `dbg!(A)`
+        // mark's dedupe key (span, value) differs across the two asserts —
+        // isolating the renormalization hazard from ordinary same-value
+        // dedupe (already covered by `repeated_evaluation_prints_once`).
+        let src = "type User as { id: number, name: string }\n\
+            type Thing as { id: string }\n\
+            type At(A, K) as if K <: keyof dbg!(A) then dbg!(A[K]) else dbg!(never) end\n\
+            unittest \"t\" do\n  \
+                assert At(User, 'id') <: number\n  \
+                assert At(Thing, 'id') <: string\n\
+            end";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (2, 0), "{out}");
+        // Each of the two `assert`s demands the `keyof dbg!(A)` mark once and
+        // the taken `dbg!(A[K])` mark once: four reports total. A
+        // renormalization duplicate would inflate this count; a
+        // misattribution or last-claim loss would leave it short.
+        assert_eq!(out.matches("Debug").count(), 4, "{out}");
+        // The dead else-branch never fires for either instantiation.
+        assert!(!out.contains("= never"), "{out}");
+        // Both claims passed (and neither panicked nor hung on the last
+        // claim's flush).
+        assert_eq!(out.matches("\n  ok").count(), 2, "{out}");
     }
 
     #[test]

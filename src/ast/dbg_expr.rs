@@ -14,7 +14,7 @@
 //! feature — a `MacroCall` is not, so a `dbg!` inside an `if` branch would
 //! panic during `simplify()` before this pass ever got a chance to strip it.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 
 use crate::ast::type_env::fingerprint;
@@ -78,11 +78,24 @@ pub struct DbgEvent {
 /// `observe`/`observe_replacement` are called from inside the assignability
 /// engine as a side effect of demand-driven evaluation — they must never
 /// change any return value or control flow, only append to the log.
+///
+/// `paused` suppresses both methods (a no-op while set): the harness's
+/// flush step calls [`Ast::normalize`](crate::ast::Ast::normalize) to render
+/// an already-drained event's value, and `normalize` re-enters the very same
+/// reducers (`reduce_conditional`, `index_type`, `eval_keyof`) that carry
+/// these hooks. Left unpaused, that presentation-only re-reduction would
+/// itself count as "demand" and append fresh events *after* the drain that
+/// already collected this claim's events — landing them in the next claim's
+/// flush (misattribution) or, for the last claim, never being drained at all
+/// (silently lost). `normalize` is documented as presentation-only and must
+/// not be a demand source in its own right, so pausing for its duration is
+/// correct, not merely a workaround.
 #[derive(Debug, Default)]
 pub struct DbgSink {
     watches: DbgWatches,
     events: RefCell<Vec<DbgEvent>>,
     seen: RefCell<HashSet<(usize, usize, String)>>,
+    paused: Cell<bool>,
 }
 
 impl DbgSink {
@@ -91,13 +104,18 @@ impl DbgSink {
             watches,
             events: RefCell::new(Vec::new()),
             seen: RefCell::new(HashSet::new()),
+            paused: Cell::new(false),
         }
     }
 
     /// If `node`'s span is watched, record a clone of it — deduped on
     /// `(span, fingerprint(node))` so repeated evaluation of the same site
-    /// with the same value only reports once.
+    /// with the same value only reports once. No-op while [`Self::pause`]'s
+    /// guard is alive.
     pub fn observe(&self, node: &Ast) {
+        if self.paused.get() {
+            return;
+        }
         let span = node.as_span();
         if !self.watches.contains(span) {
             return;
@@ -106,8 +124,12 @@ impl DbgSink {
     }
 
     /// For the substitution hook (Task 3): a watched bare-identifier span was
-    /// replaced by `replacement` during instantiation.
+    /// replaced by `replacement` during instantiation. No-op while
+    /// [`Self::pause`]'s guard is alive.
     pub fn observe_replacement(&self, ident_span: Span, replacement: &Ast) {
+        if self.paused.get() {
+            return;
+        }
         if !self.watches.contains(ident_span) {
             return;
         }
@@ -125,6 +147,27 @@ impl DbgSink {
     /// Drain events recorded since the last call.
     pub fn drain(&self) -> Vec<DbgEvent> {
         std::mem::take(&mut self.events.borrow_mut())
+    }
+
+    /// Suppress `observe`/`observe_replacement` for the lifetime of the
+    /// returned guard (RAII: dropping it resumes). Re-entrant-safe only in
+    /// the sense of restoring to "resumed" on drop — callers are not expected
+    /// to nest pauses.
+    #[must_use]
+    pub fn pause(&self) -> PauseGuard<'_> {
+        self.paused.set(true);
+        PauseGuard { sink: self }
+    }
+}
+
+/// RAII guard returned by [`DbgSink::pause`]; resumes observation on drop.
+pub struct PauseGuard<'a> {
+    sink: &'a DbgSink,
+}
+
+impl Drop for PauseGuard<'_> {
+    fn drop(&mut self) {
+        self.sink.paused.set(false);
     }
 }
 
@@ -385,6 +428,61 @@ mod tests {
         assert_eq!(
             watches.bare_ident(crate::ast::Span::new(at, at + 1)),
             Some("K")
+        );
+    }
+
+    /// Direct regression test for the flush-time suppression mechanism
+    /// (Task 3's mandatory fix): `Ast::normalize`, invoked while rendering an
+    /// already-drained event, re-enters the very reducers that carry `dbg!`
+    /// hooks (`reduce_conditional`, `index_type`, `eval_keyof`). Without
+    /// suppression, a watched span touched again during that presentation-
+    /// only pass would append a *new* event after the drain that already
+    /// collected this claim's events — landing in the next flush
+    /// (misattribution) or, for the last claim, never being drained again
+    /// (silently lost). `pause`/the `PauseGuard` must make `observe` and
+    /// `observe_replacement` no-ops for exactly the guard's lifetime, with no
+    /// panic and no event recorded, then resume cleanly afterward.
+    #[test]
+    fn paused_sink_drops_observations_and_resumes_cleanly() {
+        use crate::ast::Span;
+
+        let span = Span::new(5, 6);
+        let mut watches = DbgWatches::default();
+        watches.push(DbgWatch {
+            span,
+            bare_ident: None,
+        });
+        let sink = DbgSink::new(watches);
+
+        let node = Ast::TrueKeyword(span);
+
+        {
+            let _guard = sink.pause();
+            // Both observation entry points are no-ops while paused.
+            sink.observe(&node);
+            sink.observe_replacement(span, &node);
+            assert!(sink.drain().is_empty(), "paused sink must record nothing");
+        } // guard drops here, resuming the sink.
+
+        // Resumed: the same span/value now fires normally, exactly once —
+        // repeating it dedupes rather than double-counting.
+        sink.observe(&node);
+        sink.observe(&node);
+        let events = sink.drain();
+        assert_eq!(events.len(), 1, "resumed sink should observe normally");
+
+        // A *different* value at the same watched span, observed once the
+        // guard has dropped (simulating a mark demanded right after a flush
+        // finishes, e.g. by the next claim's real evaluation), must still be
+        // captured by this fresh drain — not lost because a guard existed
+        // earlier in the sink's lifetime.
+        let other = Ast::FalseKeyword(span);
+        sink.observe(&other);
+        let events = sink.drain();
+        assert_eq!(
+            events.len(),
+            1,
+            "an observation made once resumed must not vanish silently"
         );
     }
 }
