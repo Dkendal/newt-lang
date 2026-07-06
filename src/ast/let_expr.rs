@@ -17,6 +17,11 @@ impl LetExpr {
         F: Fn(&Ast) -> Ast,
     {
         let mut expr = self.clone();
+        expr.bindings = self
+            .bindings
+            .iter()
+            .map(|(k, v)| (k.clone(), f(v)))
+            .collect();
         expr.body = f(&self.body).into();
         expr
     }

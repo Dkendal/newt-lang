@@ -272,6 +272,17 @@ mod tests {
     }
 
     #[test]
+    fn dbg_inside_let_binding_is_reported_and_erased() {
+        let src = "type T as let x = dbg!(1) in x";
+        let (cleaned, out) = run(src);
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        assert_eq!(
+            cleaned.render_pretty_ts(120),
+            render("type T as let x = 1 in x")
+        );
+    }
+
+    #[test]
     fn dbg_inside_if_branch_is_reported_and_erased() {
         let src = "type Get(A, K) as if K <: keyof A then dbg!(A[K]) else never end";
         let (cleaned, out) = run(src);
