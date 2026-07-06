@@ -150,6 +150,26 @@ fn clamp(span: Span, len: usize) -> std::ops::Range<usize> {
     start..end
 }
 
+/// The 1-based `(line, column)` of a byte `offset` into `source`, matching
+/// ariadne's own numbering. Offsets past EOF clamp to the final position.
+pub fn line_col(source: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(source.len());
+    let mut line = 1;
+    let mut col = 1;
+    for (i, ch) in source.char_indices() {
+        if i >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +254,15 @@ mod tests {
         assert!(out.contains("= 1"), "{out}");
         assert!(out.contains("x.nt:1:11"), "{out}");
         assert!(!out.contains('\x1b'), "{out}");
+    }
+
+    #[test]
+    fn line_col_is_one_based_and_clamps() {
+        let source = "ab\ncd\n";
+        assert_eq!(line_col(source, 0), (1, 1)); // 'a'
+        assert_eq!(line_col(source, 1), (1, 2)); // 'b'
+        assert_eq!(line_col(source, 3), (2, 1)); // 'c' (after newline)
+        assert_eq!(line_col(source, 4), (2, 2)); // 'd'
+        assert_eq!(line_col(source, 100), (3, 1)); // past EOF clamps to end
     }
 }

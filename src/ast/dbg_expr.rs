@@ -77,12 +77,22 @@ impl FromIterator<DbgWatch> for DbgWatches {
     }
 }
 
+/// One evaluation frame for the `dbg!` stacktrace: a named-type application
+/// in flight (or the harness's `assert claim` root), with its call-site span.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frame {
+    pub label: String,
+    pub span: Span,
+}
+
 /// One recorded observation of a watched span: the span itself, plus the node
 /// observed at that point in evaluation.
 #[derive(Debug, Clone)]
 pub struct DbgEvent {
     pub span: Span,
     pub observed: Ast,
+    /// The evaluation stack at record time, outermost frame first.
+    pub stack: Vec<Frame>,
 }
 
 /// Read-only sink accumulating `dbg!` observations during evaluation: a watch
@@ -118,6 +128,9 @@ pub struct DbgSink {
     /// event for every instantiate cache miss and conditional decision.
     trace: Cell<bool>,
     trace_events: RefCell<Vec<String>>,
+    /// Live evaluation stack for stacktraces: pushed/popped by [`Self::frame`]
+    /// guards, snapshotted into each event by `record`.
+    stack: RefCell<Vec<Frame>>,
 }
 
 impl DbgSink {
@@ -130,6 +143,7 @@ impl DbgSink {
             paused: Cell::new(false),
             trace: Cell::new(false),
             trace_events: RefCell::new(Vec::new()),
+            stack: RefCell::new(Vec::new()),
         }
     }
 
@@ -195,7 +209,11 @@ impl DbgSink {
         if !self.seen.borrow_mut().insert(key) {
             return;
         }
-        self.events.borrow_mut().push(DbgEvent { span, observed });
+        self.events.borrow_mut().push(DbgEvent {
+            span,
+            observed,
+            stack: self.stack.borrow().clone(),
+        });
     }
 
     /// Drain events recorded since the last call.
@@ -234,6 +252,18 @@ impl DbgSink {
     pub fn is_paused(&self) -> bool {
         self.paused.get()
     }
+
+    /// Push an evaluation frame for the lifetime of the returned guard
+    /// (RAII: dropping it pops the frame). No-op while paused — flush-time
+    /// renormalization must not build stacks, mirroring `observe`.
+    #[must_use]
+    pub fn frame(&self, label: String, span: Span) -> FrameGuard<'_> {
+        let pushed = !self.paused.get();
+        if pushed {
+            self.stack.borrow_mut().push(Frame { label, span });
+        }
+        FrameGuard { sink: self, pushed }
+    }
 }
 
 /// RAII guard returned by [`DbgSink::pause`]; restores the prior paused state
@@ -246,6 +276,21 @@ pub struct PauseGuard<'a> {
 impl Drop for PauseGuard<'_> {
     fn drop(&mut self) {
         self.sink.paused.set(self.was_paused);
+    }
+}
+
+/// RAII guard returned by [`DbgSink::frame`]; pops the frame it pushed (if
+/// any — a paused sink pushes nothing) on drop.
+pub struct FrameGuard<'a> {
+    sink: &'a DbgSink,
+    pushed: bool,
+}
+
+impl Drop for FrameGuard<'_> {
+    fn drop(&mut self) {
+        if self.pushed {
+            self.sink.stack.borrow_mut().pop();
+        }
     }
 }
 
@@ -593,5 +638,49 @@ mod tests {
             !sink.is_paused(),
             "outermost guard's drop must resume the sink"
         );
+    }
+
+    /// Frames snapshot into events at record time and pop LIFO: an event
+    /// recorded while `outer`+`inner` are alive carries both (outermost
+    /// first); one recorded after `inner` drops carries only `outer`.
+    #[test]
+    fn frames_snapshot_into_events_and_pop_lifo() {
+        use crate::ast::Span;
+
+        let span = Span::new(5, 6);
+        let mut watches = DbgWatches::default();
+        watches.push(DbgWatch {
+            span,
+            bare_ident: None,
+        });
+        let sink = DbgSink::new(watches);
+
+        let outer = sink.frame("outer".to_string(), Span::new(0, 1));
+        {
+            let _inner = sink.frame("inner".to_string(), Span::new(2, 3));
+            sink.observe(&Ast::TrueKeyword(span));
+        }
+        // Different value at the same span so dedupe doesn't drop it.
+        sink.observe(&Ast::FalseKeyword(span));
+        drop(outer);
+
+        let events = sink.drain();
+        assert_eq!(events.len(), 2);
+        let labels: Vec<&str> = events[0].stack.iter().map(|f| f.label.as_str()).collect();
+        assert_eq!(labels, ["outer", "inner"], "outermost frame first");
+        let labels: Vec<&str> = events[1].stack.iter().map(|f| f.label.as_str()).collect();
+        assert_eq!(labels, ["outer"], "inner frame must have popped");
+    }
+
+    /// A paused sink pushes no frames (flush-time renormalization must not
+    /// build stacks), and the guard's drop is still safe.
+    #[test]
+    fn paused_sink_pushes_no_frames() {
+        use crate::ast::Span;
+
+        let sink = DbgSink::new(DbgWatches::default());
+        let _pause = sink.pause();
+        let _frame = sink.frame("x".to_string(), Span::new(0, 1));
+        assert!(sink.stack.borrow().is_empty());
     }
 }
