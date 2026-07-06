@@ -128,3 +128,34 @@ mod unquote {
         );
     }
 }
+
+#[test]
+fn pipe_marks_applications_from_pipe() {
+    let piped = parse_source(Rule::expr, "A |> B").unwrap();
+    assert!(matches!(&piped, Ast::ApplyGeneric(app) if app.from_pipe));
+
+    let direct = parse_source(Rule::expr, "B(A)").unwrap();
+    assert!(matches!(&direct, Ast::ApplyGeneric(app) if !app.from_pipe));
+}
+
+#[test]
+fn pipe_into_macro_call_prepends_lhs() {
+    let actual = parse_source(Rule::expr, "A |> dbg!()").unwrap();
+    let Ast::MacroCall(call) = &actual else {
+        panic!("expected MacroCall, got {actual:?}");
+    };
+    assert_eq!(call.name, "dbg!");
+    assert_eq!(call.args.len(), 1);
+    assert!(matches!(&call.args[0], Ast::Ident(id) if id.name == "A"));
+}
+
+#[test]
+fn pipe_into_macro_call_with_args_prepends_lhs() {
+    let actual = parse_source(Rule::expr, "A |> dbg!(B)").unwrap();
+    let Ast::MacroCall(call) = &actual else {
+        panic!("expected MacroCall, got {actual:?}");
+    };
+    assert_eq!(call.args.len(), 2);
+    assert!(matches!(&call.args[0], Ast::Ident(id) if id.name == "A"));
+    assert!(matches!(&call.args[1], Ast::Ident(id) if id.name == "B"));
+}

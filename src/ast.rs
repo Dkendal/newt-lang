@@ -126,6 +126,12 @@ impl Tuple {
 pub struct ApplyGeneric {
     pub receiver: Rc<Ast>,
     pub args: Vec<Ast>,
+    /// `true` iff this application was desugared from a `|>` pipeline step
+    /// (`A |> F` → `F(A)`). Lets the `dbg!` pass recover pipeline steps for
+    /// per-step reporting. Ignored by equality and serialization, like spans.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(skip)]
+    pub from_pipe: bool,
 }
 
 pub type Result = result::Result<Ast, errors::Error>;

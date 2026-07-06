@@ -179,6 +179,7 @@ fn pipe_to_application(lhs: Ast, rhs: Ast, op_span: Span, span: Span, src: &str)
             span,
             receiver: Rc::new(rhs),
             args: vec![lhs],
+            from_pipe: true,
         }),
         Ast::ApplyGeneric(ApplyGeneric { receiver, args, .. }) => {
             let mut args = args.clone();
@@ -187,14 +188,20 @@ fn pipe_to_application(lhs: Ast, rhs: Ast, op_span: Span, span: Span, src: &str)
                 span,
                 receiver,
                 args,
+                from_pipe: true,
             })
+        }
+        Ast::MacroCall(MacroCall { name, args, .. }) => {
+            let mut args = args.clone();
+            args.insert(0, lhs);
+            Ast::MacroCall(MacroCall { span, name, args })
         }
         _ => {
             let error = report::render_to_string(
                 SOURCE_NAME,
                 src,
                 op_span,
-                "the right-hand side of `|>` must be an identifier or a type application",
+                "the right-hand side of `|>` must be an identifier, a type application, or a macro call",
             );
             panic!("{error}");
         }
@@ -739,6 +746,7 @@ where
                     span: sp(e.span()),
                     receiver: Rc::new(receiver),
                     args,
+                    from_pipe: false,
                 })
             },
         ),

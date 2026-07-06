@@ -373,6 +373,7 @@ fn apply(name: &str, args: Vec<Ast>) -> Ast {
         })),
         args,
         span: span(),
+        from_pipe: false,
     })
 }
 
