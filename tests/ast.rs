@@ -404,3 +404,20 @@ mod simplify_tests {
         insta::assert_snapshot!(actual.to_sexp().unwrap());
     }
 }
+
+#[test]
+fn map_visits_macro_call_args() {
+    let ast = newtype::parser::parse_source(newtype::parser::Rule::expr, "dbg!(A)").unwrap();
+    let mapped = ast.map(|child| match child {
+        newtype::ast::Ast::Ident(id) if id.name == "A" => {
+            let mut id = id.clone();
+            id.name = "B".to_string();
+            newtype::ast::Ast::Ident(id)
+        }
+        other => other.clone(),
+    });
+    let newtype::ast::Ast::MacroCall(call) = &mapped else {
+        panic!("expected MacroCall");
+    };
+    assert!(matches!(&call.args[0], newtype::ast::Ast::Ident(id) if id.name == "B"));
+}

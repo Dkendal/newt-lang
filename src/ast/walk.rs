@@ -36,6 +36,8 @@ impl Ast {
 
             Ast::LetExpr(expr) => Ast::LetExpr(expr.map(f)),
 
+            Ast::MacroCall(expr) => Ast::MacroCall(expr.map(f)),
+
             Ast::MappedType(expr) => Ast::MappedType(expr.map(f)),
 
             Ast::MatchExpr(expr) => Ast::MatchExpr(expr.map(f)),
