@@ -64,6 +64,19 @@ impl DbgWatches {
     }
 }
 
+/// Lets a watch table be assembled from an arbitrary collection of watches
+/// (e.g. in tests, from spans collected by walking a program's `assert`
+/// claims) without exposing the internal `Vec`/`HashSet` representation.
+impl FromIterator<DbgWatch> for DbgWatches {
+    fn from_iter<I: IntoIterator<Item = DbgWatch>>(iter: I) -> Self {
+        let mut watches = DbgWatches::default();
+        for watch in iter {
+            watches.push(watch);
+        }
+        watches
+    }
+}
+
 /// One recorded observation of a watched span: the span itself, plus the node
 /// observed at that point in evaluation.
 #[derive(Debug, Clone)]
