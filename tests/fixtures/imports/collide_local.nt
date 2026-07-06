@@ -1,0 +1,7 @@
+import { Key } from "./Key"
+
+type Key as 1
+
+unittest "collision with a local definition" do
+    assert Key == 1
+end

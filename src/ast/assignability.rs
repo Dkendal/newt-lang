@@ -159,6 +159,18 @@ impl Ast {
 
             (A::AnyKeyword(_), _) => T::Both,
 
+            // A bare, unresolvable type reference as the *target* is a free type
+            // variable, so the relation is indeterminate regardless of the source
+            // (`never`/reflexive sources are handled above). Wrapper idents
+            // (`String`, `Object`, …) carry a primitive type and the global
+            // `Function` interface is meaningful to later arms, so both are
+            // excluded. Mirrors the source-side free-variable `Ident` arm below.
+            (_, rhs @ A::Ident(_))
+                if rhs.get_primitive_type().is_none() && !rhs.is_function_interface() =>
+            {
+                T::Both
+            }
+
             // `unknown` is assignable only to a top type (handled above) — except
             // a union/intersection target may *contain* a top type. Defer those to
             // the set-membership folds so `unknown <: number | unknown` holds and

@@ -1,0 +1,5 @@
+import { Hidden } from "./private"
+
+unittest "unexported import" do
+    assert Hidden == 1
+end

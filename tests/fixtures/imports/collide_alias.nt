@@ -1,0 +1,7 @@
+import { Key as Local } from "./Key"
+
+type Local as 1
+
+unittest "aliased collision" do
+    assert Local == 1
+end

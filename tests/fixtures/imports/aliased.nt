@@ -1,0 +1,5 @@
+import { Key as K } from "./Key"
+
+unittest "aliased import" do
+    assert "id" <: K
+end

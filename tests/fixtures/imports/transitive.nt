@@ -1,0 +1,5 @@
+import { B } from "./b"
+
+unittest "transitive import" do
+    assert B == 42
+end

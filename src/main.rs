@@ -134,11 +134,53 @@ fn main() {
 
             let simplified = cleaned.simplify();
 
+            // Load imported modules so their definitions resolve during
+            // evaluation. Failures (missing file, unknown export, …) are
+            // warnings — the affected names simply stay unresolved and any
+            // claim over them evaluates as indeterminate. Rendering keeps
+            // using `simplified`: imported definitions are emitted by their
+            // own modules, not duplicated here.
+            let loaded = newtype::module_loader::load(&simplified, &source_name, input);
+            for warning in &loaded.warnings {
+                eprintln!(
+                    "{}",
+                    newtype::report::render_labeled(
+                        severity,
+                        &warning.file,
+                        &warning.source,
+                        &warning.message,
+                        &[(warning.span, warning.message.clone())],
+                        true,
+                    )
+                );
+            }
+            // Name collisions (an import binding a name a local definition or
+            // another import already binds) are hard errors regardless of
+            // `--deny-unresolved`; evaluation and rendering still run, the
+            // exit code turns non-zero below.
+            for error in &loaded.errors {
+                eprintln!(
+                    "{}",
+                    newtype::report::render_labeled(
+                        newtype::report::Severity::Error,
+                        &error.file,
+                        &error.source,
+                        &error.message,
+                        &[(error.span, error.message.clone())],
+                        true,
+                    )
+                );
+            }
+            let import_warnings = !loaded.warnings.is_empty();
+            let import_errors = !loaded.errors.is_empty();
+            let evaluation_program =
+                newtype::module_loader::augment(&simplified, loaded.definitions);
+
             // Evaluate `unittest` assertions after simplification but before
             // rendering. Failures are reported to stderr; rendering still
             // proceeds so the emitted TypeScript is always produced.
             let report = test_harness::run(
-                &simplified,
+                &evaluation_program,
                 input,
                 &source_name,
                 test_harness::Config {
@@ -202,7 +244,10 @@ fn main() {
             // Non-zero exit on any assertion failure — or, with
             // `--deny-unresolved`, on any unresolved reference — after
             // rendering completes.
-            if report.has_failures() || (args.deny_unresolved && !unresolved.is_empty()) {
+            if report.has_failures()
+                || import_errors
+                || (args.deny_unresolved && (!unresolved.is_empty() || import_warnings))
+            {
                 std::process::exit(1);
             }
         }

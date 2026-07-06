@@ -75,7 +75,7 @@ mod assignability_tests {
     #[case("{}", "string", FALSE)]
     #[case("{}", "number", FALSE)]
     #[case("{}", "boolean", FALSE)]
-    #[case("{}", "bitint", FALSE)]
+    #[case("{}", "bigint", FALSE)]
     #[case("{}", "symbol", FALSE)]
     #[case("{}", "object", TRUE)]
     #[case("{}", "Object", TRUE)]
@@ -276,6 +276,18 @@ mod assignability_tests {
     #[case("Foo", "object", BOTH)]
     #[case("Foo", "Object", BOTH)] // wrapper target does not preempt the free variable
     #[case("Foo", "{ x: 1 }", BOTH)]
+    // An unresolvable reference as the *target* is likewise a free type
+    // variable: indeterminate regardless of the source (except `never`).
+    #[case("string", "Foo", BOTH)]
+    #[case("'id'", "Foo", BOTH)]
+    #[case("1", "Foo", BOTH)]
+    #[case("{ x: 1 }", "Foo", BOTH)]
+    #[case("string[]", "Foo", BOTH)]
+    #[case("() => void", "Foo", BOTH)]
+    #[case("1 | 2", "Foo", BOTH)]
+    #[case("unknown", "Foo", BOTH)]
+    #[case("any", "Foo", BOTH)]
+    #[case("never", "Foo", NEVER)]
     #[case("A::B", "A::B", TRUE)]
     #[case("A::B", "string", BOTH)]
     #[case("A[B]", "string", BOTH)] // indexed access

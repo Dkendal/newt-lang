@@ -1,8 +1,13 @@
+import { Key } from "./Key"
+import { List } from "../List/List"
+
 export type At(A, K)
     where
         A <: any,
         K <: Key
     as
+        let value = A[K] in
+        let keys = keyof A in
         if A <: List then
             if number <: A['length'] then
                 if K <: number | `${number}` then
@@ -11,32 +16,19 @@ export type At(A, K)
                     undefined
                 end
             else
-                if K <: keyof A then
-                    A[K]
+                if K <: keys then
+                    value
                 else
                     undefined
                 end
             end
         else
-            if unknown <: A then
-                unknown
-            else
-                if K <: keyof A then
-                    A[K]
-                else
-                    undefined
-                end
+            cond do
+                unknown <: A -> unknown,
+                K <: keys -> value,
+                else -> undefined
             end
         end
-
-
-export type Key as string | number | symbol
-
-export type List(A)
-    defaults
-        A = any
-    as
-        ReadonlyArray(A)
 
 // TODO allow for types in unittest blocks that aren't emitted
 type User as {

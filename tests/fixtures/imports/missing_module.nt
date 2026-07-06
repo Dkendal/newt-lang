@@ -1,0 +1,8 @@
+import { Nope } from "./nonexistent"
+
+type Get(K) where K <: Nope as K
+
+unittest "missing module" do
+    assert Get("id") == "id"
+    assert "id" <: Nope
+end

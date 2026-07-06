@@ -1,0 +1,8 @@
+import { Key } from "./Key"
+
+type Get(K) where K <: Key as K
+
+unittest "imports resolve" do
+    assert "id" <: Key
+    assert Get("id") == "id"
+end
