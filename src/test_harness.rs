@@ -35,6 +35,11 @@ pub struct Config {
     /// Mirror TypeScript's `exactOptionalPropertyTypes`: an optional target
     /// property `x?: T` no longer accepts `T | undefined` sources.
     pub exact_optional_property_types: bool,
+    /// `--trace-eval`: log a plain `trace: …` line for every instantiate cache
+    /// miss and conditional decision. Forces the `dbg!` sink on even when
+    /// `watches` is empty (it's the same sink, just also tracing). Defaults
+    /// off: zero output, zero behavior change.
+    pub trace: bool,
 }
 
 /// Summary of a harness run.
@@ -101,10 +106,10 @@ pub fn run(
     // Symbol table of the program's top-level `type`s and `interface`s, so a
     // claim referencing them (`assert Foo <: number`) resolves to their shape.
     let mut env = TypeEnv::from_program(program);
-    let sink = if watches.is_empty() {
+    let sink = if watches.is_empty() && !config.trace {
         None
     } else {
-        let sink = Rc::new(DbgSink::new(watches.clone()));
+        let sink = Rc::new(DbgSink::new(watches.clone()).with_trace(config.trace));
         env = env.with_dbg(Rc::clone(&sink));
         Some(sink)
     };
@@ -200,8 +205,9 @@ pub fn run(
 }
 
 /// Drain `sink` (if any) and render each newly-observed watched span as a
-/// `Debug` report to `out`. A no-op when `sink` is `None` (no `dbg!` watches
-/// for this run).
+/// `Debug` report, plus every `--trace-eval` trace line recorded since the
+/// last flush as a plain `trace: …` line, to `out`. A no-op when `sink` is
+/// `None` (no `dbg!` watches and no tracing for this run).
 ///
 /// `Ast::normalize` re-enters the same reducers (`reduce_conditional`,
 /// `index_type`, `eval_keyof`) that carry `dbg!` observation hooks, so
@@ -209,7 +215,8 @@ pub fn run(
 /// events — landing them in the *next* flush (misattributed to the following
 /// claim) or, for the last claim, never being drained (silently lost). The
 /// sink is paused for the duration of the normalize/render loop so this
-/// presentation-only pass cannot append to the log.
+/// presentation-only pass cannot append to the log (this also covers trace
+/// lines, since `DbgSink::trace` respects the same pause).
 fn flush_dbg_events(
     sink: Option<&DbgSink>,
     ctx: &ResolveCtx,
@@ -219,7 +226,11 @@ fn flush_dbg_events(
 ) -> io::Result<()> {
     let Some(sink) = sink else { return Ok(()) };
     let events = sink.drain();
+    let trace_lines = sink.drain_trace();
     let _guard = sink.pause();
+    for line in trace_lines {
+        writeln!(out, "{line}")?;
+    }
     for event in events {
         let rendered = event.observed.normalize(ctx).render_pretty_ts(80);
         writeln!(
@@ -586,6 +597,64 @@ mod tests {
         // Both claims passed (and neither panicked nor hung on the last
         // claim's flush).
         assert_eq!(out.matches("\n  ok").count(), 2, "{out}");
+    }
+
+    // --- Task 4: --trace-eval -----------------------------------------------
+
+    /// With trace mode on, an instantiate cache miss and a conditional
+    /// decision each produce a plain `trace: …` line, interleaved with the
+    /// harness's ordinary report.
+    #[test]
+    fn trace_eval_reports_instantiation_and_conditional_lines() {
+        let src = "type Id(T) as T\n\
+            type IsNum(T) as if T <: number then true else false end\n\
+            unittest \"t\" do\n\
+            \x20 assert Id(1) <: number\n\
+            \x20 assert IsNum(1) == true\n\
+            end";
+        let program = parse_newtype_program(src).unwrap().simplify();
+        let mut out = Vec::new();
+        let report = run(
+            &program,
+            src,
+            "<test>",
+            Config {
+                trace: true,
+                ..Config::default()
+            },
+            &DbgWatches::default(),
+            &mut out,
+        )
+        .unwrap();
+        let out = String::from_utf8(out).unwrap();
+        assert_eq!((report.passed, report.failed), (2, 0), "{out}");
+
+        let trace_lines: Vec<&str> = out.lines().filter(|l| l.starts_with("trace: ")).collect();
+        assert!(
+            trace_lines.iter().any(|l| l.contains("Id(1)")),
+            "expected an instantiate trace line for Id(1): {out}"
+        );
+        assert!(
+            trace_lines
+                .iter()
+                .any(|l| l.contains("<:") && l.contains('→')),
+            "expected a conditional-decision trace line: {out}"
+        );
+    }
+
+    /// Trace mode defaults off: no `trace: ` lines appear even though the
+    /// same program instantiates a generic and reduces a conditional.
+    #[test]
+    fn trace_eval_off_by_default_produces_no_trace_lines() {
+        let src = "type Id(T) as T\n\
+            type IsNum(T) as if T <: number then true else false end\n\
+            unittest \"t\" do\n\
+            \x20 assert Id(1) <: number\n\
+            \x20 assert IsNum(1) == true\n\
+            end";
+        let (report, out) = run_src(src, false);
+        assert_eq!((report.passed, report.failed), (2, 0), "{out}");
+        assert!(!out.lines().any(|l| l.starts_with("trace: ")), "{out}");
     }
 
     #[test]

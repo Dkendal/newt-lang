@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{
-        type_env::{fingerprint, substitute, ResolveCtx},
+        type_env::{fingerprint, one_line, substitute, ResolveCtx},
         Access, ApplyGeneric, Ast, Builtin, BuiltinKeyword, ExtendsExpr, FunctionType, Ident,
         IntersectionType, MappedType, MappingModifier, ObjectProperty, PrimitiveType, PropertyName,
         Span, Tuple, TypeLiteral, TypeNumber, TypeString, UnionType,
@@ -1447,7 +1447,9 @@ impl Ast {
 
         if Self::contains_infer(rhs) {
             let mut bindings: HashMap<String, Vec<Ast>> = HashMap::new();
-            if Self::match_infer(&check, rhs, ctx, &mut bindings) {
+            let matched = Self::match_infer(&check, rhs, ctx, &mut bindings);
+            Self::trace_conditional(ctx, &check, rhs, if matched { "then" } else { "else" });
+            if matched {
                 let resolved: HashMap<String, Ast> = bindings
                     .into_iter()
                     .map(|(name, types)| (name, Self::union_of(types, *span)))
@@ -1457,7 +1459,9 @@ impl Ast {
             return (**else_branch).clone();
         }
 
-        match check.is_assignable_to_ctx(rhs, ctx) {
+        let result = check.is_assignable_to_ctx(rhs, ctx);
+        Self::trace_conditional(ctx, &check, rhs, Self::decision_label(result));
+        match result {
             ExtendsResult::True => (**then_branch).clone(),
             ExtendsResult::False => (**else_branch).clone(),
             ExtendsResult::Never => Ast::NeverKeyword(*span),
@@ -1465,6 +1469,35 @@ impl Ast {
                 types: vec![(**then_branch).clone(), (**else_branch).clone()],
                 span: *span,
             }),
+        }
+    }
+
+    /// `--trace-eval`: a plain `trace: <check> <: <extends> → <decision>` line
+    /// per conditional decision. Read-only — only appends to the sink's log
+    /// when trace mode is on and the sink isn't paused (see `DbgSink::trace`);
+    /// never affects the branch selected above.
+    fn trace_conditional(ctx: &ResolveCtx, check: &Ast, extends: &Ast, decision: &str) {
+        let Some(sink) = ctx.env().and_then(|env| env.dbg()) else {
+            return;
+        };
+        if !sink.trace_enabled() {
+            return;
+        }
+        sink.trace(format!(
+            "trace: {} <: {} → {decision}",
+            one_line(check),
+            one_line(extends)
+        ));
+    }
+
+    /// The `--trace-eval` decision label for a definite/indeterminate relation
+    /// result, matching the branch [`Self::reduce_conditional`] selects.
+    fn decision_label(result: ExtendsResult) -> &'static str {
+        match result {
+            ExtendsResult::True => "then",
+            ExtendsResult::False => "else",
+            ExtendsResult::Never => "never",
+            ExtendsResult::Both => "both",
         }
     }
 

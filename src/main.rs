@@ -39,6 +39,11 @@ struct Args {
     /// with `--generate-tests`, the generated test aliases too.
     #[clap(long, value_name = "FILE")]
     source_map: Option<String>,
+    /// Trace engine evaluation to stderr: a `trace: …` line for every generic
+    /// instantiation and conditional-type decision, interleaved with the
+    /// `unittest` report. Off by default; composes with `dbg!` marks.
+    #[clap(long)]
+    trace_eval: bool,
 }
 
 fn main() {
@@ -139,6 +144,7 @@ fn main() {
                 test_harness::Config {
                     fail_fast: args.fail_fast,
                     exact_optional_property_types: args.exact_optional_property_types,
+                    trace: args.trace_eval,
                 },
                 &dbg_watches,
                 &mut std::io::stderr(),

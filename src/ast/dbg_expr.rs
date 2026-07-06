@@ -96,6 +96,10 @@ pub struct DbgSink {
     events: RefCell<Vec<DbgEvent>>,
     seen: RefCell<HashSet<(usize, usize, String)>>,
     paused: Cell<bool>,
+    /// `--trace-eval`: when set, [`Self::trace`] records a plain-line trace
+    /// event for every instantiate cache miss and conditional decision.
+    trace: Cell<bool>,
+    trace_events: RefCell<Vec<String>>,
 }
 
 impl DbgSink {
@@ -105,7 +109,37 @@ impl DbgSink {
             events: RefCell::new(Vec::new()),
             seen: RefCell::new(HashSet::new()),
             paused: Cell::new(false),
+            trace: Cell::new(false),
+            trace_events: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Enable (or disable) `--trace-eval` engine tracing on this sink.
+    #[must_use]
+    pub fn with_trace(self, on: bool) -> Self {
+        self.trace.set(on);
+        self
+    }
+
+    /// Whether trace mode is on (checked by callers before formatting a trace
+    /// line, so no work is done when tracing is off).
+    pub fn trace_enabled(&self) -> bool {
+        self.trace.get()
+    }
+
+    /// Record a plain `trace: …` line, unless tracing is off or the sink is
+    /// paused (flush-time renormalization must not self-trace). Unlike
+    /// `observe`, trace lines are a log — not deduped.
+    pub fn trace(&self, line: impl Into<String>) {
+        if self.paused.get() || !self.trace.get() {
+            return;
+        }
+        self.trace_events.borrow_mut().push(line.into());
+    }
+
+    /// Drain trace lines recorded since the last call.
+    pub fn drain_trace(&self) -> Vec<String> {
+        std::mem::take(&mut self.trace_events.borrow_mut())
     }
 
     /// If `node`'s span is watched, record a clone of it — deduped on

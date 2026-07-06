@@ -28,6 +28,7 @@ use crate::ast::{
     TypeLiteral, TypeParameter, UnionType, UniqueSymbol,
 };
 use crate::extends_result::ExtendsResult;
+use crate::typescript::Pretty;
 
 new_key_type! {
     /// Handle for an interned, resolved type instantiation.
@@ -176,6 +177,19 @@ impl TypeEnv {
             distribute_or_substitute(&def.body, &bindings, self.dbg())
         };
 
+        // `--trace-eval`: one line per cache miss (i.e. per distinct
+        // instantiation, matching the cache's own granularity).
+        if let Some(sink) = self.dbg() {
+            if sink.trace_enabled() {
+                let args_src = args
+                    .iter()
+                    .map(|arg| one_line(arg))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                sink.trace(format!("trace: {name}({args_src}) = {}", one_line(&body)));
+            }
+        }
+
         let id = self.arena.borrow_mut().insert(body.clone());
         self.cache.borrow_mut().insert(key, id);
         Some(body)
@@ -279,6 +293,14 @@ impl TypeEnv {
             ),
         })
     }
+}
+
+/// Render `node` to TypeScript on one line, for `--trace-eval` trace lines
+/// (which are plain single-line log output, not pretty-printed reports).
+/// Collapses any internal wrapping the pretty-printer would otherwise
+/// introduce at this width.
+pub(crate) fn one_line(node: &Ast) -> String {
+    node.render_pretty_ts(120).replace('\n', " ")
 }
 
 /// Bind `args` to `params` by position, applying defaults for omitted trailing
