@@ -1168,6 +1168,8 @@ impl TypeParameter {
     }
 }
 
+pub mod dbg_expr;
+
 pub(crate) mod if_expr;
 
 pub(crate) mod match_expr;

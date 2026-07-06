@@ -120,6 +120,18 @@ fn main() {
 
             let simplified = desugared.simplify();
 
+            // Evaluate and erase `dbg!` calls: each prints a Debug report (per
+            // pipeline step) to stderr; downstream stages see the program as if
+            // `dbg!` weren't there.
+            let simplified = newtype::ast::dbg_expr::expand(
+                &simplified,
+                input,
+                &source_name,
+                true,
+                &mut std::io::stderr(),
+            )
+            .expect("writing dbg! reports to stderr failed");
+
             // Evaluate `unittest` assertions after simplification but before
             // rendering. Failures are reported to stderr; rendering still
             // proceeds so the emitted TypeScript is always produced.
