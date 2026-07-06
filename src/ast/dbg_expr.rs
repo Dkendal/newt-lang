@@ -7,6 +7,10 @@
 //! (`a |> b |> dbg!()`), one report per pipeline step, first step first,
 //! Elixir-style. Each report shows the step's source excerpt and its
 //! normalized type ([`Ast::normalize`]).
+//!
+//! The pass is two-phase (strip & collect first, then evaluate & report)
+//! because the `TypeEnv` used for normalization must be built from the
+//! cleaned program — the resolution engine does not handle `MacroCall` nodes.
 
 use std::cell::RefCell;
 use std::io::{self, Write};
@@ -149,7 +153,6 @@ fn pipeline_steps(arg: &Ast) -> Vec<Ast> {
 mod tests {
     use super::*;
     use crate::parser::parse_newtype_program;
-    use crate::typescript::Pretty;
 
     /// Parse + simplify `src`, run the pass, return (cleaned AST, report text).
     fn run(src: &str) -> (Ast, String) {

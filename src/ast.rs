@@ -244,6 +244,8 @@ impl MacroCall {
         expr
     }
 
+    /// Evaluate a macro call (currently unused; `dbg!` is handled by the
+    /// `dbg_expr` pass before any evaluation occurs).
     fn eval(&self) -> Ast {
         let name = self.name.strip_suffix("!").unwrap();
 
