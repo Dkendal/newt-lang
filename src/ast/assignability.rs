@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{
+        dbg_expr::{Decision, TraceEvent},
         type_env::{fingerprint, frame_label, one_line, substitute, ResolveCtx},
         Access, ApplyGeneric, Ast, Builtin, BuiltinKeyword, ExtendsExpr, FunctionType, Ident,
         IntersectionType, MappedType, MappingModifier, ObjectProperty, PrimitiveType, PropertyName,
@@ -1462,7 +1463,17 @@ impl Ast {
         if Self::contains_infer(rhs) {
             let mut bindings: HashMap<String, Vec<Ast>> = HashMap::new();
             let matched = Self::match_infer(&check, rhs, ctx, &mut bindings);
-            Self::trace_conditional(ctx, &check, rhs, if matched { "then" } else { "else" });
+            Self::trace_conditional(
+                ctx,
+                *span,
+                &check,
+                rhs,
+                if matched {
+                    Decision::Then
+                } else {
+                    Decision::Else
+                },
+            );
             if matched {
                 let resolved: HashMap<String, Ast> = bindings
                     .into_iter()
@@ -1474,7 +1485,7 @@ impl Ast {
         }
 
         let result = check.is_assignable_to_ctx(rhs, ctx);
-        Self::trace_conditional(ctx, &check, rhs, Self::decision_label(result));
+        Self::trace_conditional(ctx, *span, &check, rhs, Self::decision_of(result));
         match result {
             ExtendsResult::True => (**then_branch).clone(),
             ExtendsResult::False => (**else_branch).clone(),
@@ -1486,32 +1497,39 @@ impl Ast {
         }
     }
 
-    /// `--trace-eval`: a plain `trace: <check> <: <extends> → <decision>` line
-    /// per conditional decision. Read-only — only appends to the sink's log
-    /// when trace mode is on and the sink isn't paused (see `DbgSink::trace`);
-    /// never affects the branch selected above.
-    fn trace_conditional(ctx: &ResolveCtx, check: &Ast, extends: &Ast, decision: &str) {
+    /// `--trace-eval`: one event per conditional decision, anchored at the
+    /// conditional's span and carrying which branch was taken. Read-only —
+    /// only appends to the sink's log when trace mode is on and the sink
+    /// isn't paused (see `DbgSink::trace`); never affects the branch
+    /// selected above.
+    fn trace_conditional(
+        ctx: &ResolveCtx,
+        span: Span,
+        check: &Ast,
+        extends: &Ast,
+        decision: Decision,
+    ) {
         let Some(sink) = ctx.env().and_then(|env| env.dbg()) else {
             return;
         };
         if !sink.trace_enabled() {
             return;
         }
-        sink.trace(format!(
-            "trace: {} <: {} → {decision}",
-            one_line(check),
-            one_line(extends)
-        ));
+        sink.trace(TraceEvent {
+            span,
+            message: format!("{} <: {}", one_line(check), one_line(extends)),
+            decision: Some(decision),
+        });
     }
 
-    /// The `--trace-eval` decision label for a definite/indeterminate relation
+    /// The `--trace-eval` decision for a definite/indeterminate relation
     /// result, matching the branch [`Self::reduce_conditional`] selects.
-    fn decision_label(result: ExtendsResult) -> &'static str {
+    fn decision_of(result: ExtendsResult) -> Decision {
         match result {
-            ExtendsResult::True => "then",
-            ExtendsResult::False => "else",
-            ExtendsResult::Never => "never",
-            ExtendsResult::Both => "both",
+            ExtendsResult::True => Decision::Then,
+            ExtendsResult::False => Decision::Else,
+            ExtendsResult::Never => Decision::Never,
+            ExtendsResult::Both => Decision::Both,
         }
     }
 

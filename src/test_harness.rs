@@ -35,11 +35,15 @@ pub struct Config {
     /// Mirror TypeScript's `exactOptionalPropertyTypes`: an optional target
     /// property `x?: T` no longer accepts `T | undefined` sources.
     pub exact_optional_property_types: bool,
-    /// `--trace-eval`: log a plain `trace: …` line for every instantiate cache
-    /// miss and conditional decision. Forces the `dbg!` sink on even when
+    /// `--trace-eval`: log a `[Trace]` line for every instantiate cache miss
+    /// and conditional decision. Forces the `dbg!` sink on even when
     /// `watches` is empty (it's the same sink, just also tracing). Defaults
     /// off: zero output, zero behavior change.
     pub trace: bool,
+    /// Colour the flush output (`Debug` reports, `[Trace]` lines, decision
+    /// words). The CLI sets this for stderr; tests leave it off so output
+    /// stays ANSI-free and assertable.
+    pub color: bool,
 }
 
 /// Summary of a harness run.
@@ -162,6 +166,7 @@ pub fn run(
                             &ctx_for_flush,
                             source_name,
                             source,
+                            config.color,
                             out,
                         )?;
                         break 'outer;
@@ -188,6 +193,7 @@ pub fn run(
                             &ctx_for_flush,
                             source_name,
                             source,
+                            config.color,
                             out,
                         )?;
                         break 'outer;
@@ -195,7 +201,14 @@ pub fn run(
                 }
             }
 
-            flush_dbg_events(sink.as_deref(), &ctx_for_flush, source_name, source, out)?;
+            flush_dbg_events(
+                sink.as_deref(),
+                &ctx_for_flush,
+                source_name,
+                source,
+                config.color,
+                out,
+            )?;
         }
     }
 
@@ -224,9 +237,9 @@ pub fn run(
 }
 
 /// Drain `sink` (if any) and render each newly-observed watched span as a
-/// `Debug` report, plus every `--trace-eval` trace line recorded since the
-/// last flush as a plain `trace: …` line, to `out`. A no-op when `sink` is
-/// `None` (no `dbg!` watches and no tracing for this run).
+/// `Debug` report, plus every `--trace-eval` event recorded since the last
+/// flush as a `[Trace]` line, to `out`. A no-op when `sink` is `None` (no
+/// `dbg!` watches and no tracing for this run).
 ///
 /// `Ast::normalize` re-enters the same reducers (`reduce_conditional`,
 /// `index_type`, `eval_keyof`) that carry `dbg!` observation hooks, so
@@ -235,20 +248,32 @@ pub fn run(
 /// claim) or, for the last claim, never being drained (silently lost). The
 /// sink is paused for the duration of the normalize/render loop so this
 /// presentation-only pass cannot append to the log (this also covers trace
-/// lines, since `DbgSink::trace` respects the same pause).
+/// events, since `DbgSink::trace` respects the same pause).
 fn flush_dbg_events(
     sink: Option<&DbgSink>,
     ctx: &ResolveCtx,
     source_name: &str,
     source: &str,
+    color: bool,
     out: &mut dyn Write,
 ) -> io::Result<()> {
     let Some(sink) = sink else { return Ok(()) };
     let events = sink.drain();
-    let trace_lines = sink.drain_trace();
+    let trace_events = sink.drain_trace();
     let _guard = sink.pause();
-    for line in trace_lines {
-        writeln!(out, "{line}")?;
+    for event in trace_events {
+        writeln!(
+            out,
+            "{}",
+            crate::report::render_trace_line(
+                source_name,
+                source,
+                event.span,
+                &event.message,
+                event.decision,
+                color,
+            )
+        )?;
     }
     for event in events {
         let rendered = event.observed.normalize(ctx).render_pretty_ts(80);
@@ -260,7 +285,7 @@ fn flush_dbg_events(
                 source,
                 event.span,
                 &format!("= {rendered}"),
-                false,
+                color,
             )
         )?;
         write_frames(&event.stack, source_name, source, out)?;
@@ -796,16 +821,22 @@ mod tests {
         let out = String::from_utf8(out).unwrap();
         assert_eq!((report.passed, report.failed), (2, 0), "{out}");
 
-        let trace_lines: Vec<&str> = out.lines().filter(|l| l.starts_with("trace: ")).collect();
+        let trace_lines: Vec<&str> = out.lines().filter(|l| l.starts_with("[Trace]")).collect();
         assert!(
-            trace_lines.iter().any(|l| l.contains("Id(1)")),
-            "expected an instantiate trace line for Id(1): {out}"
+            trace_lines
+                .iter()
+                .any(|l| l.contains("Id(1)") && l.contains("<test>:4:")),
+            "expected a source-anchored instantiate trace line for Id(1): {out}"
         );
         assert!(
             trace_lines
                 .iter()
-                .any(|l| l.contains("<:") && l.contains('→')),
-            "expected a conditional-decision trace line: {out}"
+                .any(|l| l.contains("<:") && l.contains("→ then")),
+            "expected a conditional-decision trace line with its branch: {out}"
+        );
+        assert!(
+            !out.lines().any(|l| l.starts_with("trace: ")),
+            "old plain trace prefix must be gone: {out}"
         );
     }
 
@@ -821,7 +852,7 @@ mod tests {
             end";
         let (report, out) = run_src(src, false);
         assert_eq!((report.passed, report.failed), (2, 0), "{out}");
-        assert!(!out.lines().any(|l| l.starts_with("trace: ")), "{out}");
+        assert!(!out.lines().any(|l| l.starts_with("[Trace]")), "{out}");
     }
 
     #[test]

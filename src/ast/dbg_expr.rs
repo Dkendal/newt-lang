@@ -85,6 +85,27 @@ pub struct Frame {
     pub span: Span,
 }
 
+/// The `--trace-eval` decision for a definite/indeterminate relation result:
+/// which branch a conditional took.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Decision {
+    Then,
+    Else,
+    Never,
+    Both,
+}
+
+/// One recorded `--trace-eval` event: an instantiate cache miss or a
+/// conditional decision, anchored at a source span.
+#[derive(Debug, Clone)]
+pub struct TraceEvent {
+    pub span: Span,
+    pub message: String,
+    /// `Some` for a conditional decision (which branch was taken); `None` for
+    /// an instantiation event, which has no branch.
+    pub decision: Option<Decision>,
+}
+
 /// One recorded observation of a watched span: the span itself, plus the node
 /// observed at that point in evaluation.
 #[derive(Debug, Clone)]
@@ -127,7 +148,7 @@ pub struct DbgSink {
     /// `--trace-eval`: when set, [`Self::trace`] records a plain-line trace
     /// event for every instantiate cache miss and conditional decision.
     trace: Cell<bool>,
-    trace_events: RefCell<Vec<String>>,
+    trace_events: RefCell<Vec<TraceEvent>>,
     /// Live evaluation stack for stacktraces: pushed/popped by [`Self::frame`]
     /// guards, snapshotted into each event by `record`.
     stack: RefCell<Vec<Frame>>,
@@ -160,18 +181,18 @@ impl DbgSink {
         self.trace.get()
     }
 
-    /// Record a plain `trace: …` line, unless tracing is off or the sink is
+    /// Record a `--trace-eval` event, unless tracing is off or the sink is
     /// paused (flush-time renormalization must not self-trace). Unlike
-    /// `observe`, trace lines are a log — not deduped.
-    pub fn trace(&self, line: impl Into<String>) {
+    /// `observe`, trace events are a log — not deduped.
+    pub fn trace(&self, event: TraceEvent) {
         if self.paused.get() || !self.trace.get() {
             return;
         }
-        self.trace_events.borrow_mut().push(line.into());
+        self.trace_events.borrow_mut().push(event);
     }
 
-    /// Drain trace lines recorded since the last call.
-    pub fn drain_trace(&self) -> Vec<String> {
+    /// Drain trace events recorded since the last call.
+    pub fn drain_trace(&self) -> Vec<TraceEvent> {
         std::mem::take(&mut self.trace_events.borrow_mut())
     }
 

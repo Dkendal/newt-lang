@@ -145,6 +145,7 @@ fn main() {
                     fail_fast: args.fail_fast,
                     exact_optional_property_types: args.exact_optional_property_types,
                     trace: args.trace_eval,
+                    color: true,
                 },
                 &dbg_watches,
                 &mut std::io::stderr(),

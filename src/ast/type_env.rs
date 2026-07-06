@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 use slotmap::{new_key_type, SlotMap};
 
-use crate::ast::dbg_expr::DbgSink;
+use crate::ast::dbg_expr::{DbgSink, TraceEvent};
 use crate::ast::{
     ApplyGeneric, Ast, ExtendsExpr, Ident, Interface, IntersectionType, Span, Tuple, TypeAlias,
     TypeLiteral, TypeParameter, UnionType, UniqueSymbol,
@@ -185,16 +185,17 @@ impl TypeEnv {
             distribute_or_substitute(&def.body, &bindings, self.dbg())
         };
 
-        // `--trace-eval`: one line per cache miss (i.e. per distinct
-        // instantiation, matching the cache's own granularity).
+        // `--trace-eval`: one event per cache miss (i.e. per distinct
+        // instantiation, matching the cache's own granularity), anchored at
+        // the call site.
         if let Some(sink) = self.dbg() {
             if sink.trace_enabled() {
-                let args_src = args
-                    .iter()
-                    .map(|arg| one_line(arg))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                sink.trace(format!("trace: {name}({args_src}) = {}", one_line(&body)));
+                let args_src = args.iter().map(one_line).collect::<Vec<_>>().join(", ");
+                sink.trace(TraceEvent {
+                    span: site,
+                    message: format!("{name}({args_src}) = {}", one_line(&body)),
+                    decision: None,
+                });
             }
         }
 

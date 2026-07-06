@@ -7,6 +7,7 @@
 //! message; the helpers pair it with the source text and name and produce the
 //! familiar underlined source excerpt.
 
+use crate::ast::dbg_expr::Decision;
 use crate::ast::Span;
 use ariadne::{Config, IndexType, Label, Report, ReportKind, Source};
 
@@ -150,6 +151,54 @@ fn clamp(span: Span, len: usize) -> std::ops::Range<usize> {
     start..end
 }
 
+/// ANSI codes for the hand-formatted `[Trace]` line. ariadne cannot emit a
+/// label-free one-liner, so the compact trace line is formatted here in
+/// ariadne's visual style; explicit codes (rather than ariadne's
+/// concolor-gated painting) keep output deterministic under the `color`
+/// switch.
+const ANSI_CYAN: &str = "\x1b[36m";
+const ANSI_RESET: &str = "\x1b[0m";
+
+/// The decision word and its colour for a conditional-trace line: which
+/// branch the conditional took.
+fn decision_word(decision: Decision) -> (&'static str, &'static str) {
+    match decision {
+        Decision::Then => ("then", "\x1b[32m"),
+        Decision::Else => ("else", "\x1b[31m"),
+        Decision::Never => ("never", "\x1b[35m"),
+        Decision::Both => ("both (indeterminate)", "\x1b[33m"),
+    }
+}
+
+/// Render one `--trace-eval` event as a compact source-anchored line:
+/// `[Trace] file:line:col  message[ → decision]`. With `color` on, the kind
+/// word is cyan and the decision word takes its branch colour.
+pub fn render_trace_line(
+    source_name: &str,
+    source: &str,
+    span: Span,
+    message: &str,
+    decision: Option<Decision>,
+    color: bool,
+) -> String {
+    let (line, col) = line_col(source, span.start);
+    let kind = if color {
+        format!("{ANSI_CYAN}[Trace]{ANSI_RESET}")
+    } else {
+        "[Trace]".to_string()
+    };
+    let mut out = format!("{kind} {source_name}:{line}:{col}  {message}");
+    if let Some(decision) = decision {
+        let (word, code) = decision_word(decision);
+        if color {
+            out.push_str(&format!(" → {code}{word}{ANSI_RESET}"));
+        } else {
+            out.push_str(&format!(" → {word}"));
+        }
+    }
+    out
+}
+
 /// The 1-based `(line, column)` of a byte `offset` into `source`, matching
 /// ariadne's own numbering. Offsets past EOF clamp to the final position.
 pub fn line_col(source: &str, offset: usize) -> (usize, usize) {
@@ -173,6 +222,55 @@ pub fn line_col(source: &str, offset: usize) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::dbg_expr::Decision;
+
+    #[test]
+    fn trace_line_plain_when_colour_off() {
+        let out = render_trace_line(
+            "x.nt",
+            "type A as 1\n",
+            Span::new(0, 4),
+            "1 <: number",
+            Some(Decision::Then),
+            false,
+        );
+        assert_eq!(out, "[Trace] x.nt:1:1  1 <: number → then");
+        assert!(!out.contains('\x1b'));
+    }
+
+    #[test]
+    fn trace_line_colours_decision_word_when_colour_on() {
+        for (decision, expected) in [
+            (Decision::Then, "\x1b[32mthen\x1b[0m"),
+            (Decision::Else, "\x1b[31melse\x1b[0m"),
+            (Decision::Never, "\x1b[35mnever\x1b[0m"),
+            (Decision::Both, "\x1b[33mboth (indeterminate)\x1b[0m"),
+        ] {
+            let out = render_trace_line(
+                "x.nt",
+                "type A as 1\n",
+                Span::new(0, 4),
+                "1 <: number",
+                Some(decision),
+                true,
+            );
+            assert!(out.contains(expected), "{out:?}");
+            assert!(out.contains("\x1b[36m[Trace]\x1b[0m"), "{out:?}");
+        }
+    }
+
+    #[test]
+    fn trace_line_without_decision_has_no_arrow() {
+        let out = render_trace_line(
+            "x.nt",
+            "type A as 1\ntype B as 2\n",
+            Span::new(12, 16),
+            "Id(1) = 1",
+            None,
+            false,
+        );
+        assert_eq!(out, "[Trace] x.nt:2:1  Id(1) = 1");
+    }
 
     #[test]
     fn renders_name_line_and_column() {
