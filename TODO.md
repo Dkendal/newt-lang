@@ -209,6 +209,18 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   only be used with an extends expression"); `not` of `not` is unsupported.
   Decide whether to allow it (simplifying the double negation away).
 
+- [ ] **`dbg!` around a relational claim** — `dbg!(number <: A['length'])` is a
+  parse error: macro arguments are parsed with the type-expression pratt table
+  (`argument_list` in `src/parser.rs`), while `<:`/`==`/`and`/`or`/`not` live in
+  the separate claim grammar used by `if` conditions and `assert`s, so the two
+  don't nest. Supporting it is new semantics, not just parsing: a claim isn't a
+  type, so the natural report is the branch **decision** (then/else/never/both,
+  as `reduce_conditional` already computes for `--trace-eval`) rather than
+  `= <type>`. Would need a macro-call atom in the claim grammar, an erasure arm
+  + watch kind in `src/ast/dbg_expr.rs`, and a decision-observation hook.
+  Workaround today: mark the operands (`if dbg!(number) <: dbg!(A['length'])`)
+  or use `--trace-eval`. Design direction undecided.
+
 ## Assignability engine (`is_assignable_to`)
 
 - [x] **Implemented the assignability engine** — renamed `is_subtype` →
