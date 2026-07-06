@@ -191,6 +191,17 @@ pub fn run(
         }
     }
 
+    if let Some(sink) = sink.as_deref() {
+        let never_fired = sink.never_fired_count();
+        if never_fired > 0 {
+            writeln!(
+                out,
+                "note: {never_fired} dbg! mark(s) were never evaluated (dbg! fires at \
+                evaluation time; add an assert that exercises them)"
+            )?;
+        }
+    }
+
     if report.total() > 0 {
         writeln!(
             out,
@@ -508,6 +519,48 @@ mod tests {
         assert!(!out.contains("Debug"), "{out}");
     }
 
+    /// UX hint: a `dbg!` mark that never fires (nothing in the program
+    /// demands it) gets a one-line note after the run, naming how many marks
+    /// went unexercised — covers the no-unittest case, where the harness
+    /// still runs (with zero assertions) but should still surface the hint.
+    #[test]
+    fn never_demanded_mark_gets_a_hint_note() {
+        let src = "type T as dbg!(1)"; // no unittest → the mark never fires
+        let (_, out) = run_src_dbg(src);
+        assert!(
+            out.contains("note: 1 dbg! mark(s) were never evaluated"),
+            "{out}"
+        );
+    }
+
+    /// Two unexercised marks → the note's count reflects both.
+    #[test]
+    fn never_demanded_hint_counts_every_unfired_mark() {
+        let src = "type T as dbg!(1)\ntype U as dbg!(2)";
+        let (_, out) = run_src_dbg(src);
+        assert!(
+            out.contains("note: 2 dbg! mark(s) were never evaluated"),
+            "{out}"
+        );
+    }
+
+    /// When every watched mark fires, no hint note is printed.
+    #[test]
+    fn all_marks_fired_gets_no_hint_note() {
+        let src = "unittest \"t\" do\n  assert dbg!(1) <: number\nend";
+        let (_, out) = run_src_dbg(src);
+        assert!(!out.contains("note:"), "{out}");
+    }
+
+    /// A run with no `dbg!` watches at all (the sink is never constructed)
+    /// prints no hint note either — the existing zero-watch runs stay
+    /// unaffected by the new hint.
+    #[test]
+    fn no_watches_at_all_gets_no_hint_note() {
+        let (_, out) = run_src("unittest \"t\" do\n  assert 1 <: number\nend", false);
+        assert!(!out.contains("note:"), "{out}");
+    }
+
     #[test]
     fn repeated_evaluation_prints_once() {
         let src = "unittest \"t\" do\n  assert dbg!(1) <: number\n  assert dbg!(1) <: number\nend";
@@ -597,6 +650,33 @@ mod tests {
         // Both claims passed (and neither panicked nor hung on the last
         // claim's flush).
         assert_eq!(out.matches("\n  ok").count(), 2, "{out}");
+    }
+
+    /// Regression test for the final-review finding: a paused flush-time
+    /// instantiation (inside `flush_dbg_events`'s call to `Ast::normalize`)
+    /// must not poison the shared instantiate cache. `Probe('x')` first gets
+    /// instantiated *while paused*, as a side effect of rendering the
+    /// `dbg!({a: Probe('x')})` event from claim 1's flush; if that paused
+    /// instantiation's result were cached, the second claim's genuine
+    /// `Probe('x') <: string` would hit the cache, `substitute` would never
+    /// re-run, and the bare-parameter mark on `K` would silently never fire.
+    #[test]
+    fn paused_flush_instantiation_does_not_poison_the_cache() {
+        let src = "type Probe(K) as dbg!(K)\n\
+            unittest \"t\" do\n  \
+                assert dbg!({a: Probe('x')}) <: unknown\n  \
+                assert Probe('x') <: string\n\
+            end";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (2, 0), "{out}");
+        // The bare-parameter mark from claim 2's (re-)instantiation of
+        // Probe('x') must still fire, reporting the substituted argument.
+        assert!(
+            out.contains("= 'x'"),
+            "expected the Probe mark to fire with '= 'x'' for claim 2's own \
+            instantiation, not be silently suppressed by a poisoned cache \
+            entry from claim 1's paused flush-time renormalization: {out}"
+        );
     }
 
     // --- Task 4: --trace-eval -----------------------------------------------

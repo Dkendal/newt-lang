@@ -190,6 +190,19 @@ impl TypeEnv {
             }
         }
 
+        // A paused sink means this instantiation happened during flush-time
+        // re-normalization (see `DbgSink`'s docs): `substitute` ran with
+        // `observe_replacement` suppressed, so the body is correct but this
+        // call must not claim "first miss" status for the real evaluation
+        // that follows. Caching it here would give that later, genuine
+        // instantiation a cache hit — `substitute` would never re-run, and a
+        // bare-parameter mark would silently never fire. Skip the insert (but
+        // still return the freshly computed body) so the next, unpaused call
+        // recomputes and observes normally.
+        if self.dbg().is_some_and(|sink| sink.is_paused()) {
+            return Some(body);
+        }
+
         let id = self.arena.borrow_mut().insert(body.clone());
         self.cache.borrow_mut().insert(key, id);
         Some(body)
@@ -300,7 +313,20 @@ impl TypeEnv {
 /// Collapses any internal wrapping the pretty-printer would otherwise
 /// introduce at this width.
 pub(crate) fn one_line(node: &Ast) -> String {
-    node.render_pretty_ts(120).replace('\n', " ")
+    let rendered = node.render_pretty_ts(120).replace('\n', " ");
+    truncate_chars(&rendered, 120)
+}
+
+/// Truncate `s` to at most `max_chars` characters, appending an ellipsis when
+/// truncated. Counts characters (not bytes), so this never splits a
+/// multi-byte UTF-8 sequence.
+fn truncate_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    let mut truncated: String = s.chars().take(max_chars).collect();
+    truncated.push('…');
+    truncated
 }
 
 /// Bind `args` to `params` by position, applying defaults for omitted trailing

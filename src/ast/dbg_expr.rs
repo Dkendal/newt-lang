@@ -108,6 +108,11 @@ pub struct DbgSink {
     watches: DbgWatches,
     events: RefCell<Vec<DbgEvent>>,
     seen: RefCell<HashSet<(usize, usize, String)>>,
+    /// Every watch span that has fired at least once via `record` (even if
+    /// the specific event was deduped by `seen`), so the harness can report
+    /// on marks that never fired at all. Keyed the same way as
+    /// `DbgWatches`'s own index: `(span.start(), span.end())`.
+    fired: RefCell<HashSet<(usize, usize)>>,
     paused: Cell<bool>,
     /// `--trace-eval`: when set, [`Self::trace`] records a plain-line trace
     /// event for every instantiate cache miss and conditional decision.
@@ -121,6 +126,7 @@ impl DbgSink {
             watches,
             events: RefCell::new(Vec::new()),
             seen: RefCell::new(HashSet::new()),
+            fired: RefCell::new(HashSet::new()),
             paused: Cell::new(false),
             trace: Cell::new(false),
             trace_events: RefCell::new(Vec::new()),
@@ -184,6 +190,7 @@ impl DbgSink {
     }
 
     fn record(&self, span: Span, observed: Ast) {
+        self.fired.borrow_mut().insert((span.start(), span.end()));
         let key = (span.start(), span.end(), fingerprint(&observed));
         if !self.seen.borrow_mut().insert(key) {
             return;
@@ -196,25 +203,49 @@ impl DbgSink {
         std::mem::take(&mut self.events.borrow_mut())
     }
 
+    /// Count of watches (spans in [`DbgWatches`]) that never fired via
+    /// [`Self::observe`]/[`Self::observe_replacement`] over the sink's whole
+    /// lifetime — used for the "N dbg! mark(s) were never evaluated" hint
+    /// printed once the harness run completes.
+    pub fn never_fired_count(&self) -> usize {
+        let fired = self.fired.borrow();
+        self.watches
+            .iter()
+            .filter(|watch| !fired.contains(&(watch.span.start(), watch.span.end())))
+            .count()
+    }
+
     /// Suppress `observe`/`observe_replacement` for the lifetime of the
-    /// returned guard (RAII: dropping it resumes). Re-entrant-safe only in
-    /// the sense of restoring to "resumed" on drop — callers are not expected
-    /// to nest pauses.
+    /// returned guard (RAII: dropping it restores whatever paused state was
+    /// in effect before the guard was created — safe under nesting).
     #[must_use]
     pub fn pause(&self) -> PauseGuard<'_> {
-        self.paused.set(true);
-        PauseGuard { sink: self }
+        let was_paused = self.paused.replace(true);
+        PauseGuard {
+            sink: self,
+            was_paused,
+        }
+    }
+
+    /// Whether the sink is currently paused (flush-time re-normalization):
+    /// callers that must not let a paused instantiation poison a shared cache
+    /// (e.g. [`TypeEnv::instantiate`](crate::ast::type_env::TypeEnv)) check
+    /// this to skip caching the result of work done while paused.
+    pub fn is_paused(&self) -> bool {
+        self.paused.get()
     }
 }
 
-/// RAII guard returned by [`DbgSink::pause`]; resumes observation on drop.
+/// RAII guard returned by [`DbgSink::pause`]; restores the prior paused state
+/// on drop (rather than unconditionally resuming), so nested pauses are safe.
 pub struct PauseGuard<'a> {
     sink: &'a DbgSink,
+    was_paused: bool,
 }
 
 impl Drop for PauseGuard<'_> {
     fn drop(&mut self) {
-        self.sink.paused.set(false);
+        self.sink.paused.set(self.was_paused);
     }
 }
 
@@ -530,6 +561,37 @@ mod tests {
             events.len(),
             1,
             "an observation made once resumed must not vanish silently"
+        );
+    }
+
+    /// Regression test for the final-review finding: `PauseGuard::drop` must
+    /// restore whatever paused state was in effect before the guard was
+    /// created, not unconditionally unpause. Nesting a guard while already
+    /// paused (e.g. an outer flush-time pause around an inner instantiation
+    /// path that also calls `pause`) must leave the sink paused once the
+    /// inner guard drops — only the outermost guard's drop should resume it.
+    #[test]
+    fn nested_pause_restores_prior_paused_state() {
+        let sink = DbgSink::new(DbgWatches::default());
+        assert!(!sink.is_paused());
+
+        let outer = sink.pause();
+        assert!(sink.is_paused());
+        {
+            let inner = sink.pause();
+            assert!(sink.is_paused());
+            drop(inner);
+            // Inner guard's drop must restore "paused" (the state from
+            // before it was created), not unconditionally resume.
+            assert!(
+                sink.is_paused(),
+                "inner guard's drop must not resume a sink an outer guard is still pausing"
+            );
+        }
+        drop(outer);
+        assert!(
+            !sink.is_paused(),
+            "outermost guard's drop must resume the sink"
         );
     }
 }
