@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::io::{self, Write};
 
 use crate::ast::type_env::{ResolveCtx, TypeEnv};
-use crate::ast::{ApplyGeneric, Assert, Ast, MacroCall, UnitTest};
+use crate::ast::{ApplyGeneric, Assert, Ast, Interface, MacroCall, UnitTest};
 use crate::typescript::Pretty;
 
 /// Width for pretty-printing normalized types in report labels.
@@ -61,9 +61,9 @@ pub fn expand(
 }
 
 /// Replace every `dbg!(X)` with `X`, recording a [`DbgCall`] per occurrence.
-/// `UnitTest` bodies and `Assert` claims are recursed into explicitly —
-/// [`Ast::map`] deliberately does not descend into them (mirroring
-/// `rewrite_unique_symbols` in `walk.rs`).
+/// `UnitTest` bodies, `Assert` claims, and `Interface` bodies are recursed
+/// into explicitly — [`Ast::map`] deliberately does not descend into them
+/// (mirroring `rewrite_unique_symbols` in `walk.rs`).
 fn strip(node: &Ast, source: &str, source_name: &str, calls: &RefCell<Vec<DbgCall>>) -> Ast {
     match node {
         Ast::MacroCall(MacroCall { name, args, span }) if name == "dbg!" => {
@@ -96,6 +96,26 @@ fn strip(node: &Ast, source: &str, source_name: &str, calls: &RefCell<Vec<DbgCal
         Ast::Assert(assert) => Ast::Assert(Assert {
             span: assert.span,
             claim: strip(&assert.claim, source, source_name, calls).into(),
+        }),
+        Ast::Interface(interface) => Ast::Interface(Interface {
+            span: interface.span,
+            export: interface.export,
+            name: interface.name.clone(),
+            extends: interface
+                .extends
+                .as_ref()
+                .map(|e| strip(e, source, source_name, calls).into()),
+            params: interface
+                .params
+                .iter()
+                .map(|p| p.map(|child| strip(child, source, source_name, calls)))
+                .collect(),
+            definition: interface
+                .definition
+                .iter()
+                .cloned()
+                .map(|prop| prop.map(|child| strip(child, source, source_name, calls)))
+                .collect(),
         }),
         other => other.map(|child| strip(child, source, source_name, calls)),
     }
@@ -210,6 +230,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!((report.passed, report.failed), (1, 0));
+    }
+
+    #[test]
+    fn dbg_inside_interface_body_is_reported_and_erased() {
+        let src = "interface Foo {\n  x: dbg!(1)\n}";
+        let (cleaned, out) = run(src);
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        assert_eq!(
+            cleaned.render_pretty_ts(120),
+            render("interface Foo {\n  x: 1\n}")
+        );
     }
 
     #[test]
