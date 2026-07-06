@@ -1180,7 +1180,7 @@ pub mod validate;
 
 mod assignability;
 
-pub(crate) mod type_env;
+pub mod type_env;
 
 mod desugar;
 

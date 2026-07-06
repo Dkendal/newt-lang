@@ -421,3 +421,65 @@ fn map_visits_macro_call_args() {
     };
     assert!(matches!(&call.args[0], newtype::ast::Ast::Ident(id) if id.name == "B"));
 }
+
+mod normalize {
+    use newtype::ast::type_env::{ResolveCtx, TypeEnv};
+    use newtype::parser::{parse_newtype_program, parse_source, Rule};
+    use newtype::typescript::Pretty;
+
+    /// Normalize `expr` against the definitions in `program` and render it.
+    fn normalized(program: &str, expr: &str) -> String {
+        let program = parse_newtype_program(program).unwrap().simplify();
+        let env = TypeEnv::from_program(&program);
+        let ctx = ResolveCtx::new(&env);
+        parse_source(Rule::expr, expr)
+            .unwrap()
+            .simplify()
+            .normalize(&ctx)
+            .render_pretty_ts(80)
+    }
+
+    #[test]
+    fn expands_alias() {
+        assert_eq!(normalized("type A as 1", "A"), "1");
+    }
+
+    #[test]
+    fn expands_generic_application_and_reduces_access() {
+        assert_eq!(
+            normalized(
+                "type User as { id: number }\ntype Get(T) as T['id']",
+                "Get(User)"
+            ),
+            "number"
+        );
+    }
+
+    #[test]
+    fn reduces_keyof() {
+        assert_eq!(
+            normalized("type User as { id: number }", "keyof User"),
+            "'id'"
+        );
+    }
+
+    #[test]
+    fn reduces_conditional_from_alias_body() {
+        assert_eq!(
+            normalized("type C as if 1 <: number then true else false end", "C"),
+            "true"
+        );
+    }
+
+    #[test]
+    fn unresolved_reference_is_left_as_is() {
+        assert_eq!(normalized("type A as 1", "Unknown"), "Unknown");
+    }
+
+    #[test]
+    fn recursive_alias_terminates() {
+        // Must not hang; the exact (partially expanded) output is unspecified.
+        let out = normalized("type Rec as { next: Rec }", "Rec");
+        assert!(out.contains("next"), "{out}");
+    }
+}

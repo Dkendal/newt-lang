@@ -1687,6 +1687,68 @@ impl Ast {
         Some(current)
     }
 
+    /// Reduce `self` toward a normal form **for display** (the `dbg!` macro):
+    /// resolve named references against the environment and reduce
+    /// conditionals, indexed access, and `keyof`, bottom-up, repeating to a
+    /// fixpoint. The iteration cap bounds recursive aliases (`type Rec as
+    /// { next: Rec }`), which would otherwise expand forever — a capped or
+    /// unresolvable expression is returned as far as it got. Never fails.
+    ///
+    /// This is presentation-only: assignability continues to reduce lazily and
+    /// is unaffected.
+    pub fn normalize(&self, ctx: &ResolveCtx) -> Ast {
+        const CAP: usize = 8;
+
+        let mut current = self.clone();
+        for _ in 0..CAP {
+            let next = Self::normalize_step(&current, ctx);
+            // Spans are ignored by `PartialEq`, so this is structural equality.
+            if next == current {
+                break;
+            }
+            current = next;
+        }
+        current
+    }
+
+    /// One bottom-up reduction pass: children first, then resolve/reduce the
+    /// rebuilt node.
+    fn normalize_step(node: &Ast, ctx: &ResolveCtx) -> Ast {
+        // `ApplyGeneric`'s receiver names a generic definition, not an
+        // independent expression: `Ast::map` would otherwise recurse into it
+        // and `resolve_head` would try to instantiate it with zero arguments
+        // (e.g. `Get` alone), corrupting the receiver before the application
+        // as a whole gets a chance to resolve. Only the arguments are
+        // reduced bottom-up; the receiver is left for `resolve_head` on the
+        // rebuilt application node below.
+        let node = if let Ast::ApplyGeneric(app) = node {
+            let mut app = app.clone();
+            app.args = app
+                .args
+                .iter()
+                .map(|arg| Self::normalize_step(arg, ctx))
+                .collect();
+            Ast::ApplyGeneric(app)
+        } else {
+            node.map(|child| Self::normalize_step(child, ctx))
+        };
+
+        if let Some(resolved) = ctx.env().and_then(|env| env.resolve_head(&node)) {
+            return resolved;
+        }
+
+        match &node {
+            Ast::ExtendsExpr(conditional) => Self::reduce_conditional(conditional, ctx),
+            Ast::Access(_) => Self::reduce_access_leaf(&node, ctx).unwrap_or_else(|| node.clone()),
+            Ast::Builtin(Builtin {
+                name: BuiltinKeyword::Keyof,
+                argument,
+                ..
+            }) => Self::eval_keyof(argument, ctx).unwrap_or_else(|| node.clone()),
+            _ => node,
+        }
+    }
+
     /// Reduce a single indexed access `obj[key]` to the referenced member type,
     /// or `None` when it cannot be resolved definitely (leaving the operand
     /// indeterminate). `obj` is resolved to its definition head before dispatch;
