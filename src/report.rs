@@ -87,6 +87,32 @@ pub fn render_labeled(
     report_to_string(&report.finish(), source_name, source)
 }
 
+/// Render a `dbg!` report: a `Debug`-kind diagnostic anchored at `span`, whose
+/// label carries the evaluated type (`= <type>`).
+pub fn render_debug(
+    source_name: &str,
+    source: &str,
+    span: Span,
+    message: &str,
+    color: bool,
+) -> String {
+    let range = clamp(span, source.len());
+
+    let report = Report::build(
+        ReportKind::Custom("Debug", ariadne::Color::Cyan),
+        (source_name.to_string(), range.clone()),
+    )
+    .with_config(
+        Config::new()
+            .with_index_type(IndexType::Byte)
+            .with_color(color),
+    )
+    .with_label(Label::new((source_name.to_string(), range)).with_message(message))
+    .finish();
+
+    report_to_string(&report, source_name, source)
+}
+
 fn render(source_name: &str, source: &str, span: Span, message: &str, color: bool) -> String {
     report_to_string(
         &build_report(source_name, source, span, message, color),
@@ -197,5 +223,16 @@ mod tests {
         let labels = vec![(Span::new(at, at + 3), "boom".to_string())];
         let out = render_labeled(Severity::Error, "x.nt", source, "bad", &labels, false);
         assert!(out.contains("Error"), "{out}");
+    }
+
+    #[test]
+    fn renders_debug_kind() {
+        let source = "type A as 1\n";
+        let at = source.find('1').unwrap();
+        let out = render_debug("x.nt", source, Span::new(at, at + 1), "= 1", false);
+        assert!(out.contains("Debug"), "{out}");
+        assert!(out.contains("= 1"), "{out}");
+        assert!(out.contains("x.nt:1:11"), "{out}");
+        assert!(!out.contains('\x1b'), "{out}");
     }
 }
