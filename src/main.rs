@@ -118,19 +118,22 @@ fn main() {
                 );
             }
 
-            let simplified = desugared.simplify();
-
-            // Evaluate and erase `dbg!` calls: each prints a Debug report (per
-            // pipeline step) to stderr; downstream stages see the program as if
-            // `dbg!` weren't there.
-            let simplified = newtype::ast::dbg_expr::expand(
-                &simplified,
+            // Evaluate and erase `dbg!` calls before simplification: `simplify()`
+            // desugars `if`/`cond`/… via `ExtendsExpr::new`, which panics on a
+            // `MacroCall` operand, so a `dbg!` inside an `if` branch must be
+            // stripped first. Each call prints a Debug report (per pipeline
+            // step) to stderr; downstream stages see the program as if `dbg!`
+            // weren't there.
+            let cleaned = newtype::ast::dbg_expr::expand(
+                &desugared,
                 input,
                 &source_name,
                 true,
                 &mut std::io::stderr(),
             )
             .expect("writing dbg! reports to stderr failed");
+
+            let simplified = cleaned.simplify();
 
             // Evaluate `unittest` assertions after simplification but before
             // rendering. Failures are reported to stderr; rendering still

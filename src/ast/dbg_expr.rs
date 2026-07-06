@@ -1,12 +1,22 @@
 //! The `dbg!` compile pass.
 //!
-//! Runs in the CLI between [`Ast::simplify`] and the assert harness: it
+//! Runs in the CLI after `desugar_globals` and BEFORE [`Ast::simplify`]: it
 //! **erases** every `dbg!` call (replacing it with its argument, so asserts,
 //! rendered TypeScript, and source maps are unaffected) while printing one
 //! `Debug` report per debugged expression — and, for a pipeline
 //! (`a |> b |> dbg!()`), one report per pipeline step, first step first,
 //! Elixir-style. Each report shows the step's source excerpt and its
 //! normalized type ([`Ast::normalize`]).
+//!
+//! The pass must run before `simplify()`: `simplify()` desugars `if`/`cond`/…
+//! via `ExtendsExpr::new`, which asserts every operand is a TypeScript
+//! feature — a `MacroCall` is not, so a `dbg!` inside an `if` branch would
+//! panic during `simplify()` before this pass ever got a chance to strip it.
+//! Stripping first means `calls` holds pre-simplify steps, which may still
+//! carry `if`/`let` sugar; evaluation normalizes them against the *simplified
+//! cleaned* program so reported types keep post-desugar semantics — the
+//! `TypeEnv` is built from `cleaned.simplify()`, and each step is
+//! `step.simplify().normalize(&ctx)`.
 //!
 //! The pass is two-phase (strip & collect first, then evaluate & report)
 //! because the `TypeEnv` used for normalization must be built from the
@@ -46,12 +56,13 @@ pub fn expand(
         return Ok(cleaned);
     }
 
-    let env = TypeEnv::from_program(&cleaned);
+    let simplified_cleaned = cleaned.simplify();
+    let env = TypeEnv::from_program(&simplified_cleaned);
     let ctx = ResolveCtx::new(&env);
 
     for call in &calls {
         for step in &call.steps {
-            let normalized = step.normalize(&ctx);
+            let normalized = step.simplify().normalize(&ctx);
             let message = format!("= {}", normalized.render_pretty_ts(RENDER_WIDTH));
             writeln!(
                 out,
@@ -154,12 +165,12 @@ mod tests {
     use super::*;
     use crate::parser::parse_newtype_program;
 
-    /// Parse + simplify `src`, run the pass, return (cleaned AST, report text).
+    /// Parse `src`, run the pass, return (simplified cleaned AST, report text).
     fn run(src: &str) -> (Ast, String) {
-        let program = parse_newtype_program(src).unwrap().simplify();
+        let program = parse_newtype_program(src).unwrap();
         let mut out = Vec::new();
         let cleaned = expand(&program, src, "<test>", false, &mut out).unwrap();
-        (cleaned, String::from_utf8(out).unwrap())
+        (cleaned.simplify(), String::from_utf8(out).unwrap())
     }
 
     fn render(src: &str) -> String {
@@ -258,5 +269,16 @@ mod tests {
     #[should_panic(expected = "dbg! expects exactly one argument")]
     fn dbg_with_wrong_arity_panics_with_report() {
         run("type T as dbg!(1, 2)");
+    }
+
+    #[test]
+    fn dbg_inside_if_branch_is_reported_and_erased() {
+        let src = "type Get(A, K) as if K <: keyof A then dbg!(A[K]) else never end";
+        let (cleaned, out) = run(src);
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        assert_eq!(
+            cleaned.render_pretty_ts(120),
+            render("type Get(A, K) as if K <: keyof A then A[K] else never end")
+        );
     }
 }
