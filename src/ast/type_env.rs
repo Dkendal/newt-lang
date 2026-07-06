@@ -151,9 +151,9 @@ impl TypeEnv {
     /// arguments substituted for parameters. Otherwise `None`.
     pub fn resolve_head(&self, ast: &Ast) -> Option<Ast> {
         match ast {
-            Ast::Ident(Ident { name, .. }) => self.instantiate(name, &[]),
+            Ast::Ident(Ident { name, .. }) => self.instantiate(name, &[], ast.as_span()),
             Ast::ApplyGeneric(ApplyGeneric { receiver, args, .. }) => match receiver.as_ref() {
-                Ast::Ident(Ident { name, .. }) => self.instantiate(name, args),
+                Ast::Ident(Ident { name, .. }) => self.instantiate(name, args, ast.as_span()),
                 _ => None,
             },
             _ => None,
@@ -161,8 +161,10 @@ impl TypeEnv {
     }
 
     /// Expand `name(args)` to its definition's body, substituting `args` for the
-    /// definition's parameters. Interns and caches the result.
-    fn instantiate(&self, name: &str, args: &[Ast]) -> Option<Ast> {
+    /// definition's parameters. Interns and caches the result. `site` is the
+    /// call-site span (the applying node), used for `dbg!` stack frames and
+    /// `--trace-eval` locations.
+    fn instantiate(&self, name: &str, args: &[Ast], site: Span) -> Option<Ast> {
         let def = self.defs.get(name)?;
 
         let key = instantiation_key(name, args);
@@ -173,6 +175,12 @@ impl TypeEnv {
         let body = if def.params.is_empty() {
             def.body.clone()
         } else {
+            // `dbg!` stacktrace frame for the generic being instantiated:
+            // `observe_replacement` fires inside `distribute_or_substitute`,
+            // so this frame must already be on the stack at that moment.
+            let _frame = self
+                .dbg()
+                .map(|sink| sink.frame(frame_label_apply(name, args), site));
             let bindings = bind_params(&def.params, args);
             distribute_or_substitute(&def.body, &bindings, self.dbg())
         };
@@ -315,6 +323,30 @@ impl TypeEnv {
 pub(crate) fn one_line(node: &Ast) -> String {
     let rendered = node.render_pretty_ts(120).replace('\n', " ");
     truncate_chars(&rendered, 120)
+}
+
+/// A frame label for the `dbg!` stacktrace: the node on one line, truncated
+/// so the location column stays readable. A named application is spelled in
+/// newtype call syntax (`Wrap(1)`), matching the labels `instantiate` builds
+/// for the same application — `one_line` would render TypeScript's `Wrap<1>`
+/// and the two frame kinds would disagree about the same call.
+pub(crate) fn frame_label(node: &Ast) -> String {
+    if let Ast::ApplyGeneric(ApplyGeneric { receiver, args, .. }) = node {
+        if let Ast::Ident(Ident { name, .. }) = receiver.as_ref() {
+            return frame_label_apply(name, args);
+        }
+    }
+    truncate_chars(&one_line(node), 60)
+}
+
+/// A frame label for an instantiation: `Name(arg, …)` (or the bare name for
+/// a zero-argument application), truncated like [`frame_label`].
+pub(crate) fn frame_label_apply(name: &str, args: &[Ast]) -> String {
+    if args.is_empty() {
+        return truncate_chars(name, 60);
+    }
+    let args_src = args.iter().map(one_line).collect::<Vec<_>>().join(", ");
+    truncate_chars(&format!("{name}({args_src})"), 60)
 }
 
 /// Truncate `s` to at most `max_chars` characters, appending an ellipsis when

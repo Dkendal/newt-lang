@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{
-        type_env::{fingerprint, one_line, substitute, ResolveCtx},
+        type_env::{fingerprint, frame_label, one_line, substitute, ResolveCtx},
         Access, ApplyGeneric, Ast, Builtin, BuiltinKeyword, ExtendsExpr, FunctionType, Ident,
         IntersectionType, MappedType, MappingModifier, ObjectProperty, PrimitiveType, PropertyName,
         Span, Tuple, TypeLiteral, TypeNumber, TypeString, UnionType,
@@ -99,6 +99,16 @@ impl Ast {
                 if !ctx.assume(&pair) {
                     return T::True;
                 }
+                // `dbg!` stacktrace frames: the resolved body is evaluated by
+                // the recursion below, so each resolved side's application
+                // stays on the stack for exactly that extent. Read-only.
+                let sink = ctx.env().and_then(|env| env.dbg());
+                let _lhs_frame = sink
+                    .filter(|_| lhs_resolved.is_some())
+                    .map(|s| s.frame(frame_label(self), self.as_span()));
+                let _rhs_frame = sink
+                    .filter(|_| rhs_resolved.is_some())
+                    .map(|s| s.frame(frame_label(other), other.as_span()));
                 let lhs = lhs_resolved.as_ref().unwrap_or(self);
                 let rhs = rhs_resolved.as_ref().unwrap_or(other);
                 let result = lhs.is_assignable_to_ctx(rhs, ctx);
@@ -1440,10 +1450,14 @@ impl Ast {
         }
 
         // Resolve a named check type one step (e.g. an alias) before matching.
-        let check = ctx
-            .env()
-            .and_then(|env| env.resolve_head(lhs))
-            .unwrap_or_else(|| (**lhs).clone());
+        let resolved = ctx.env().and_then(|env| env.resolve_head(lhs));
+        // `dbg!` stacktrace frame for a named check type: alive while the
+        // resolved check is related below. Read-only.
+        let sink = ctx.env().and_then(|env| env.dbg());
+        let _check_frame = sink
+            .filter(|_| resolved.is_some())
+            .map(|s| s.frame(frame_label(lhs), lhs.as_span()));
+        let check = resolved.unwrap_or_else(|| (**lhs).clone());
 
         if Self::contains_infer(rhs) {
             let mut bindings: HashMap<String, Vec<Ast>> = HashMap::new();

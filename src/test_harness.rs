@@ -130,7 +130,15 @@ pub fn run(
             let ctx_for_flush = ResolveCtx::new(&env)
                 .with_exact_optional_property_types(config.exact_optional_property_types);
 
-            match evaluate(&assert.claim, &env, config) {
+            let outcome = {
+                // Root `dbg!` stacktrace frame: every evaluation this claim
+                // triggers reports `in assert claim` at the claim's span.
+                let _claim_frame = sink
+                    .as_deref()
+                    .map(|s| s.frame("assert claim".to_string(), span));
+                evaluate(&assert.claim, &env, config)
+            };
+            match outcome {
                 Outcome::Pass => {
                     report.passed += 1;
                     writeln!(out, "  ok      {claim_src}")?;
@@ -254,6 +262,30 @@ fn flush_dbg_events(
                 &format!("= {rendered}"),
                 false,
             )
+        )?;
+        write_frames(&event.stack, source_name, source, out)?;
+    }
+    Ok(())
+}
+
+/// Render a `dbg!` event's evaluation stacktrace, innermost frame first,
+/// Elixir-style: `    in <label>   <file>:<line>:<col>`. Labels are padded so
+/// the location column aligns within one report. No-op for an empty stack.
+fn write_frames(
+    stack: &[crate::ast::dbg_expr::Frame],
+    source_name: &str,
+    source: &str,
+    out: &mut dyn Write,
+) -> io::Result<()> {
+    let Some(width) = stack.iter().map(|f| f.label.chars().count()).max() else {
+        return Ok(());
+    };
+    for frame in stack.iter().rev() {
+        let (line, col) = crate::report::line_col(source, frame.span.start());
+        writeln!(
+            out,
+            "    in {:<width$}   {source_name}:{line}:{col}",
+            frame.label
         )?;
     }
     Ok(())
@@ -677,6 +709,61 @@ mod tests {
             instantiation, not be silently suppressed by a poisoned cache \
             entry from claim 1's paused flush-time renormalization: {out}"
         );
+    }
+
+    // --- Task 2: dbg! stacktraces -------------------------------------------
+
+    /// The motivating case for stacktraces: a bare-parameter mark inside `Get`,
+    /// reached via `At(User, 'id')`, reports its live binding AND the chain of
+    /// instantiations that led there — innermost frame first, each with a
+    /// 1-based source location.
+    #[test]
+    fn dbg_report_includes_instantiation_stacktrace() {
+        let src = "type User as { id: number }\n\
+            type Get(A, K) as if dbg!(K) <: keyof A then A[K] else never end\n\
+            type At(A, K) as Get(A, K)\n\
+            unittest \"t\" do\n\
+            \x20 assert At(User, 'id') <: number\n\
+            end";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (1, 0), "{out}");
+        assert!(out.contains("= 'id'"), "live binding: {out}");
+
+        let get = out
+            .find("in Get(User,")
+            .expect(&format!("Get frame missing: {out}"));
+        let at = out
+            .find("in At(User,")
+            .expect(&format!("At frame missing: {out}"));
+        let claim = out
+            .find("in assert claim")
+            .expect(&format!("claim frame missing: {out}"));
+        assert!(get < at && at < claim, "innermost frame first: {out}");
+
+        // Locations: `Get(A, K)` is applied on line 3, the claim is on line 5.
+        assert!(out.contains("<test>:3:"), "Get frame location: {out}");
+        assert!(out.contains("<test>:5:"), "claim frame location: {out}");
+    }
+
+    /// Distinct instantiations of the same generic each fire with a full stack
+    /// (the spec's cache-interaction case: the second event must not lose its
+    /// frames to the first's cache entry).
+    #[test]
+    fn each_distinct_instantiation_gets_a_full_stack() {
+        let src = "type Probe(K) as dbg!(K)\n\
+            type Wrap(K) as Probe(K)\n\
+            unittest \"t\" do\n\
+            \x20 assert Wrap(1) <: number\n\
+            \x20 assert Wrap(2) <: number\n\
+            end";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (2, 0), "{out}");
+        assert!(out.contains("= 1"), "{out}");
+        assert!(out.contains("= 2"), "{out}");
+        assert!(out.contains("in Probe(1)"), "{out}");
+        assert!(out.contains("in Probe(2)"), "{out}");
+        assert!(out.contains("in Wrap(1)"), "{out}");
+        assert!(out.contains("in Wrap(2)"), "{out}");
     }
 
     // --- Task 4: --trace-eval -----------------------------------------------
