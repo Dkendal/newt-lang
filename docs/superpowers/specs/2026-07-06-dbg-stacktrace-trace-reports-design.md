@@ -34,21 +34,33 @@ pushed/popped via an RAII `FrameGuard` (same shape as the existing
 on the sink (`fn frame(&self, label, span) -> FrameGuard`) is a no-op-ish
 push; callers without a sink skip it entirely.
 
-**Where frames are pushed — resolve-and-recurse sites, not `instantiate`.**
-`TypeEnv::instantiate` only substitutes and returns; the resolved body is
-evaluated *afterwards* in the caller. So the guard wraps each engine site in
-`assignability.rs` that does `ctx.resolve_head(node)` **and then recurses
-into the result** — the frame is alive for exactly the dynamic extent of that
-named type's evaluation. Frame label = `one_line(node)` capped at ~60 chars;
-frame span = the application node's own span.
+**Where frames are pushed — two kinds of site.**
+
+1. **Inside `TypeEnv::instantiate`, around substitution** (cache-miss path,
+   generics with parameters): `observe_replacement` — the `dbg!(K)`
+   bare-parameter hook — fires *during* `distribute_or_substitute`, so the
+   frame for the generic being instantiated must already be on the stack at
+   that moment. Label = `Name(args…)`; span = the call-site span (`instantiate`
+   gains a `site: Span` parameter threaded from `resolve_head`, which has the
+   application node).
+2. **Resolve-and-recurse sites in `assignability.rs`**: `instantiate` only
+   substitutes and returns; the resolved body is evaluated *afterwards* in
+   the caller. So a guard also wraps each engine site that does
+   `ctx.resolve_head(node)` **and then recurses into the result** — the
+   `is_assignable_to_ctx` named-reference block (one frame per side that
+   resolved) and `reduce_conditional`'s check resolution. The frame is alive
+   for exactly the dynamic extent of that named type's evaluation. Label =
+   `one_line(node)` capped at ~60 chars; span = the node's own span.
 
 Deliberate consequences:
 
-- `observe_replacement` (the `dbg!(K)` bare-parameter hook, firing inside
-  `substitute` during instantiation) runs within the resolving caller's
-  guard, so it snapshots the correct stack.
-- **Cache hits still get stacks**: frames live at the resolve call sites,
-  which run identically whether `instantiate` hits or misses its cache.
+- A bare-parameter mark inside `Get` fired while instantiating
+  `Get(User,'id')` snapshots `Get(User,'id')` (site 1) plus its callers
+  (site 2 frames) plus the claim root — the preview's exact shape.
+- **Cache hits still get stacks**: site-2 frames live at the resolve call
+  sites, which run identically whether `instantiate` hits or misses its
+  cache. (A cache hit pushes no site-1 frame, but a cache hit also runs no
+  substitution, so no replacement observation is missed.)
 - Only *named-type applications* become frames (per the chosen design) —
   not every assignability-relation or conditional-reduction step.
 
