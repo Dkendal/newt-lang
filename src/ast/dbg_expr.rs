@@ -2,77 +2,95 @@
 //!
 //! Runs in the CLI after `desugar_globals` and BEFORE [`Ast::simplify`]: it
 //! **erases** every `dbg!` call (replacing it with its argument, so asserts,
-//! rendered TypeScript, and source maps are unaffected) while printing one
-//! `Debug` report per debugged expression — and, for a pipeline
-//! (`a |> b |> dbg!()`), one report per pipeline step, first step first,
-//! Elixir-style. Each report shows the step's source excerpt and its
-//! normalized type ([`Ast::normalize`]).
+//! rendered TypeScript, and source maps are unaffected) while *recording* a
+//! [`DbgWatch`] per debugged expression — and, for a pipeline
+//! (`a |> b |> dbg!()`), one watch per pipeline step, first step first,
+//! Elixir-style. Reporting no longer happens here: evaluation demands the
+//! watched spans and reports on them as they're resolved (see the v2 design
+//! doc); this pass only erases and records *where* to watch.
 //!
 //! The pass must run before `simplify()`: `simplify()` desugars `if`/`cond`/…
 //! via `ExtendsExpr::new`, which asserts every operand is a TypeScript
 //! feature — a `MacroCall` is not, so a `dbg!` inside an `if` branch would
 //! panic during `simplify()` before this pass ever got a chance to strip it.
-//! Stripping first means `calls` holds pre-simplify steps, which may still
-//! carry `if`/`let` sugar; evaluation normalizes them against the *simplified
-//! cleaned* program so reported types keep post-desugar semantics — the
-//! `TypeEnv` is built from `cleaned.simplify()`, and each step is
-//! `step.simplify().normalize(&ctx)`.
-//!
-//! The pass is two-phase (strip & collect first, then evaluate & report)
-//! because the `TypeEnv` used for normalization must be built from the
-//! cleaned program — the resolution engine does not handle `MacroCall` nodes.
 
 use std::cell::RefCell;
-use std::io::{self, Write};
+use std::collections::HashSet;
 
-use crate::ast::type_env::{ResolveCtx, TypeEnv};
-use crate::ast::{ApplyGeneric, Assert, Ast, Interface, MacroCall, UnitTest};
-use crate::typescript::Pretty;
+use crate::ast::{ApplyGeneric, Assert, Ast, Ident, Interface, MacroCall, Span, UnitTest};
 
-/// Width for pretty-printing normalized types in report labels.
-const RENDER_WIDTH: usize = 80;
+/// A single watched site: the span evaluation must demand for it to fire.
+#[derive(Debug, Clone)]
+pub struct DbgWatch {
+    pub span: Span,
+    /// `Some(name)` when the watched node is a bare identifier (a probable
+    /// type-parameter reference): substitution must observe its replacement.
+    pub bare_ident: Option<String>,
+}
 
-/// One collected `dbg!` call: the steps to report, first step first. A
+/// The watch table produced by [`expand`]: every span evaluation must watch
+/// for, plus a fast exact-span membership/lookup index.
+#[derive(Debug, Clone, Default)]
+pub struct DbgWatches {
+    watches: Vec<DbgWatch>,
+    index: HashSet<(usize, usize)>,
+}
+
+impl DbgWatches {
+    fn push(&mut self, watch: DbgWatch) {
+        self.index.insert((watch.span.start(), watch.span.end()));
+        self.watches.push(watch);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.watches.is_empty()
+    }
+
+    /// Exact `(start, end)` match.
+    pub fn contains(&self, span: Span) -> bool {
+        self.index.contains(&(span.start(), span.end()))
+    }
+
+    pub fn bare_ident(&self, span: Span) -> Option<&str> {
+        self.watches
+            .iter()
+            .find(|watch| watch.span.start() == span.start() && watch.span.end() == span.end())
+            .and_then(|watch| watch.bare_ident.as_deref())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &DbgWatch> {
+        self.watches.iter()
+    }
+}
+
+/// One collected `dbg!` call: the steps to watch, first step first. A
 /// non-pipeline argument is a single step.
 struct DbgCall {
     steps: Vec<Ast>,
 }
 
-/// Strip every `dbg!` from `program`, print one Debug report per step to
-/// `out`, and return the cleaned program. `source`/`source_name` anchor the
-/// reports; `color` selects ANSI output (true in the CLI, false in tests).
-pub fn expand(
-    program: &Ast,
-    source: &str,
-    source_name: &str,
-    color: bool,
-    out: &mut dyn Write,
-) -> io::Result<Ast> {
+/// Strip every `dbg!` from `program`, recording a [`DbgWatch`] per step, and
+/// return the cleaned program alongside the watch table.
+pub fn expand(program: &Ast, source: &str, source_name: &str) -> (Ast, DbgWatches) {
     let calls = RefCell::new(Vec::new());
     let cleaned = strip(program, source, source_name, &calls);
     let calls = calls.into_inner();
 
-    if calls.is_empty() {
-        return Ok(cleaned);
-    }
-
-    let simplified_cleaned = cleaned.simplify();
-    let env = TypeEnv::from_program(&simplified_cleaned);
-    let ctx = ResolveCtx::new(&env);
-
+    let mut watches = DbgWatches::default();
     for call in &calls {
         for step in &call.steps {
-            let normalized = step.simplify().normalize(&ctx);
-            let message = format!("= {}", normalized.render_pretty_ts(RENDER_WIDTH));
-            writeln!(
-                out,
-                "{}",
-                crate::report::render_debug(source_name, source, step.as_span(), &message, color)
-            )?;
+            let bare_ident = match step {
+                Ast::Ident(Ident { name, .. }) => Some(name.clone()),
+                _ => None,
+            };
+            watches.push(DbgWatch {
+                span: step.as_span(),
+                bare_ident,
+            });
         }
     }
 
-    Ok(cleaned)
+    (cleaned, watches)
 }
 
 /// Replace every `dbg!(X)` with `X`, recording a [`DbgCall`] per occurrence.
@@ -164,13 +182,12 @@ fn pipeline_steps(arg: &Ast) -> Vec<Ast> {
 mod tests {
     use super::*;
     use crate::parser::parse_newtype_program;
+    use crate::typescript::Pretty;
 
-    /// Parse `src`, run the pass, return (simplified cleaned AST, report text).
-    fn run(src: &str) -> (Ast, String) {
-        let program = parse_newtype_program(src).unwrap();
-        let mut out = Vec::new();
-        let cleaned = expand(&program, src, "<test>", false, &mut out).unwrap();
-        (cleaned.simplify(), String::from_utf8(out).unwrap())
+    /// Parse `src`, run the pass, return (simplified cleaned AST, watches).
+    fn run(src: &str) -> (Ast, DbgWatches) {
+        let (cleaned, watches) = expand(&parse_newtype_program(src).unwrap(), src, "<test>");
+        (cleaned.simplify(), watches)
     }
 
     fn render(src: &str) -> String {
@@ -181,11 +198,8 @@ mod tests {
     }
 
     #[test]
-    fn plain_dbg_reports_normalized_type_and_is_erased() {
-        let (cleaned, out) = run("type User as { id: number }\ntype T as dbg!(User)");
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
-        // The label carries the *normalized* type, not the alias name.
-        assert!(out.contains("id: number"), "{out}");
+    fn plain_dbg_is_erased() {
+        let (cleaned, _) = run("type User as { id: number }\ntype T as dbg!(User)");
         // Erased: renders exactly as if dbg! weren't there.
         assert_eq!(
             cleaned.render_pretty_ts(120),
@@ -194,16 +208,11 @@ mod tests {
     }
 
     #[test]
-    fn pipeline_reports_each_step_innermost_first() {
+    fn pipeline_is_erased() {
         let src = "type Id(T) as T\n\
             type Box(T) as { value: T }\n\
             type T as 1 |> Id |> Box |> dbg!()";
-        let (cleaned, out) = run(src);
-        assert_eq!(out.matches("Debug").count(), 3, "{out}");
-        // Step order: `1`, then `1 |> Id`, then `1 |> Id |> Box`.
-        let first = out.find("= 1").expect(&out);
-        let last = out.find("value").expect(&out);
-        assert!(first < last, "{out}");
+        let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
             render("type Id(T) as T\ntype Box(T) as { value: T }\ntype T as 1 |> Id |> Box")
@@ -211,10 +220,9 @@ mod tests {
     }
 
     #[test]
-    fn mid_pipeline_dbg_reports_one_step_and_is_transparent() {
+    fn mid_pipeline_dbg_is_transparent() {
         let src = "type Id(T) as T\ntype T as 1 |> dbg!() |> Id";
-        let (cleaned, out) = run(src);
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
             render("type Id(T) as T\ntype T as 1 |> Id")
@@ -223,16 +231,14 @@ mod tests {
 
     #[test]
     fn hand_written_application_is_a_single_step() {
-        let (_, out) = run("type Box(T) as { value: T }\ntype T as dbg!(Box(1))");
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
-        assert!(out.contains("value"), "{out}");
+        let (_, watches) = run("type Box(T) as { value: T }\ntype T as dbg!(Box(1))");
+        assert_eq!(watches.iter().count(), 1);
     }
 
     #[test]
-    fn dbg_inside_assert_claim_is_reported_and_erased() {
+    fn dbg_inside_assert_claim_is_erased() {
         let src = "unittest \"t\" do\n  assert dbg!(1) <: number\nend";
-        let (cleaned, out) = run(src);
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        let (cleaned, _) = run(src);
         // The cleaned program's assert must still evaluate (and pass).
         let mut sink = Vec::new();
         let report = crate::test_harness::run(
@@ -247,10 +253,9 @@ mod tests {
     }
 
     #[test]
-    fn dbg_inside_interface_body_is_reported_and_erased() {
+    fn dbg_inside_interface_body_is_erased() {
         let src = "interface Foo {\n  x: dbg!(1)\n}";
-        let (cleaned, out) = run(src);
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
             render("interface Foo {\n  x: 1\n}")
@@ -258,10 +263,10 @@ mod tests {
     }
 
     #[test]
-    fn program_without_dbg_is_untouched_and_silent() {
+    fn program_without_dbg_is_untouched_and_has_no_watches() {
         let src = "type A as 1";
-        let (cleaned, out) = run(src);
-        assert!(out.is_empty(), "{out}");
+        let (cleaned, watches) = run(src);
+        assert!(watches.is_empty());
         assert_eq!(cleaned.render_pretty_ts(120), render(src));
     }
 
@@ -272,10 +277,9 @@ mod tests {
     }
 
     #[test]
-    fn dbg_inside_let_binding_is_reported_and_erased() {
+    fn dbg_inside_let_binding_is_erased() {
         let src = "type T as let x = dbg!(1) in x";
-        let (cleaned, out) = run(src);
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
             render("type T as let x = 1 in x")
@@ -283,13 +287,38 @@ mod tests {
     }
 
     #[test]
-    fn dbg_inside_if_branch_is_reported_and_erased() {
+    fn dbg_inside_if_branch_is_erased() {
         let src = "type Get(A, K) as if K <: keyof A then dbg!(A[K]) else never end";
-        let (cleaned, out) = run(src);
-        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
             render("type Get(A, K) as if K <: keyof A then A[K] else never end")
+        );
+    }
+
+    #[test]
+    fn watches_record_marked_spans() {
+        let src = "type T as dbg!(1)";
+        let (_, watches) = run(src);
+        let at = src.find('1').unwrap();
+        assert!(watches.contains(crate::ast::Span::new(at, at + 1)));
+    }
+
+    #[test]
+    fn pipeline_yields_one_watch_per_step() {
+        let src = "type Id(T) as T\ntype B as 1 |> Id |> dbg!()";
+        let (_, watches) = run(src);
+        assert_eq!(watches.iter().count(), 2);
+    }
+
+    #[test]
+    fn bare_ident_watch_is_flagged() {
+        let src = "type Get(A, K) as dbg!(K)";
+        let (_, watches) = run(src);
+        let at = src.rfind('K').unwrap();
+        assert_eq!(
+            watches.bare_ident(crate::ast::Span::new(at, at + 1)),
+            Some("K")
         );
     }
 }
