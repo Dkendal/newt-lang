@@ -17,6 +17,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 
+use crate::ast::type_env::fingerprint;
 use crate::ast::{ApplyGeneric, Assert, Ast, Ident, Interface, MacroCall, Span, UnitTest};
 
 /// A single watched site: the span evaluation must demand for it to fire.
@@ -60,6 +61,70 @@ impl DbgWatches {
 
     pub fn iter(&self) -> impl Iterator<Item = &DbgWatch> {
         self.watches.iter()
+    }
+}
+
+/// One recorded observation of a watched span: the span itself, plus the node
+/// observed at that point in evaluation.
+#[derive(Debug, Clone)]
+pub struct DbgEvent {
+    pub span: Span,
+    pub observed: Ast,
+}
+
+/// Read-only sink accumulating `dbg!` observations during evaluation: a watch
+/// table (which spans to notice) plus a deduped event log.
+///
+/// `observe`/`observe_replacement` are called from inside the assignability
+/// engine as a side effect of demand-driven evaluation — they must never
+/// change any return value or control flow, only append to the log.
+#[derive(Debug, Default)]
+pub struct DbgSink {
+    watches: DbgWatches,
+    events: RefCell<Vec<DbgEvent>>,
+    seen: RefCell<HashSet<(usize, usize, String)>>,
+}
+
+impl DbgSink {
+    pub fn new(watches: DbgWatches) -> Self {
+        Self {
+            watches,
+            events: RefCell::new(Vec::new()),
+            seen: RefCell::new(HashSet::new()),
+        }
+    }
+
+    /// If `node`'s span is watched, record a clone of it — deduped on
+    /// `(span, fingerprint(node))` so repeated evaluation of the same site
+    /// with the same value only reports once.
+    pub fn observe(&self, node: &Ast) {
+        let span = node.as_span();
+        if !self.watches.contains(span) {
+            return;
+        }
+        self.record(span, node.clone());
+    }
+
+    /// For the substitution hook (Task 3): a watched bare-identifier span was
+    /// replaced by `replacement` during instantiation.
+    pub fn observe_replacement(&self, ident_span: Span, replacement: &Ast) {
+        if !self.watches.contains(ident_span) {
+            return;
+        }
+        self.record(ident_span, replacement.clone());
+    }
+
+    fn record(&self, span: Span, observed: Ast) {
+        let key = (span.start(), span.end(), fingerprint(&observed));
+        if !self.seen.borrow_mut().insert(key) {
+            return;
+        }
+        self.events.borrow_mut().push(DbgEvent { span, observed });
+    }
+
+    /// Drain events recorded since the last call.
+    pub fn drain(&self) -> Vec<DbgEvent> {
+        std::mem::take(&mut self.events.borrow_mut())
     }
 }
 
@@ -246,6 +311,7 @@ mod tests {
             src,
             "<test>",
             crate::test_harness::Config::default(),
+            &DbgWatches::default(),
             &mut sink,
         )
         .unwrap();

@@ -236,6 +236,7 @@ pub fn cli_stderr(rule: Rule, source: &str) -> String {
         source,
         "<stdin>",
         crate::test_harness::Config::default(),
+        &crate::ast::dbg_expr::DbgWatches::default(),
         &mut out,
     )
     .expect("writing the assertion report to an in-memory buffer cannot fail");
@@ -315,6 +316,7 @@ pub fn run_assertion_case(rule: Rule, path: &Path) {
         &case.source,
         "<stdin>",
         crate::test_harness::Config::default(),
+        &crate::ast::dbg_expr::DbgWatches::default(),
         &mut log,
     )
     .expect("writing the assertion report to an in-memory buffer cannot fail");

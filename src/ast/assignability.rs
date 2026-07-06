@@ -62,6 +62,14 @@ impl Ast {
         type A = Ast;
         type T = ExtendsResult;
 
+        // Read-only `dbg!` observation hook: evaluation demands both operands
+        // of a relation, so this is where a watched span becomes "observed".
+        // Must not affect any return value or control flow.
+        if let Some(sink) = ctx.env().and_then(|env| env.dbg()) {
+            sink.observe(self);
+            sink.observe(other);
+        }
+
         // Reduce top-level string-literal indexed accesses (`T["k"]`, nested
         // `T["a"]["b"]`) on either operand to the referenced property's type
         // before relating. Only fully-resolved accesses are substituted in;

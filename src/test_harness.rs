@@ -19,10 +19,13 @@
 //! produced.
 
 use std::io::{self, Write};
+use std::rc::Rc;
 
+use crate::ast::dbg_expr::{DbgSink, DbgWatches};
 use crate::ast::type_env::{ResolveCtx, TypeEnv};
 use crate::ast::{Ast, ExtendsInfixOp, ExtendsPrefixOp, InfixOp, PrefixOp, Span};
 use crate::extends_result::ExtendsResult;
+use crate::typescript::Pretty;
 
 /// Configuration for a harness run.
 #[derive(Debug, Clone, Copy, Default)]
@@ -77,6 +80,12 @@ struct Diagnostic {
 /// Evaluate every `unittest` in `program`, writing a report to `out`. Failure
 /// excerpts are reported under `source_name`.
 ///
+/// `watches` is the `dbg!` span watch table produced by
+/// [`dbg_expr::expand`](crate::ast::dbg_expr::expand); when non-empty, each
+/// claim's evaluation is followed by a flush of newly-observed watched spans,
+/// rendered as `Debug` reports to `out`. Pass [`DbgWatches::default`] (empty)
+/// to opt out — behavior is then identical to no `dbg!` support at all.
+///
 /// Returns once all assertions are evaluated, or — when [`Config::fail_fast`] is
 /// set — as soon as one fails. Write errors on `out` are propagated.
 pub fn run(
@@ -84,13 +93,21 @@ pub fn run(
     source: &str,
     source_name: &str,
     config: Config,
+    watches: &DbgWatches,
     out: &mut dyn Write,
 ) -> io::Result<Report> {
     let mut report = Report::default();
 
     // Symbol table of the program's top-level `type`s and `interface`s, so a
     // claim referencing them (`assert Foo <: number`) resolves to their shape.
-    let env = TypeEnv::from_program(program);
+    let mut env = TypeEnv::from_program(program);
+    let sink = if watches.is_empty() {
+        None
+    } else {
+        let sink = Rc::new(DbgSink::new(watches.clone()));
+        env = env.with_dbg(Rc::clone(&sink));
+        Some(sink)
+    };
 
     'outer: for unittest in collect_unittests(program) {
         writeln!(out, "unittest {}", unittest.name)?;
@@ -104,6 +121,9 @@ pub fn run(
             // otherwise render with the closing `)` missing.
             let span = claim_span(source, assert.span);
             let claim_src = slice_or(source, span, "<claim>");
+
+            let ctx_for_flush = ResolveCtx::new(&env)
+                .with_exact_optional_property_types(config.exact_optional_property_types);
 
             match evaluate(&assert.claim, &env, config) {
                 Outcome::Pass => {
@@ -124,6 +144,13 @@ pub fn run(
                         crate::report::render_to_string(source_name, source, span, &message)
                     )?;
                     if config.fail_fast {
+                        flush_dbg_events(
+                            sink.as_deref(),
+                            &ctx_for_flush,
+                            source_name,
+                            source,
+                            out,
+                        )?;
                         break 'outer;
                     }
                 }
@@ -143,10 +170,19 @@ pub fn run(
                         )?;
                     }
                     if config.fail_fast {
+                        flush_dbg_events(
+                            sink.as_deref(),
+                            &ctx_for_flush,
+                            source_name,
+                            source,
+                            out,
+                        )?;
                         break 'outer;
                     }
                 }
             }
+
+            flush_dbg_events(sink.as_deref(), &ctx_for_flush, source_name, source, out)?;
         }
     }
 
@@ -161,6 +197,34 @@ pub fn run(
     }
 
     Ok(report)
+}
+
+/// Drain `sink` (if any) and render each newly-observed watched span as a
+/// `Debug` report to `out`. A no-op when `sink` is `None` (no `dbg!` watches
+/// for this run).
+fn flush_dbg_events(
+    sink: Option<&DbgSink>,
+    ctx: &ResolveCtx,
+    source_name: &str,
+    source: &str,
+    out: &mut dyn Write,
+) -> io::Result<()> {
+    let Some(sink) = sink else { return Ok(()) };
+    for event in sink.drain() {
+        let rendered = event.observed.normalize(ctx).render_pretty_ts(80);
+        writeln!(
+            out,
+            "{}",
+            crate::report::render_debug(
+                source_name,
+                source,
+                event.span,
+                &format!("= {rendered}"),
+                false,
+            )
+        )?;
+    }
+    Ok(())
 }
 
 /// Evaluate one claim to a pass/fail/invalid outcome.
@@ -378,10 +442,61 @@ mod tests {
                 fail_fast,
                 ..Config::default()
             },
+            &DbgWatches::default(),
             &mut out,
         )
         .unwrap();
         (report, String::from_utf8(out).unwrap())
+    }
+
+    /// Parse, expand `dbg!` (recording watches), simplify, and run the
+    /// harness with those watches wired in — so watched sites demanded during
+    /// evaluation print a `Debug` report.
+    fn run_src_dbg(src: &str) -> (Report, String) {
+        use crate::ast::dbg_expr;
+
+        let program = parse_newtype_program(src).unwrap();
+        let (cleaned, watches) = dbg_expr::expand(&program, src, "<test>");
+        let simplified = cleaned.simplify();
+        let mut out = Vec::new();
+        let report = run(
+            &simplified,
+            src,
+            "<test>",
+            Config::default(),
+            &watches,
+            &mut out,
+        )
+        .unwrap();
+        (report, String::from_utf8(out).unwrap())
+    }
+
+    #[test]
+    fn dbg_in_claim_fires_on_evaluation_with_value() {
+        let src = "unittest \"t\" do\n  assert dbg!(1) <: number\nend";
+        let (report, out) = run_src_dbg(src);
+        assert_eq!((report.passed, report.failed), (1, 0), "{out}");
+        assert_eq!(out.matches("Debug").count(), 1, "{out}");
+        assert!(out.contains("= 1"), "{out}");
+    }
+
+    #[test]
+    fn unevaluated_dbg_prints_nothing() {
+        let src = "type T as dbg!(1)"; // no unittest → nothing demands it
+        let (_, out) = run_src_dbg(src);
+        assert!(!out.contains("Debug"), "{out}");
+    }
+
+    #[test]
+    fn repeated_evaluation_prints_once() {
+        let src = "unittest \"t\" do\n  assert dbg!(1) <: number\n  assert dbg!(1) <: number\nend";
+        // NOTE: two *separate* dbg! sites (different spans) print twice; the
+        // dedupe key is (span, value). Same-site re-evaluation is the dedupe case:
+        let src2 = "type One as dbg!(1)\nunittest \"t\" do\n  assert One <: number\n  assert One <: number\nend";
+        let (_, out) = run_src_dbg(src);
+        assert_eq!(out.matches("Debug").count(), 2, "{out}");
+        let (_, out2) = run_src_dbg(src2);
+        assert_eq!(out2.matches("Debug").count(), 1, "{out2}");
     }
 
     #[test]
@@ -696,6 +811,7 @@ mod tests {
                 exact_optional_property_types: true,
                 ..Config::default()
             },
+            &DbgWatches::default(),
             &mut out,
         )
         .unwrap();

@@ -219,6 +219,7 @@ mod tests {
             src,
             "<test>",
             crate::test_harness::Config::default(),
+            &crate::ast::dbg_expr::DbgWatches::default(),
             &mut out,
         )
         .unwrap();

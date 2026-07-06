@@ -122,11 +122,9 @@ fn main() {
             // desugars `if`/`cond`/… via `ExtendsExpr::new`, which panics on a
             // `MacroCall` operand, so a `dbg!` inside an `if` branch must be
             // stripped first. Each call contributes a watch (per pipeline
-            // step) rather than printing directly; downstream stages see the
-            // program as if `dbg!` weren't there. `dbg_watches` is unused
-            // until evaluation-time reporting is wired up (see the v2 design
-            // doc's later tasks).
-            let (cleaned, _dbg_watches) =
+            // step) rather than printing directly; the harness reports on
+            // watched spans as evaluation demands them.
+            let (cleaned, dbg_watches) =
                 newtype::ast::dbg_expr::expand(&desugared, input, &source_name);
 
             let simplified = cleaned.simplify();
@@ -142,6 +140,7 @@ fn main() {
                     fail_fast: args.fail_fast,
                     exact_optional_property_types: args.exact_optional_property_types,
                 },
+                &dbg_watches,
                 &mut std::io::stderr(),
             )
             .expect("writing the test report to stderr failed");

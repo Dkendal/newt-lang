@@ -18,9 +18,11 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use slotmap::{new_key_type, SlotMap};
 
+use crate::ast::dbg_expr::DbgSink;
 use crate::ast::{
     ApplyGeneric, Ast, ExtendsExpr, Ident, Interface, IntersectionType, Span, Tuple, TypeAlias,
     TypeLiteral, TypeParameter, UnionType, UniqueSymbol,
@@ -73,6 +75,7 @@ pub struct TypeEnv {
     defs: HashMap<String, Def>,
     arena: RefCell<SlotMap<TypeId, Ast>>,
     cache: RefCell<HashMap<String, TypeId>>,
+    dbg: Option<Rc<DbgSink>>,
 }
 
 impl TypeEnv {
@@ -120,7 +123,21 @@ impl TypeEnv {
             defs,
             arena: RefCell::new(SlotMap::with_key()),
             cache: RefCell::new(HashMap::new()),
+            dbg: None,
         }
+    }
+
+    /// Attach a `dbg!` observation sink, so relation-entry evaluation reports
+    /// on watched spans as they're demanded.
+    #[must_use]
+    pub fn with_dbg(mut self, sink: Rc<DbgSink>) -> Self {
+        self.dbg = Some(sink);
+        self
+    }
+
+    /// The attached `dbg!` sink, if any.
+    pub(crate) fn dbg(&self) -> Option<&DbgSink> {
+        self.dbg.as_deref()
     }
 
     /// Whether the environment has no definitions (so resolution is a no-op).
