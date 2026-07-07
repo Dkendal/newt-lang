@@ -1,0 +1,7 @@
+tuple with labeled elements
+=======
+[a: number, b: string]
+=======
+[a: number, b: string]
+
+=======

@@ -70,3 +70,29 @@ unittest "rest element types accept narrower targets" do
   assert (...a: number[]) => void <: (a: 1, b: 2) => void
   assert (a: number) => void <: (...a: 1[]) => void
 end
+unittest "tuple-typed rest parameter expands to positional parameters" do
+  assert (...a: [string, number]) => void == (a: string, b: number) => void
+  assert (a: string, b: number) => void <: (...a: [string, number]) => void
+  assert not((...a: [string]) => void == (a: string, b: number) => void)
+  assert (x: number, ...a: [string]) => void == (x: number, a: string) => void
+end
+
+unittest "optional function parameters" do
+  assert (x?: string) => void <: () => void
+  assert () => void <: (x?: string) => void
+  assert (x?: string) => void <: (x: string) => void
+  assert not((x: string) => void <: (x?: string) => void)
+  assert (x: string | undefined) => void <: (x?: string) => void
+  assert not((x?: string) => void <: (x: number) => void)
+  assert (x?: string) => void == (x?: string) => void
+end
+type CtorSigSig as new () => string
+
+unittest "constructor types" do
+  assert CtorSig == new () => string
+  assert not(CtorSig <: () => string)
+  assert not(() => string <: CtorSig)
+  assert new (x: number) => string <: new (x: 1) => string
+  assert not(new (x: 1) => string <: new (x: number) => string)
+  assert new () => string <: Function
+end

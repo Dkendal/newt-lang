@@ -1,0 +1,11 @@
+Mapped-type modifier removal renders -readonly and -?
+
+=======
+
+map -readonly -? k in t do 1 end
+
+=======
+
+{ -readonly [k in t]-?: 1 }
+
+=======

@@ -375,10 +375,7 @@ fn bind_params(params: &[Param], args: &[Ast]) -> HashMap<String, Ast> {
             let items: Vec<Ast> = rest_args.by_ref().cloned().collect();
             bindings.insert(
                 param.name.clone(),
-                Ast::Tuple(Tuple {
-                    items,
-                    span: Span::new(0, 0),
-                }),
+                Ast::Tuple(Tuple::of(items, Span::new(0, 0))),
             );
             continue;
         }

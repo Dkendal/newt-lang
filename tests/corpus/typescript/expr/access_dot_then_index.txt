@@ -1,0 +1,11 @@
+Dot access followed by an indexed access chains left-associatively
+
+=======
+
+A.b[C]
+
+=======
+
+A['b'][C]
+
+=======

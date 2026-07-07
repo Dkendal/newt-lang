@@ -127,3 +127,7 @@ unittest "curried function variance is contravariant in first param" do
   assert ((x: number) => (y: string) => void) <: ((x: 1) => (y: string) => void)
   assert not(((x: 1) => (y: string) => void) <: ((x: number) => (y: string) => void))
 end
+unittest "double negation" do
+  assert not (not (1 <: number))
+  assert not (not (not (1 <: string)))
+end

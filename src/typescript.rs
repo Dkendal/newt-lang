@@ -154,11 +154,16 @@ impl typescript::Pretty for FunctionType {
 
         let return_type = self.return_type.to_ts();
 
-        params
-            .append(D::space())
-            .append("=>")
-            .append(D::space())
-            .append(return_type)
+        if self.is_constructor {
+            D::text("new").append(D::space())
+        } else {
+            D::nil()
+        }
+        .append(params)
+        .append(D::space())
+        .append("=>")
+        .append(D::space())
+        .append(return_type)
     }
 }
 
@@ -172,6 +177,7 @@ impl typescript::Pretty for Parameter {
             D::nil()
         }
         .append(self.name.clone())
+        .append(if self.optional { "?" } else { "" })
         .append(":")
         .append(D::space())
         .append(kind)
@@ -271,7 +277,37 @@ impl typescript::Pretty for Ast {
             Ast::Tuple(Tuple { items, .. }) => {
                 let sep = D::text(",").append(D::space());
 
-                let items = D::intersperse(items.iter().map(|item| item.to_ts()), sep);
+                fn element(el: &crate::ast::TupleElement) -> D<'_, ()> {
+                    let prefix = if el.rest { D::text("...") } else { D::nil() };
+                    match &el.label {
+                        // `a: A` / `a?: A` — the `?` sits on the label.
+                        Some(label) => prefix
+                            .append(D::text(label.as_str()))
+                            .append(D::text(if el.optional { "?: " } else { ": " }))
+                            .append(el.value.to_ts()),
+                        None if el.optional => {
+                            // An unlabeled optional element parenthesizes a
+                            // lower-precedence type so `?` binds to all of it.
+                            let needs_parens = el.value.is_set_op()
+                                || matches!(
+                                    el.value,
+                                    Ast::Infer(_)
+                                        | Ast::FunctionType(_)
+                                        | Ast::ExtendsExpr(_)
+                                        | Ast::Builtin(_)
+                                );
+                            let doc = if needs_parens {
+                                parens(el.value.to_ts())
+                            } else {
+                                el.value.to_ts()
+                            };
+                            prefix.append(doc).append(D::text("?"))
+                        }
+                        None => prefix.append(el.value.to_ts()),
+                    }
+                }
+
+                let items = D::intersperse(items.iter().map(element), sep);
 
                 D::text("[").append(items).append(D::text("]"))
             }

@@ -215,24 +215,10 @@ mod macro_calls {
 // implements all of those arms. Their behavior is locked in by
 // `assignability_tests::is_assignable_to_extended` in tests/ast.rs.
 
-/// Known correctness bugs in *implemented* features (as opposed to the
-/// unimplemented features above). These render the wrong TypeScript today; each
-/// test asserts the correct output, so it fails now and will pass once the bug
-/// is fixed. Discovered while building out the corpus.
-mod known_bugs {
-    use super::*;
-
-    /// A dot access followed by an indexed access panics in the renderer
-    /// ("rhs of dot access should be an ident", src/ast/pretty.rs), instead of
-    /// chaining: `A.b` -> `A['b']`, then `[C]` -> `A['b'][C]`.
-    #[ignore = "BUG: dot-then-index access panics in src/ast/pretty.rs (rhs of dot access should be an ident)"]
-    #[test]
-    fn dot_then_indexed_access() {
-        assert_renders_like(Rule::expr, "A.b[C]", "A['b'][C]");
-    }
-
-    // NOTE: the intersection-of-unions parenthesisation bugs were fixed; their
-    // cases now live in the corpus as
-    // tests/corpus/typescript/expr/intersection_of_unions.txt and
-    // union_in_intersection.txt.
-}
+// NOTE: the `known_bugs` pending module has been removed: the dot-then-indexed
+// access bug (`A.b[C]` panicking in the renderer) was fixed by giving the
+// indexed-access postfix the same binding power as `.`, and the case now lives
+// in the corpus as tests/corpus/typescript/expr/access_dot_then_index.txt. The
+// intersection-of-unions parenthesisation bugs were fixed earlier; their cases
+// live in tests/corpus/typescript/expr/intersection_of_unions.txt and
+// union_in_intersection.txt.

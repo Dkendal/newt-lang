@@ -425,7 +425,29 @@ where
     // ---- Tuples -------------------------------------------------------------
 
     // `[]` with no gap lexes as one token (also the array postfix); a bracketed
-    // list takes no trailing comma.
+    // list takes no trailing comma. Each element takes an optional `...` rest
+    // prefix, an optional `label:` / `label?:` prefix, and (unlabeled) an
+    // optional postfix `?` — handled here at the element level so the postfix
+    // `?` never reaches the expression pratt table (where prefix `?` is infer).
+    let tuple_element = just(T::Ellipsis)
+        .or_not()
+        .then(choice((
+            ident_name
+                .then(just(T::Question).or_not())
+                .then_ignore(just(T::Colon))
+                .then(expr.clone())
+                .map(|((label, optional), value)| (Some(label), optional.is_some(), value)),
+            expr.clone()
+                .then(just(T::Question).or_not())
+                .map(|(value, optional)| (None, optional.is_some(), value)),
+        )))
+        .map_with(|(ellipsis, (label, optional, value)), e| TupleElement {
+            span: sp(e.span()),
+            label,
+            optional,
+            rest: ellipsis.is_some(),
+            value,
+        });
     let tuple = choice((
         just(T::BracketPair).map_with(|_, e| {
             Ast::Tuple(Tuple {
@@ -433,7 +455,7 @@ where
                 items: vec![],
             })
         }),
-        expr.clone()
+        tuple_element
             .separated_by(comma.clone())
             .collect::<Vec<_>>()
             .delimited_by(lbracket.clone(), rbracket.clone())
@@ -451,11 +473,13 @@ where
     let named_parameter = just(T::Ellipsis)
         .or_not()
         .then(ident_name)
+        .then(just(T::Question).or_not())
         .then_ignore(just(T::Colon))
         .then(expr.clone())
-        .map_with(|((ellipsis, name), kind), e| Parameter {
+        .map_with(|(((ellipsis, name), optional), kind), e| Parameter {
             span: sp(e.span()),
             ellipsis: ellipsis.is_some(),
+            optional: optional.is_some(),
             name,
             kind,
         });
@@ -483,6 +507,7 @@ where
                 .map(|(idx, (ellipsis, kind, span))| Parameter {
                     span,
                     ellipsis,
+                    optional: false,
                     name: if ellipsis {
                         "rest".to_string()
                     } else {
@@ -499,12 +524,17 @@ where
         .map(Option::unwrap_or_default)
         .delimited_by(lparen.clone(), rparen.clone());
 
-    let function_type = parameters
+    // A leading `new` marks a construct signature (`new () => T`).
+    let new_kw = select! { T::Ident(s) if s == "new" => () };
+    let function_type = new_kw
+        .or_not()
+        .then(parameters)
         .then_ignore(just(T::FatArrow))
         .then(expr.clone())
-        .map_with(|(params, return_type), e| {
+        .map_with(|((new, params), return_type), e| {
             Ast::FunctionType(FunctionType {
                 span: sp(e.span()),
+                is_constructor: new.is_some(),
                 params,
                 return_type: Rc::new(return_type),
             })
@@ -616,9 +646,17 @@ where
         })
         .boxed();
 
+    let readonly_modifier = choice((
+        kw(Kw::Readonly).to(MappingModifier::Add),
+        just(T::MinusReadonly).to(MappingModifier::Remove),
+    ));
+    let optional_modifier = choice((
+        just(T::Question).to(MappingModifier::Add),
+        just(T::MinusQuestion).to(MappingModifier::Remove),
+    ));
     let map_expr_p = kw(Kw::Map)
-        .ignore_then(kw(Kw::Readonly).or_not())
-        .then(just(T::Question).or_not())
+        .ignore_then(readonly_modifier.or_not())
+        .then(optional_modifier.or_not())
         .then(index_property_key.clone())
         .then_ignore(soft("do"))
         .then(expr.clone())
@@ -629,8 +667,8 @@ where
                 index: index_key.key,
                 iterable: Rc::new(index_key.iterable),
                 remapped_as: index_key.remapped_as.map(Rc::new),
-                readonly_mod: readonly.map(|_| MappingModifier::Add),
-                optional_mod: optional.map(|_| MappingModifier::Add),
+                readonly_mod: readonly,
+                optional_mod: optional,
                 body: Rc::new(body),
             })
         })
@@ -767,7 +805,9 @@ where
                 span: sp(e.span()),
             })
         }),
-        postfix(9, indexed_access, |lhs: Ast, rhs: Ast, e| {
+        // Same binding power as `.`/`::` so `A.b[C]` parses as `(A.b)[C]`
+        // (a tighter postfix would grab `b[C]` as the dot's rhs).
+        postfix(7, indexed_access, |lhs: Ast, rhs: Ast, e| {
             Ast::Access(Access {
                 lhs: Rc::new(lhs),
                 rhs: Rc::new(rhs),
@@ -826,7 +866,8 @@ where
             3,
             kw(Kw::Not).map_with(|_, e| e.span()),
             move |op_span: TSpan, value: Ast, e| {
-                if !value.is_extends_infix_op() {
+                // A nested `not (…)` is itself a valid operand (double negation).
+                if !value.is_compatible_with_not_prefix_op() {
                     let error_not = report::render_to_string(
                         SOURCE_NAME,
                         src,

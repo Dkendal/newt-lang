@@ -100,3 +100,30 @@ unittest "string literals not matching a delimited template are rejected" do
   assert not('aX' <: `a${string}b`)
   assert not('Xb' <: `a${string}b`)
 end
+
+unittest "template pattern assignable to a wider template pattern" do
+  assert `a${string}b` <: `a${string}`
+  assert `${number}` <: `${string}`
+  assert `a${number}` <: `a${string}`
+  assert `pre${string}post` <: `${string}`
+  assert not (`a${string}` <: `a${string}b`)
+  assert not (`${string}` <: `${number}`)
+end
+
+unittest "hole-free template collapses to its string literal" do
+  assert `abc` == 'abc'
+  assert `a${'b'}c` == 'abc'
+  assert `${1}${2}` == '12'
+  assert `abc` <: 'abc'
+  assert not (`a${string}` <: 'ab')
+end
+unittest "bigint literals" do
+  assert 1n <: bigint
+  assert not(1n <: number)
+  assert not(1 <: bigint)
+  assert 1n == 1n
+  assert not(1n == 2n)
+  assert not(1n == 1)
+  assert 1n <: BigInt
+  assert '1' <: `${bigint}`
+end

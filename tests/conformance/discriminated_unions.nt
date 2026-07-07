@@ -1,0 +1,10 @@
+unittest "object union-typed property distributes over a discriminated union target" do
+  assert {a: 1 | 2} <: {a: 1} | {a: 2}
+  assert {a: 1 | 2, b: string} <: {a: 1} | {a: 2}
+  assert {a: 1 | 2, b: string} <: {a: 1, b: string} | {a: 2}
+  assert not({a: 1 | 2} <: {a: 1, b: 1} | {a: 2})
+  assert not({a: 1 | 2 | 3} <: {a: 1} | {a: 2})
+  assert not({a: 1 | 2, b: 'x' | 'y'} <: {a: 1} | {a: 2, b: 'x'} | {b: 'y'})
+  assert {kind: 'a' | 'b', v: number} <: {kind: 'a', v: number} | {kind: 'b', v: number}
+  assert not({kind: 'a' | 'b', v: number} <: {kind: 'a', v: number} | {kind: 'b', v: string})
+end

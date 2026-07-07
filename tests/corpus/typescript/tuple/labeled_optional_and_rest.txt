@@ -1,0 +1,7 @@
+tuple mixing labeled optional and labeled rest elements
+=======
+[a: number, b?: string, ...rest: boolean[]]
+=======
+[a: number, b?: string, ...rest: boolean[]]
+
+=======

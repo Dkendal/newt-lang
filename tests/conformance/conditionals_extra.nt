@@ -95,3 +95,20 @@ unittest "single element tuple infer requires exact arity" do
   assert Only([number]) == number
   assert Only([number, string]) == never
 end
+
+type InferBothParams(T) as if T <: (a: ?A, b: ?A) => any then A else never end
+
+unittest "contravariant infer candidates intersect" do
+  assert InferBothParams((a: string, b: number) => any) == (string & number)
+  assert InferBothParams((a: string, b: string) => any) == string
+  assert InferBothParams((a: {x: 1}, b: {y: 2}) => any) == ({x: 1} & {y: 2})
+end
+
+type ElemOf(T) as if T <: Array(?U) then U else never end
+
+unittest "Array infer pattern matches tuples" do
+  assert ElemOf([1, 2]) == 1 | 2
+  assert ElemOf([string]) == string
+  assert ElemOf(number[]) == number
+  assert ElemOf([]) == never
+end

@@ -165,3 +165,91 @@ unittest "never array and empty relationships" do
   assert never[] <: number[]
   assert [never] <: never[]
 end
+
+// --- G9: optional / rest / labeled tuple elements (verified against tsgo) ---
+
+unittest "optional element arity" do
+  assert [number] <: [number, string?]
+  assert [number, string] <: [number, string?]
+  assert [number, string?] <: [number, string?]
+  assert not([number, string?] <: [number, string])
+  assert not([number, string?] <: [number])
+  assert not([number, boolean] <: [number, string?])
+  assert [] <: [number?]
+  assert not([number?] <: [])
+end
+
+unittest "optional element types include undefined" do
+  assert [number, string | undefined] <: [number, string?]
+  assert not([number, string?] <: [number, string, boolean?])
+  assert [number, string?] <: [number, (string | number)?]
+  assert not([number, undefined] <: [number, string])
+end
+
+unittest "rest element arity" do
+  assert [number] <: [number, ...string[]]
+  assert [number, string] <: [number, ...string[]]
+  assert [number, string, string] <: [number, ...string[]]
+  assert not([number, boolean] <: [number, ...string[]])
+  assert not([string] <: [number, ...string[]])
+  assert not([] <: [number, ...string[]])
+  assert [] <: [...string[]]
+  assert [string, string] <: [...string[]]
+  assert [number, ...string[]] <: [number, ...string[]]
+  assert [number, ...string[]] <: [number, ...(string | number)[]]
+  assert not([number, ...string[]] <: [number, string])
+  assert not([number, ...string[]] <: [number, string?])
+end
+
+unittest "rest tuple vs array" do
+  assert [number, ...string[]] <: (number | string)[]
+  assert not([number, ...string[]] <: string[])
+  assert string[] <: [...string[]]
+  assert not(string[] <: [string, ...string[]])
+  assert not(number[] <: [...string[]])
+end
+
+unittest "optional tuple vs array" do
+  assert [number, string?] <: (number | string | undefined)[]
+  assert not([number, string?] <: (number | string)[])
+end
+
+unittest "labels are erased" do
+  assert [a: number] == [number]
+  assert [a: number, b: string] <: [x: number, y: string]
+  assert [number, string] <: [x: number, y: string]
+  assert [a: number, b?: string] <: [number, string?]
+  assert not([a: number] <: [a: string])
+  assert [x: number, ...rest: string[]] <: [number, ...string[]]
+end
+
+unittest "indexed access on optional and rest tuples" do
+  assert [number, string?][0] == number
+  assert [number, string?][1] == (string | undefined)
+  assert [number, ...string[]][0] == number
+  assert [number, ...string[]][1] == string
+  assert [number, string?]['length'] == (1 | 2)
+  assert [number, ...string[]]['length'] == number
+  assert [number, string?][number] == (number | string | undefined)
+  assert [number, ...string[]][number] == (number | string)
+end
+
+type G9ElemOf(T) as if T <: Array(?U) then U else never end
+
+unittest "infer element union over optional and rest tuples" do
+  assert G9ElemOf([number, string?]) == (number | string | undefined)
+  assert G9ElemOf([number, ...string[]]) == (number | string)
+  assert G9ElemOf([a: number, b: string]) == (number | string)
+end
+
+unittest "tuple object shape with optional elements" do
+  assert [number, string?] <: { length: 1 | 2 }
+  assert not([number, string?] <: { length: 2 })
+  assert not([number, string?] <: { length: 1 })
+end
+
+unittest "readonly interplay with optional and rest" do
+  assert [number, string?] <: readonly [number, string?]
+  assert not(readonly [number, string?] <: [number, string?])
+  assert [number, ...string[]] <: readonly [number, ...string[]]
+end

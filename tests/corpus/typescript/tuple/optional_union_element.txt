@@ -1,0 +1,7 @@
+optional element of union type keeps parentheses
+=======
+[number, (string | boolean)?]
+=======
+[number, (string | boolean)?]
+
+=======

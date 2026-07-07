@@ -210,6 +210,10 @@ pub enum Token {
     Ellipsis,
     /// `?`
     Question,
+    /// `-?` (mapped-type optionality removal)
+    MinusQuestion,
+    /// `-readonly` (mapped-type readonly removal)
+    MinusReadonly,
     /// `,`
     Comma,
     /// `*`
@@ -256,6 +260,8 @@ impl fmt::Display for Token {
             Token::Dot => f.write_str("."),
             Token::Ellipsis => f.write_str("..."),
             Token::Question => f.write_str("?"),
+            Token::MinusQuestion => f.write_str("-?"),
+            Token::MinusReadonly => f.write_str("-readonly"),
             Token::Comma => f.write_str(","),
             Token::Star => f.write_str("*"),
             Token::Arrow => f.write_str("->"),
@@ -326,11 +332,13 @@ fn lexer<'src>(
                 .repeated(),
         )
         .ignored();
+    // A trailing `n` marks a bigint literal (`1n`); the raw text keeps it.
     let number = just('-')
         .then(one_of(" \t\n\r").repeated())
         .or_not()
         .then(digits)
         .then(fraction.or_not())
+        .then(just('n').or_not())
         .to_slice()
         .map(|s: &str| Token::Number(s.to_string()));
 
@@ -370,6 +378,9 @@ fn lexer<'src>(
         just("->").to(Token::Arrow),
         just("...").to(Token::Ellipsis),
         just(".").to(Token::Dot),
+        just("-readonly")
+            .to(Token::MinusReadonly)
+            .or(just("-?").to(Token::MinusQuestion)),
         just("?").to(Token::Question),
         just(",").to(Token::Comma),
         just("*").to(Token::Star),

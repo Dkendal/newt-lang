@@ -53,3 +53,15 @@ unittest "homomorphic identity over required-only source" do
   assert map k in keyof(Q) do Q[k] end <: {a: number}
   assert Q <: map k in keyof(Q) do Q[k] end
 end
+
+type ModSrc as {a?: number, readonly b: string}
+type ModAllRequired as map -? k in keyof(ModSrc) do ModSrc[k] end
+type ModAllMutable as map -readonly k in keyof(ModSrc) do ModSrc[k] end
+type ModBothRemoved as map -readonly -? k in keyof(ModSrc) do ModSrc[k] end
+
+unittest "mapped modifier removal" do
+  assert ModAllRequired == {a: number, readonly b: string}
+  assert not(ModAllRequired == ModSrc)
+  assert ModAllMutable == {a?: number, b: string}
+  assert ModBothRemoved == {a: number, b: string}
+end

@@ -247,7 +247,7 @@ impl Collector {
 
             Ast::Tuple(tuple) => {
                 for item in &tuple.items {
-                    self.visit(item);
+                    self.visit(&item.value);
                 }
             }
 

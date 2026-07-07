@@ -41,11 +41,9 @@ impl IfExpr {
 /// before simplification would otherwise panic.
 pub(crate) fn malformed_condition_span(condition: &Ast) -> Option<Span> {
     match condition {
-        // `not`/`infer` wrap a nested condition; recurse into it. (`infer` is
-        // unsupported downstream but is not itself a missing-comparison error.)
+        // `not` wraps a nested condition; recurse into it.
         Ast::ExtendsPrefixOp(ExtendsPrefixOp { op, value, .. }) => match op {
             PrefixOp::Not => malformed_condition_span(value),
-            PrefixOp::Infer => None,
         },
         // `and`/`or` combine two sub-conditions; the relational operators are
         // the well-formed leaves. Anything else is not a comparison.
@@ -75,9 +73,8 @@ pub(crate) fn expand_to_extends(condition: &Ast, then: &Ast, else_arm: &Ast) -> 
                 PrefixOp::Not if value.is_compatible_with_not_prefix_op() => {
                     Some(expand_to_extends(value, else_arm, then))
                 }
-                PrefixOp::Infer => todo!(),
                 _ => {
-                    unreachable!("Expected `not` or `infer` prefix operator, found {condition:#?}")
+                    unreachable!("Expected `not` prefix operator, found {condition:#?}")
                 }
             }
         }

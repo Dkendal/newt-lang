@@ -105,18 +105,70 @@ impl ExtendsExpr {
     }
 }
 
+/// One element of a tuple type. `label` (`[a: A]`) is presentation-only and
+/// erased for assignability; `optional` is a `B?` element; `rest` is a
+/// `...B[]` spread element (its `value` is the spread type, usually an array).
 #[ast_node]
-pub struct Tuple {
-    pub items: Vec<Ast>,
+pub struct TupleElement {
+    pub label: Option<String>,
+    pub optional: bool,
+    pub rest: bool,
+    pub value: Ast,
 }
 
-impl Tuple {
+impl TupleElement {
+    /// A plain element: no label, not optional, not rest.
+    pub fn plain(value: Ast) -> Self {
+        let span = value.as_span();
+        Self {
+            label: None,
+            optional: false,
+            rest: false,
+            value,
+            span,
+        }
+    }
+
     pub fn map<F>(&self, f: F) -> Self
     where
         F: Fn(&Ast) -> Ast,
     {
         Self {
-            items: self.items.iter().map(f).collect(),
+            label: self.label.clone(),
+            optional: self.optional,
+            rest: self.rest,
+            value: f(&self.value),
+            span: self.span,
+        }
+    }
+}
+
+#[ast_node]
+pub struct Tuple {
+    pub items: Vec<TupleElement>,
+}
+
+impl Tuple {
+    /// A tuple of plain (unlabeled, required, non-rest) elements.
+    pub fn of(items: Vec<Ast>, span: Span) -> Self {
+        Self {
+            items: items.into_iter().map(TupleElement::plain).collect(),
+            span,
+        }
+    }
+
+    /// Whether every element is a plain required element (labels allowed —
+    /// they are erased for typing purposes).
+    pub fn is_plain(&self) -> bool {
+        self.items.iter().all(|el| !el.optional && !el.rest)
+    }
+
+    pub fn map<F>(&self, f: F) -> Self
+    where
+        F: Fn(&Ast) -> Ast,
+    {
+        Self {
+            items: self.items.iter().map(|el| el.map(&f)).collect(),
             span: self.span,
         }
     }
@@ -243,32 +295,12 @@ impl MacroCall {
         expr.args = self.args.iter().map(f).collect();
         expr
     }
-
-    /// Evaluate a macro call (currently unused; `dbg!` is handled by the
-    /// `dbg_expr` pass before any evaluation occurs).
-    fn eval(&self) -> Ast {
-        let name = self.name.strip_suffix("!").unwrap();
-
-        match name {
-            "dbg" => match self.args.as_slice() {
-                [node] => builtin::dbg(node.to_owned()),
-                _ => panic!("dbg! expects exactly one argument"),
-            },
-            "assert_equal" => match self.args.as_slice() {
-                [lhs, rhs] => builtin::assert_equal(lhs.to_owned(), rhs.to_owned()),
-                _ => panic!("assert_equal! expects exactly two arguments"),
-            },
-            "unquote" => match self.args.as_slice() {
-                [node] => builtin::unquote(node.to_owned()),
-                _ => panic!("unquote! expects exactly one argument"),
-            },
-            id => unimplemented!("macro {} not implemented", id),
-        }
-    }
 }
 
 #[ast_node]
 pub struct FunctionType {
+    /// A construct signature (`new () => T`) rather than a call signature.
+    pub is_constructor: bool,
     pub params: Vec<Parameter>,
     pub return_type: Rc<Ast>,
 }
@@ -276,6 +308,7 @@ pub struct FunctionType {
 #[ast_node]
 pub struct Parameter {
     pub ellipsis: bool,
+    pub optional: bool,
     pub name: String,
     pub kind: Ast,
 }
@@ -286,11 +319,13 @@ impl FunctionType {
         F: Fn(&Ast) -> Ast,
     {
         Self {
+            is_constructor: self.is_constructor,
             params: self
                 .params
                 .iter()
                 .map(|p| Parameter {
                     ellipsis: p.ellipsis,
+                    optional: p.optional,
                     name: p.name.clone(),
                     kind: f(&p.kind),
                     span: p.span,
@@ -598,7 +633,14 @@ impl Ast {
         let value = match self {
             Ast::TypeString(_) => P::String,
 
-            Ast::TypeNumber(_) => P::Number,
+            // A numeric literal with the `n` suffix (`1n`) is a bigint literal.
+            Ast::TypeNumber(n) => {
+                if n.ty.ends_with('n') {
+                    P::BigInt
+                } else {
+                    P::Number
+                }
+            }
 
             Ast::TrueKeyword(_) => P::Boolean,
 
@@ -1010,7 +1052,6 @@ pub enum PrimitiveType {
 #[derivative(Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum PrefixOp {
-    Infer,
     Not,
 }
 

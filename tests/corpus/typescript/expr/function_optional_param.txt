@@ -1,0 +1,11 @@
+Optional function parameter renders with the postfix question mark
+
+=======
+
+(x?: string, y: number) => void
+
+=======
+
+(x?: string, y: number) => void
+
+=======

@@ -1,0 +1,7 @@
+tuple with a trailing rest element
+=======
+[number, ...string[]]
+=======
+[number, ...string[]]
+
+=======

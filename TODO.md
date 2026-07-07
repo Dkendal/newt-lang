@@ -49,10 +49,13 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 - [x] **B6. `boolean` not distributed as `true | false`.** A naked type
   parameter conditional over `boolean` should distribute; `type BoolDist(T) as
   if T <: true then 1 else 2 end` gives `1 | 2`, but newtype returns just `2`.
-- [ ] **B7. Contravariant `infer` candidates unioned, not intersected.** Two
-  `infer A` in parameter positions should combine by intersection. `if T <: (?A,
-  ?A) => any then A` over `(string, number) => any` should give `string &
-  number`; newtype gives `string | number`.
+- [x] **B7. Contravariant `infer` candidates unioned, not intersected.** Two
+  `infer A` in parameter positions should combine by intersection. FIXED:
+  `match_infer` (`src/ast/assignability.rs`) now tracks variance polarity
+  (flipping in function-parameter positions) and `combine_candidates` unions
+  covariant candidates (which take priority, as in tsc) but intersects
+  all-contravariant ones. _Tests:_ `tests/conformance/conditionals_extra.nt`
+  ("contravariant infer candidates intersect").
 
 ### Wrong-rejects (newtype returns a definite `false`)
 
@@ -66,18 +69,29 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 - [x] **B10. null/undefined/void not disjoint in intersections.** `null & string
   <: never`, `undefined & string`, `null & undefined` all fail (TS reduces them
   to `never` under strict). `void & undefined == undefined` must stay.
-- [~] **B11. Template-literal pattern matching (concrete literal vs pattern done; template-to-template and all-concrete collapse deferred).** `'abc' <:
-  \`a${string}\`` and `'42' <: \`${number}\`` return false; newtype only relates
-  templates *to* `string`, not concrete literals *to* a template pattern.
+- [x] **B11. Template-literal pattern matching.** Concrete-literal-vs-pattern,
+  template-to-template, and all-concrete collapse are all modelled now:
+  `template_subsumes` decides pattern-vs-pattern language inclusion (backtracking
+  at character granularity over what each target hole absorbs), a hole-free
+  template (`` `abc` ``, `` `a${'b'}c` ``) collapses to its string literal
+  before relating, and `parse_template` treats concrete literal placeholders
+  (`${'b'}`, `${1}`, `${true}`) as fixed runs. A template with an open hole is
+  definitively not assignable to a single string literal. _Tests:_
+  `tests/conformance/literals_extra.nt` (template pattern / collapse blocks).
 - [x] **B12. `unknown` not absorbed into a union.** `unknown <: number |
   unknown` and `string | unknown == unknown` return false.
 - [x] **B13. Numeric literals compared by surface text.** `1.0 == 1`, `1.50 ==
   1.5`, `0 == -0`, `1_000 == 1000` fail because `TypeNumber.ty` is the raw string.
 - [x] **B14. Intersection of two unions not distributed/reduced.** `(1|2|3) &
   (2|3|4) <: 2|3` fails (no `&`-over-`|` distribution with `never` elimination).
-- [ ] **B15. Object with union-typed property not assignable to a union of
-  objects.** `{a: 1 | 2} <: {a: 1} | {a: 2}` is true in TS; newtype only tries
-  each member as-is and rejects.
+- [x] **B15. Object with union-typed property not assignable to a union of
+  objects.** `{a: 1 | 2} <: {a: 1} | {a: 2}` is true in TS. FIXED:
+  `assignable_to_union` (`src/ast/assignability.rs`) now distributes the
+  source's union-typed *discriminant* properties (declared by every target
+  member, non-uniform, unit-typed in at least one) and requires every
+  constituent to match some member — full cartesian distribution over
+  non-discriminant properties is unsound (tsc rejects it too; verified).
+  _Tests:_ `tests/conformance/discriminated_unions.nt`.
 - [x] **B16. Required `T | undefined` property not assignable to optional
   property.** `{x: number | undefined} <: {x?: number}` is true under strict
   (no `exactOptionalPropertyTypes`); newtype rejects.
@@ -130,17 +144,54 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   which the engine does not model, so any shared-key intersection stays
   indeterminate (`Both`) instead of reducing (only pairwise-disjoint key sets
   reduce). `keyof any` is desugared upstream.
-- [ ] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` not equated with `T[]`.
-- [ ] **G5.** The `Array(?U)` infer pattern does not match tuple types.
-- [ ] **G6.** Tuple-typed rest parameter `(...a: [A, B]) => …` not expanded.
-- [ ] **G7.** Primitives' boxed/apparent member set not modeled (`true <:
-  {valueOf: () => boolean}`).
-- [ ] **G8.** bigint literals (`1n`) do not parse.
-- [ ] **G9.** Tuple optional / rest / labeled elements (`[A, B?]`, `[A,
-  ...B[]]`, `[a: A]`) do not parse.
-- [ ] **G10.** Optional function parameters (`x?: T`) do not parse.
-- [ ] **G11.** Constructor types (`new () => T`) do not parse.
-- [ ] **G12.** Mapped modifier-removal (`-?`, `-readonly`) does not parse.
+- [x] **G4.** Builtin `Array(T)` / `ReadonlyArray(T)` equated with `T[]`
+  (`src/ast/desugar.rs` desugars the application; verified against tsgo).
+- [x] **G5.** The `Array(?U)` / `(?U)[]` infer pattern now matches tuple types:
+  a tuple binds the pattern's element to the union of its element types
+  (`match_infer` in `src/ast/assignability.rs`). _Tests:_
+  `tests/conformance/conditionals_extra.nt` ("Array infer pattern matches
+  tuples").
+- [x] **G6.** Tuple-typed rest parameter `(...a: [A, B]) => …` expands to
+  positional parameters in `split_params` (`src/ast/assignability.rs`).
+  _Tests:_ `tests/conformance/functions_extra.nt`.
+- [x] **G7.** Primitives' boxed/apparent member set modeled:
+  `primitive_apparent_shape` (`src/ast/assignability.rs`) carries a curated
+  es2020 member table for `string`/`number`/`boolean`/`bigint`/`symbol`
+  (`true <: {valueOf: () => boolean}`, `"x" <: {length: number}`, string's
+  numeric index signature, …). A member missing from the table is a definite
+  reject (a wrong-reject for the long tail of unmodeled lib methods, never
+  unsound). _Tests:_ `tests/conformance/primitives_extra.nt`.
+- [x] **G8.** bigint literals (`1n`) parse: the lexer keeps the `n` suffix in
+  the numeric literal's raw text, `get_primitive_type` classifies it as
+  `bigint` (`1n <: bigint`, `1n </: number`, `1 </: bigint`). _Tests:_
+  `tests/conformance/literals_extra.nt`.
+- [x] **G9.** Tuple optional / rest / labeled elements (`[A, B?]`,
+  `[A, ...B[]]`, `[a: A]`) parse and evaluate: `Tuple.items` is now
+  `Vec<TupleElement>` (label/optional/rest metadata), tuple↔tuple relates by
+  arity-range containment with optional elements reading as `T | undefined`,
+  tuple→array unions the element read types, `T['length']` on an
+  optional-arity tuple is the union of arities (`number` with a rest), and
+  labels are erased for assignability. Shapes not modelled exactly
+  (non-trailing rest `[A, ...B[], C]`, generic spreads `...T`,
+  required-after-optional, rest tuples vs object targets, `infer` inside
+  optional/rest tuple patterns) stay indeterminate/fail-to-match — never a
+  wrong definite answer. _Tests:_ `tests/conformance/tuples_extra.nt`,
+  `tests/corpus/typescript/tuple/{optional_element,rest_element,
+  labeled_elements,labeled_optional_and_rest,optional_union_element}.txt`.
+- [x] **G10.** Optional function parameters (`x?: T`) parse; an optional
+  parameter contributes `T | undefined` and does not count toward required
+  arity (`split_params` in `src/ast/assignability.rs`). _Tests:_
+  `tests/conformance/functions_extra.nt`,
+  `tests/corpus/typescript/expr/function_optional_param.txt`.
+- [x] **G11.** Constructor types (`new () => T`) parse (`FunctionType.
+  is_constructor`); construct and call signatures are never inter-assignable,
+  and parameters/returns relate with the usual variance. _Tests:_
+  `tests/conformance/functions_extra.nt`.
+- [x] **G12.** Mapped modifier-removal (`-?`, `-readonly`) parses (dedicated
+  `MinusQuestion`/`MinusReadonly` tokens; `map -readonly -? k in … do … end`)
+  and `expand_mapped_type` strips the source modifiers on `Remove`. _Tests:_
+  `tests/conformance/mapped_extra.nt`,
+  `tests/corpus/typescript/map_expr/modifier_removal.txt`.
 
 ---
 
@@ -157,9 +208,10 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   `keyof A[]` is `keyof (A[])`, `keyof A | B` is `(keyof A) | B`
   (`src/grammar.pest`, `src/parser/pratt.rs`, `src/parser.rs`). _Test:_
   `tests/corpus/typescript/expr/keyof_prefix.txt`.
-  - [ ] _Follow-up:_ `keyof`'s **assignability** is still the `Both` placeholder
-    (`assignability.rs`), so `keyof { a: 1, b: 2 } <: string` is indeterminate
-    rather than `true`. Needs a keyof evaluator (see the mapped-type plan).
+  - [x] _Follow-up:_ resolved by the keyof evaluator (`eval_keyof` in
+    `src/ast/assignability.rs`, see G3): `keyof { a: 1, b: 2 } <: string` is
+    `true` and `keyof { a: 1 } == 'a'` holds. keyof of primitives/arrays/
+    tuples remains indeterminate (see G3's STILL OPEN note).
 
 - [x] **`readonly` arrays/tuples** — `readonly T[]` / `readonly [A, B]` now parse
   via a new `Ast::Readonly` wrapper (`expr_prefix`, rejected on non-array/tuple
@@ -200,14 +252,17 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
     tighten `pending::equality_operators::strict_*` to the new exact output.
 
 - [ ] **Macro calls** (`name!(...)`) — `Ast::MacroCall` is `todo!()`
-  (`src/runtime.rs:28`) and `unreachable!()` in the renderer
-  (`src/ast/pretty.rs:388`). `unquote!` is intended to evaluate its argument
-  (`unquote!(1)` → `1`); `dbg!` / `assert_equal!` outputs are undecided. _Tests:_
-  `pending::macro_calls`, and `tests/parser.rs` `unquote::evaluates_expression`.
+  (`src/runtime.rs`, inside `builtin::unquote`) and `unreachable!()` in the
+  renderer (`src/typescript.rs`, "MacroCall should be desugared before this
+  point"). `unquote!` is intended to evaluate its argument (`unquote!(1)` →
+  `1`); `dbg!` is handled by the `dbg_expr` pass; `assert_equal!` output is
+  undecided. _Tests:_ `pending::macro_calls`, and `tests/parser.rs`
+  `unquote::evaluates_expression`.
 
-- [ ] **Double negation** `not (not (a <: b))` — the parser rejects it ("not may
-  only be used with an extends expression"); `not` of `not` is unsupported.
-  Decide whether to allow it (simplifying the double negation away).
+- [x] **Double negation** `not (not (a <: b))` — allowed now: the claim
+  grammar's `not` prefix accepts a nested `not` operand (`src/parser.rs`); the
+  harness, desugarer, and test codegen already handled nesting recursively.
+  _Tests:_ `tests/conformance/exotic_extra.nt` ("double negation").
 
 - [ ] **`dbg!` around a relational claim** — `dbg!(number <: A['length'])` is a
   parse error: macro arguments are parsed with the type-expression pratt table
@@ -281,15 +336,17 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 
 ## Bugs
 
-- [ ] **Dot-then-indexed access** `A.b[C]` panics in the renderer ("rhs of dot
-  access should be an ident", `src/ast/pretty.rs:219`) instead of chaining to
-  `A['b'][C]`. _Test:_ `pending::known_bugs::dot_then_indexed_access`.
+- [x] **Dot-then-indexed access** `A.b[C]` no longer panics: the bug was
+  parser precedence (the indexed-access postfix bound tighter than `.`, so
+  `[C]` attached to `b` inside the dot's rhs). The postfix now shares `.`/`::`'s
+  binding power, so `A.b[C]` parses as `(A.b)[C]` and renders `A['b'][C]`.
+  _Test:_ `tests/corpus/typescript/expr/access_dot_then_index.txt` (promoted
+  from `pending::known_bugs`).
 
-- [ ] **`unittest` statement emits a stray `;`** — `Ast::UnitTest` renders to
-  `D::nil()` (`src/ast/pretty.rs`), but the wrapping `Ast::Statement` still
-  appends `;`, so a program containing a unittest renders a stray `;` line
-  instead of nothing. _Tests:_ `pending::unittest_statement`, and
-  `tests/parser.rs` `unittest_statement::typescript_no_output`.
+- [x] **`unittest` statement emits a stray `;`** — already resolved: a
+  `unittest` block renders to nothing, locked in by
+  `tests/corpus/typescript/program/unittest_emits_nothing.txt` (the
+  `pending::unittest_statement` module was removed).
 
 - [x] **Intersection-of-unions dropped parens** — the `IntersectionType` printer
   did not parenthesise union members, so `(A | B) & (C | D)` rendered as
@@ -300,13 +357,12 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 
 ## Dead / unreachable code
 
-- [ ] **`Ast::eval()` is unused** (`src/ast.rs:228`, no callers). The evaluation
-  path it gates — `Ast::MacroCall` (`src/runtime.rs:28`) and `Ast::MappedType`
-  (`src/runtime.rs:50`) `todo!()`s, plus the `is_subtype` arms above — is only
-  reachable through it. Either wire up evaluation (e.g. for running `unittest`
-  blocks) or remove the dead code.
+- [x] **`MacroCall::eval()` was unused** — removed (`src/ast.rs`). The
+  `runtime::builtin` helpers it dispatched to (`dbg`/`assert_equal`/`unquote`)
+  remain, exercised by `src/runtime.rs`'s own tests; the `Ast::MacroCall` /
+  `Ast::MappedType` `todo!()`s inside `builtin::unquote` are part of the open
+  macro-calls feature above.
 
-- [ ] **Unreachable `PrefixOp::Infer` arm** (`src/ast/if_expr.rs:46`, `todo!()`)
-  — the grammar only allows `not` as a condition prefix
-  (`extends_prefix = _{ not }`), so an infer prefix can never reach it. Remove
-  the arm or revisit the grammar if infer-in-condition is intended.
+- [x] **Unreachable `PrefixOp::Infer` arm** — removed: `PrefixOp` is now just
+  `Not`, and the `todo!()`/recursion arms in `src/ast/if_expr.rs` went with it
+  (the chumsky parser only ever built `Ast::Infer`, never a prefix-op infer).

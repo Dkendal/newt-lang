@@ -112,3 +112,16 @@ end
 unittest "void intersect undefined is undefined" do
   assert (void & undefined) == undefined
 end
+unittest "primitive apparent members" do
+  assert true <: {valueOf: () => boolean}
+  assert 'x' <: {length: number}
+  assert 42 <: {toFixed: (d: number) => string}
+  assert string <: {length: number}
+  assert not(string <: {length: 1})
+  assert not(true <: {valueOf: () => string})
+  assert not(string <: {missing_member_xyz: number})
+  assert number <: {valueOf: () => number}
+  assert 1n <: {valueOf: () => bigint}
+  assert symbol <: {toString: () => string}
+  assert string <: {includes: (s: string) => boolean}
+end
