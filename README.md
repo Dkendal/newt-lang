@@ -75,6 +75,8 @@ as
 While these simple examples probably aren't too compelling given all the extra
 characters, this get much more useful as your type programs get more complicated.
 
+The easiest way to get started is to check out some of the [examples](./examples/) or [tests](./tests/corpus/).
+
 
 ## Development
 
