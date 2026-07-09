@@ -1,0 +1,19 @@
+import { Partial as OPartial } from "../Object/Partial"
+import { Depth } from "../Object/_Internal"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+
+export type Partial(L, depth)
+    defaults depth = 'flat'
+    where
+        L <: List,
+        depth <: Depth
+    as
+        Cast(OPartial(L, depth), List)
+
+unittest "Partial(L, depth)" do
+    // TODO: evaluator cannot prove this yet
+    assert Partial([1, 2]) == [1?, 2?]
+    // TODO: evaluator cannot prove this yet
+    assert Partial([1, 2], 'flat') == [1?, 2?]
+end

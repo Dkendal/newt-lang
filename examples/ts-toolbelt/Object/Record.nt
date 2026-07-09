@@ -1,0 +1,27 @@
+import { Modx } from "./_Internal"
+import { Key } from "../Any/Key"
+
+// Create an object filled with `A` for the fields `K`
+export type Record(K, A, modx)
+    defaults A = unknown, modx = ['!', 'W']
+    where
+        K <: Key,
+        A <: any,
+        modx <: Modx
+    as
+        // Original TS indexes a two-level table with string-literal keys
+        // ({'!': {'R': ..., 'W': ...}, '?': ...}[modx[0]][modx[1]]); .nt
+        // object literals only accept identifier keys, so match on the
+        // modifier tuple instead.
+        match modx do
+            ['!', 'R'] -> map readonly P in K do A end,
+            ['!', 'W'] -> map P in K do A end,
+            ['?', 'R'] -> map readonly ? P in K do A end,
+            ['?', 'W'] -> map ? P in K do A end
+        end
+
+unittest "Record(K, A, modx)" do
+    assert Record('a' | 'b', number) == {a: number, b: number}
+    assert Record('a', number, ['?', 'W']) == {a?: number}
+    assert Record('a', number, ['!', 'R']) == {readonly a: number}
+end

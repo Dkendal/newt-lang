@@ -1,0 +1,19 @@
+import { Merge as OMerge } from "../Object/Merge"
+import { List } from "./List"
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Cast } from "../Any/Cast"
+
+export type Merge(L, L1, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = undefined
+    where
+        L <: List,
+        L1 <: List,
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        Cast(OMerge(L, L1, depth, ignore, fill), List)

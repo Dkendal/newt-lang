@@ -1,0 +1,15 @@
+// An asynchronous operation like the original `Promise` type, but this one
+// prevents promises from being wrapped within more promises (not possible).
+export type Promise(A)
+    where
+        A <: any
+    as
+        globalThis.Promise(
+            if A <: globalThis.Promise(?X) then X else A end
+        )
+
+unittest "Promise(A)" do
+    // TODO: evaluator cannot prove this yet (`globalThis.Promise` is an
+    // unresolvable reference, so the claim is indeterminate)
+    assert Promise(Promise(number)) == Promise(number)
+end

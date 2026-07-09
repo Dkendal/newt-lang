@@ -1,0 +1,27 @@
+import { Has } from "../Union/Has"
+import { List } from "./List"
+
+// Get the shortest List of `L` & `L1`
+// (`L` has priority if both lengths are equal)
+export type Shortest(L, L1)
+    where
+        L <: List,
+        L1 <: List
+    as
+        if L <: unknown then
+            if L1 <: unknown then
+                // TS uses a `{0: L1, 1: L}[...]` lookup here; numeric
+                // property names are not supported, so an equivalent tuple
+                // lookup is used.
+                [L1, L][Has(keyof L1, keyof L)]
+            end
+        end
+
+unittest "Shortest(L, L1)" do
+    // TODO: evaluator cannot prove this yet
+    assert Shortest([1], [1, 2]) == [1]
+    // TODO: evaluator cannot prove this yet
+    assert Shortest([1, 2], ['a']) == ['a']
+    // TODO: evaluator cannot prove this yet
+    assert Shortest([1, 2], ['a', 'b']) == [1, 2]
+end

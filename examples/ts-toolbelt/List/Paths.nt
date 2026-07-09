@@ -1,0 +1,9 @@
+import { Paths as OPaths } from "../Object/Paths"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type Paths(L)
+    where
+        L <: List
+    as
+        OPaths(ObjectOf(L))

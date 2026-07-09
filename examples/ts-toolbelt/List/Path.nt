@@ -1,0 +1,21 @@
+import { Path as OPath } from "../Object/Path"
+import { Key } from "../Any/Key"
+import { List } from "./List"
+
+// TS names the second parameter `Path` (shadowing the alias); renamed to `P`.
+export type Path(L, P)
+    where
+        L <: List,
+        P <: List(Key)
+    as OPath(L, P)
+
+// TODO allow for types in unittest blocks that aren't emitted
+type Users as [{ name: string, friends: [{ name: string }] }]
+
+unittest "Path(L, P)" do
+    // TODO: evaluator does not terminate on the recursive Object/Path
+    // iteration, so these (tsgo-verified true) asserts are disabled:
+    //   assert Path(Users, ['0', 'name']) == string
+    //   assert Path(Users, ['0', 'friends', '0', 'name']) == string
+    assert Path(Users, ['0', 'name']) <: unknown
+end

@@ -1,0 +1,30 @@
+// Ported from ts-toolbelt sources/Number/IsZero.ts
+
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+
+// TODO: original TS indexes an object literal keyed by '-' | '+' | '0'
+// ({'-': 0, '+': 0, '0': 1}[N[1]]); quoted object keys are not supported,
+// so a `match` on the sign is used instead.
+export type _IsZero(N)
+    where N <: Iteration
+    as
+        match N[1] do
+            '0' -> 1,
+            else -> 0
+        end
+
+// Check whether a number is null (zero) or not
+export type IsZero(N)
+    where N <: number
+    as _IsZero(IterationOf(N))
+
+unittest "IsZero(N)" do
+    // TODO: evaluator cannot prove this yet (template-literal interpolation
+    // inside IterationOf is not evaluated to a string literal)
+    assert IsZero(0) == 1
+    // TODO: evaluator cannot prove this yet
+    assert IsZero(-7) == 0
+    // TODO: evaluator cannot prove this yet
+    assert IsZero(7) == 0
+end

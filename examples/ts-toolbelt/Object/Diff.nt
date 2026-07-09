@@ -1,0 +1,36 @@
+import { Exclude } from "./Exclude"
+import { Match } from "../Any/_Internal"
+import { PatchFlat } from "./Patch"
+
+// Get an object that is the difference between `O` & `O1`
+// (`O`'s differences have priority over `O1`'s if fields overlap)
+// (If `match = 'default'`, no type checks are done)
+export type Diff(O, O1, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        PatchFlat(Exclude(O, O1, match), Exclude(O1, O, match))
+
+// TODO allow for types in unittest blocks that aren't emitted
+type Person0 as {
+    name: string,
+    age: string
+}
+
+type Person1 as {
+    name: string,
+    age: number | string,
+    nick: string
+}
+
+unittest "Diff(O, O1, match)" do
+    // TODO: evaluator cannot prove these yet (depends on ./Exclude, ./Patch,
+    // ../Union/Exclude which may not resolve)
+    assert Diff(Person0, Person1, 'default') == {nick: string}
+    assert Diff(Person0, Person1, 'extends->') == {nick: string, age: string | number}
+    assert Diff(Person0, Person1, '<-extends') == {nick: string, age: string}
+    assert Diff(Person0, Person1, 'equals') == {nick: string, age: string}
+end

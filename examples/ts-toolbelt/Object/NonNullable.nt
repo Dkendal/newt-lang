@@ -1,0 +1,55 @@
+import { NonNullable as UNonNullable } from "../Union/NonNullable"
+import { Depth } from "./_Internal"
+import { _Pick } from "./Pick"
+import { Key } from "../Any/Key"
+import { PatchFlat } from "./Patch"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+export type NonNullableFlat(O) as
+    (map K in keyof O do UNonNullable(O[K]) end) & {}
+
+export type NonNullableDeep(O) as
+    map K in keyof O do
+        if O[K] <: BuiltIn then
+            O[K]
+        else
+            NonNullableDeep(UNonNullable(O[K]))
+        end
+    end
+
+export type NonNullablePart(O, depth)
+    where
+        O <: object,
+        depth <: Depth
+    as
+        match depth do
+            'flat' -> NonNullableFlat(O),
+            'deep' -> NonNullableDeep(O)
+        end
+
+export type _NonNullable(O, K, depth)
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        PatchFlat(NonNullablePart(_Pick(O, K), depth), O)
+
+// Make some fields of `O` not nullable (deeply or not)
+// (Optional fields will be left untouched & `undefined`)
+export type NonNullable(O, K, depth)
+    defaults K = Key, depth = 'flat'
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        if O <: unknown then
+            _NonNullable(O, K, depth)
+        end
+
+unittest "NonNullable(O, K, depth)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Union/NonNullable,
+    // ./Pick and ./Patch)
+    assert NonNullable({a: 1 | undefined, b: 2 | null}, 'a') == {a: 1, b: 2 | null}
+end

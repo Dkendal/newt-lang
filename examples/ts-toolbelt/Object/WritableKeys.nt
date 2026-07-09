@@ -1,0 +1,32 @@
+import { Equals } from "../Any/Equals"
+
+// Credit https://stackoverflow.com/a/52473108/3570903
+export type _WritableKeys(O)
+    where
+        O <: object
+    as
+        let picks =
+            map -? K in keyof O do
+                match Equals(map -readonly Q in K do O[K] end, map Q in K do O[K] end) do
+                    1 -> K,
+                    0 -> never
+                end
+            end
+        in
+        picks[keyof O]
+
+// Get the keys of `O` that are writable
+export type WritableKeys(O)
+    where
+        O <: object
+    as
+        if O <: unknown then
+            _WritableKeys(O)
+        end
+
+unittest "WritableKeys(O)" do
+    // TODO: evaluator cannot prove these yet (mapped type with conditional
+    // body indexed by `[keyof O]`)
+    assert WritableKeys({a: 1, readonly b: 2}) == 'a'
+    assert WritableKeys({a: 1, b: 2}) == 'a' | 'b'
+end

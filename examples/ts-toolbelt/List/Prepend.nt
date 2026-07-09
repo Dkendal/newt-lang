@@ -1,0 +1,17 @@
+import { List } from "./List"
+
+export type Prepend(L, A)
+    where
+        L <: List,
+        A <: any
+    as
+        [A, ...L]
+
+unittest "Prepend(L, A)" do
+    // TODO: evaluator cannot prove this yet
+    assert Prepend([1, 2, 3], 0) == [0, 1, 2, 3]
+    // TODO: evaluator cannot prove this yet
+    assert Prepend([], 'a') == ['a']
+    // TODO: evaluator cannot prove this yet
+    assert Prepend([1, 2], [3, 4]) == [[3, 4], 1, 2]
+end

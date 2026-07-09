@@ -1,0 +1,28 @@
+import { Function } from "../../Function"
+import { Await } from "../../../Any/Await"
+import { Curry } from "../../Curry"
+
+// TODO: newtype cannot express object types with generic call signatures
+// (function overloads). The original TS is an object type with ten generic
+// call signatures, one per pipeline arity:
+//
+//   export type PipeMultiAsync = {
+//       <R0, P extends any[]>(...fns: [
+//           Function<P, R0> | Curry<Function<P, R0>>,
+//       ]): Function<P, Promise<Await<R0>>>
+//       <R0, R1, P extends any[]>(...fns: [
+//           Function<P,           R0> | Curry<Function<P,           R0>>,
+//           Function<[Await<R0>], R1> | Curry<Function<[Await<R0>], R1>>,
+//       ]): Function<P, Promise<Await<R1>>>
+//       // ... and so on, up to R9
+//   }
+//
+// Closest expressible form: a single non-generic signature taking the
+// (possibly curried) functions as a non-empty rest parameter and returning
+// a promise-returning function.
+export type PipeMultiAsync as (
+    ...fns: [
+        Function(any[], any) | Curry(Function(any[], any)),
+        ...(Function(any[], any) | Curry(Function(any[], any)))[]
+    ]
+) => Function(any[], Promise(Await(any)))

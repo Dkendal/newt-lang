@@ -1,0 +1,34 @@
+import { Equals } from "../Any/Equals"
+
+// Credit https://stackoverflow.com/a/52473108/3570903
+export type _ReadonlyKeys(O)
+    where
+        O <: object
+    as
+        let picks =
+            map -? K in keyof O do
+                match Equals(map -readonly Q in K do O[K] end, map Q in K do O[K] end) do
+                    1 -> never,
+                    0 -> K
+                end
+            end
+        in
+        picks[keyof O]
+
+// Get the keys of `O` that are readonly
+export type ReadonlyKeys(O)
+    where
+        O <: object
+    as
+        if O <: unknown then
+            _ReadonlyKeys(O)
+        end
+
+unittest "ReadonlyKeys(O)" do
+    // TODO: evaluator cannot prove this yet (it does not model TS's
+    // homomorphic readonly-modifier inheritance in `map Q in K do O[K] end`,
+    // so Equals(...) never observes the readonly difference)
+    assert ReadonlyKeys({a: 1, readonly b: 2}) == 'b'
+    // TODO: evaluator cannot prove this yet (same modifier-inheritance gap)
+    assert ReadonlyKeys({a: 1, b: 2}) == never
+end

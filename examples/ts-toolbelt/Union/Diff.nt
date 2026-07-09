@@ -1,0 +1,14 @@
+import { Exclude } from "./Exclude"
+
+// Get an [[Union]] that is the difference between `U1` & `U2`
+export type Diff(U1, U2)
+    where
+        U1 <: any,
+        U2 <: any
+    as
+        Exclude(U1, U2) | Exclude(U2, U1)
+
+unittest "Diff(U1, U2)" do
+    assert Diff('a' | 'b' | 'c', 'b' | 'c' | 'd') == 'a' | 'd'
+    assert Diff('a', 'a') == never
+end

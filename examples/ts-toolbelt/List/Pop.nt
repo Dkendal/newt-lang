@@ -1,0 +1,18 @@
+import { List } from "./List"
+
+// Remove the last element out of `L`
+export type Pop(L)
+    where L <: List
+    as
+        if L <: readonly [...?LBody, any] | readonly [...?LBody, any?] then
+            LBody
+        else
+            L
+        end
+
+unittest "Pop(L)" do
+    // TODO: evaluator cannot prove this yet
+    assert Pop([1, 2, 3]) == [1, 2]
+    // TODO: evaluator cannot prove this yet
+    assert Pop(['a']) == []
+end

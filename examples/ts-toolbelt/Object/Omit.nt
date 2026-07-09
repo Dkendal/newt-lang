@@ -1,0 +1,29 @@
+import { _Pick } from "./Pick"
+import { Exclude } from "../Union/Exclude"
+import { Key } from "../Any/Key"
+
+export type _Omit(O, K)
+    where
+        O <: object,
+        K <: Key
+    as _Pick(O, Exclude(keyof O, K))
+
+// Remove out of `O` the fields of key `K`
+export type Omit(O, K)
+    where
+        O <: object,
+        K <: Key
+    as
+        if O <: unknown then
+            _Omit(O, K)
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as { name: string, age: number }
+
+unittest "Omit(O, K)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Union/Exclude)
+    assert Omit(User, 'age') == { name: string }
+    // TODO: evaluator cannot prove this yet (depends on ../Union/Exclude)
+    assert Omit(User, 'zzz') == User
+end

@@ -1,0 +1,8 @@
+import { Range } from "../Number/Range"
+import { UnionOf } from "./UnionOf"
+
+export type KeySet(From, To)
+    where
+        From <: number,
+        To <: number
+    as UnionOf(Range(From, To, '->'))

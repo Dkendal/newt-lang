@@ -1,0 +1,18 @@
+import { List } from "./List"
+
+export type Append(L, A)
+    where
+        L <: List,
+        A <: any
+    as
+        [...L, A]
+
+unittest "Append(L, A)" do
+    // TODO: evaluator cannot prove this yet (tuple spread of a substituted
+    // type parameter is not folded)
+    assert Append([1, 2, 3], 4) == [1, 2, 3, 4]
+    // TODO: evaluator cannot prove this yet
+    assert Append([], 'a') == ['a']
+    // TODO: evaluator cannot prove this yet
+    assert Append([1, 2], [3, 4]) == [1, 2, [3, 4]]
+end

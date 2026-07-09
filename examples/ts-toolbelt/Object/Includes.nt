@@ -1,0 +1,23 @@
+import { SelectKeys } from "./SelectKeys"
+import { Match } from "../Any/_Internal"
+
+// Check whether `O` has fields that match `M`
+export type Includes(O, M, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        if [SelectKeys(O, M, match)] <: [never] then
+            0
+        else
+            1
+        end
+
+unittest "Includes(O, M, match)" do
+    // TODO: evaluator cannot prove these yet (depends on ./SelectKeys which
+    // may not resolve)
+    assert Includes({a: 1, b: string}, string) == 1
+    assert Includes({a: 1, b: 2}, string) == 0
+end

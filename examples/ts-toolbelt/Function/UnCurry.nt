@@ -1,0 +1,14 @@
+import { Curry } from "./Curry"
+
+export type UnCurry(F)
+    where F <: Curry(any)
+    as
+        if F <: Curry(?UF) then
+            UF
+        end
+
+unittest "UnCurry(F)" do
+    // TODO: evaluator cannot prove this yet (infer through a generic alias
+    // application)
+    assert UnCurry(Curry((a: string, b: number) => boolean)) == ((a: string, b: number) => boolean)
+end

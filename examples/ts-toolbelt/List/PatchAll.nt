@@ -1,0 +1,19 @@
+import { PatchAll as OPatchAll } from "../Object/PatchAll"
+import { List } from "../List/List"
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Cast } from "../Any/Cast"
+
+export type PatchAll(O, Ls, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = never
+    where
+        O <: List,
+        Ls <: List(List),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        Cast(OPatchAll(O, Ls, depth, ignore, fill), List)

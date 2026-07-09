@@ -1,0 +1,13 @@
+import { ExcludeKeys as OExcludeKeys } from "../Object/ExcludeKeys"
+import { Match } from "../Any/_Internal"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type ExcludeKeys(L, L1, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        L1 <: List,
+        match <: Match
+    as
+        OExcludeKeys(ObjectOf(L), ObjectOf(L1), match)

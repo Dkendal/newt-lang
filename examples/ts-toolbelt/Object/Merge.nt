@@ -1,0 +1,210 @@
+import { At } from "../Any/At"
+import { _OptionalKeys } from "./OptionalKeys"
+import { Key } from "../Any/Key"
+import { List } from "../List/List"
+import { Depth, Anyfy } from "./_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Length } from "../List/Length"
+import { RequiredKeys } from "../List/RequiredKeys"
+import { Exclude } from "../Union/Exclude"
+import { Has } from "../Union/Has"
+
+type Longer(L, L1)
+    where
+        L <: List,
+        L1 <: List
+    as
+        if L <: unknown then
+            if L1 <: unknown then
+                if Has(RequiredKeys(L), RequiredKeys(L1)) <: 1 then 1 else 0 end
+            end
+        end
+
+type MergeProp(OK, O1K, fill, OOKeys, K)
+    where
+        OOKeys <: Key,
+        K <: Key
+    as cond do
+        K <: OOKeys -> Exclude(OK, undefined) | O1K, // if prop of `O` is optional, merge it with prop of `O1`
+        [OK] <: [never] -> O1K,                      // complete with prop of `O1`
+        OK <: fill -> O1K,                           // fill/replace if required
+        else -> OK
+    end
+
+type MergeFlatObject(O, O1, fill, OOKeys)
+    defaults OOKeys = _OptionalKeys(O)
+    where
+        O <: object,
+        O1 <: object,
+        OOKeys <: Key
+    as
+        (map K in keyof (Anyfy(O) & O1) do
+            MergeProp(At(O, K), At(O1, K), fill, OOKeys, K)
+        end) & {}
+
+type MergeFlatList(L, L1, ignore, fill, LOK)
+    defaults LOK = _OptionalKeys(L)
+    where
+        L <: List,
+        L1 <: List,
+        ignore <: object,
+        LOK <: Key
+    as
+        if number <: Length(L | L1) then
+            MergeFlatChoice(L[number], L1[number], ignore, fill)[]
+        else
+            if Longer(L, L1) <: 1 then
+                map K in keyof L do
+                    MergeProp(L[K], At(L1, K), fill, LOK, K)
+                end
+            else
+                map K in keyof L1 do
+                    MergeProp(At(L, K), L1[K], fill, LOK, K)
+                end
+            end
+        end
+
+export type MergeFlatChoice(O, O1, ignore, fill)
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object
+    as cond do
+        O <: ignore -> O,
+        O1 <: ignore -> O,
+        O <: List and O1 <: List -> MergeFlatList(O, O1, ignore, fill),
+        else -> MergeFlatObject(O, O1, fill)
+    end
+
+export type MergeFlat(O, O1, ignore, fill)
+    defaults
+        ignore = BuiltIn,
+        fill = undefined
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object
+    as
+        if O <: unknown then
+            if O1 <: unknown then
+                MergeFlatChoice(O, O1, ignore, fill)
+            end
+        end
+
+type MergeDeepList(L, L1, ignore, fill)
+    where
+        L <: List,
+        L1 <: List,
+        ignore <: object
+    as
+        if number <: Length(L | L1) then
+            MergeDeepChoice(L[number], L1[number], ignore, fill, never, any)[]
+        else
+            if Longer(L, L1) <: 1 then
+                map K in keyof L do
+                    MergeDeepChoice(L[K], At(L1, K), ignore, fill, _OptionalKeys(L), K)
+                end
+            else
+                map K in keyof L1 do
+                    MergeDeepChoice(At(L, K), L1[K], ignore, fill, _OptionalKeys(L), K)
+                end
+            end
+        end
+
+type MergeDeepObject(O, O1, ignore, fill, OOKeys)
+    defaults OOKeys = _OptionalKeys(O)
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object,
+        OOKeys <: Key
+    as
+        map K in keyof (Anyfy(O) & O1) do
+            MergeDeepChoice(At(O, K), At(O1, K), ignore, fill, OOKeys, K)
+        end
+
+type MergeDeepChoice(OK, O1K, ignore, fill, OOKeys, K)
+    where
+        ignore <: object,
+        OOKeys <: Key,
+        K <: Key
+    as cond do
+        [OK] <: [never] -> MergeProp(OK, O1K, fill, OOKeys, K),
+        [O1K] <: [never] -> MergeProp(OK, O1K, fill, OOKeys, K),
+        OK <: ignore -> MergeProp(OK, O1K, fill, OOKeys, K),
+        O1K <: ignore -> MergeProp(OK, O1K, fill, OOKeys, K),
+        OK <: List and O1K <: List -> MergeDeepList(OK, O1K, ignore, fill),
+        OK <: List -> MergeProp(OK, O1K, fill, OOKeys, K),
+        OK <: object and O1K <: object -> MergeDeepObject(OK, O1K, ignore, fill),
+        else -> MergeProp(OK, O1K, fill, OOKeys, K)
+    end
+
+export type MergeDeep(O, O1, ignore, fill)
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object
+    as
+        if O <: unknown then
+            if O1 <: unknown then
+                MergeDeepChoice(O, O1, ignore, fill, 'x', 'y') // dummy x, y
+            end
+        end
+
+// Accurately merge the fields of `O` with the ones of `O1`. It is
+// equivalent to the spread operator in JavaScript. [[Union]]s and [[Optional]]
+// fields will be handled gracefully.
+// (needs `--strictNullChecks` enabled)
+export type Merge(O, O1, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = undefined
+    where
+        O <: object,
+        O1 <: object,
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        // NOTE: quoted property names are unsupported; identifier keys
+        // `flat`/`deep` denote the same string keys as TS `'flat'`/`'deep'`.
+        {
+            flat: MergeFlat(O, O1, ignore, fill),
+            deep: MergeDeep(O, O1, ignore, fill)
+        }[depth]
+
+// TODO allow for types in unittest blocks that aren't emitted
+type O0 as {
+    name?: string,
+    age?: number,
+    zip?: string,
+    pay: {
+        cvv?: number
+    }
+}
+
+type O1 as {
+    age: number,
+    zip?: number,
+    city: string,
+    pay: {
+        cvv: number,
+        ccn?: string
+    }
+}
+
+unittest "Merge(O, O1, depth)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Union/Exclude,
+    // ../Union/Has and the `_OptionalKeys` keys idiom)
+    assert Merge(O0, O1, 'deep') == {
+        name?: string,
+        age: number,
+        zip?: string | number,
+        pay: {
+            cvv: number,
+            ccn?: string
+        },
+        city: string
+    }
+end

@@ -1,0 +1,30 @@
+// Ported from ts-toolbelt sources/Number/IsNegative.ts
+
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+
+// TODO: original TS indexes an object literal keyed by '-' | '+' | '0'
+// ({'-': 1, '+': 0, '0': 0}[N[1]]); quoted object keys are not supported,
+// so a `match` on the sign is used instead.
+export type _IsNegative(N)
+    where N <: Iteration
+    as
+        match N[1] do
+            '-' -> 1,
+            else -> 0
+        end
+
+// Check whether a number is negative or not
+export type IsNegative(N)
+    where N <: number
+    as _IsNegative(IterationOf(N))
+
+unittest "IsNegative(N)" do
+    // TODO: evaluator cannot prove this yet (template-literal interpolation
+    // inside IterationOf is not evaluated to a string literal)
+    assert IsNegative(0) == 0
+    // TODO: evaluator cannot prove this yet
+    assert IsNegative(-7) == 1
+    // TODO: evaluator cannot prove this yet
+    assert IsNegative(7) == 0
+end

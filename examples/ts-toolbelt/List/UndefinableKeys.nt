@@ -1,0 +1,8 @@
+import { UndefinableKeys as OUndefinableKeys } from "../Object/UndefinableKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+// Get the keys of `L` that are `undefined`
+export type UndefinableKeys(L)
+    where L <: List
+    as OUndefinableKeys(ObjectOf(L))

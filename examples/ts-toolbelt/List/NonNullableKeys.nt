@@ -1,0 +1,14 @@
+import { NonNullableKeys as ONonNullableKeys } from "../Object/NonNullableKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type NonNullableKeys(L)
+    where
+        L <: List
+    as
+        ONonNullableKeys(ObjectOf(L))
+
+unittest "NonNullableKeys(L)" do
+    // TODO: evaluator cannot prove this yet
+    assert NonNullableKeys([1, 2 | null]) == '0'
+end

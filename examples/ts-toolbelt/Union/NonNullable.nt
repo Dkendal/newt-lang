@@ -1,0 +1,13 @@
+import { Exclude } from "./Exclude"
+
+// Remove `undefined` & `null` out of `U`
+export type NonNullable(U)
+    where
+        U <: any
+    as
+        Exclude(U, undefined | null)
+
+unittest "NonNullable(U)" do
+    assert NonNullable(string | undefined | null) == string
+    assert NonNullable(string) == string
+end

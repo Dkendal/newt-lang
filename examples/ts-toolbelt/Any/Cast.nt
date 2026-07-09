@@ -1,0 +1,11 @@
+export type Cast(A1, A2)
+    where
+        A1 <: any,
+        A2 <: any
+    as
+        if A1 <: A2 then A1 else A2 end
+
+unittest "Cast(A1, A2)" do
+    assert Cast('42', string) == '42'
+    assert Cast('42', number) == number
+end

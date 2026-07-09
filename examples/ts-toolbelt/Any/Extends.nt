@@ -1,0 +1,23 @@
+// `never` is a fall-through type that we want to narrow down to `0`,
+// so `Extends(never, never)` is false.
+export type Extends(A1, A2)
+    where
+        A1 <: any,
+        A2 <: any
+    as
+        if [A1] <: [never] then
+            0
+        else
+            if A1 <: A2 then 1 else 0 end
+        end
+
+unittest "Extends(A1, A2)" do
+    // TODO: evaluator cannot prove this yet (the nested `A1 <: A2`
+    // conditional should distribute over the union in A1, yielding 0 | 1)
+    assert Extends('a' | 'b', 'b') == 0 | 1
+    assert Extends('a', 'a' | 'b') == 1
+    assert Extends({a: string}, {a: any}) == 1
+    assert Extends({a: any}, {a: any, b: any}) == 0
+    // Nothing cannot extend nothing, use `A.Equals`
+    assert Extends(never, never) == 0
+end

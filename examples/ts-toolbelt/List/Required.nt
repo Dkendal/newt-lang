@@ -1,0 +1,17 @@
+import { Depth } from "../Object/_Internal"
+import { RequiredPart } from "../Object/Required"
+import { List } from "./List"
+import { Cast } from "../Any/Cast"
+
+// Make `L` required (deeply or not)
+export type Required(L, depth)
+    defaults depth = 'flat'
+    where
+        L <: List,
+        depth <: Depth
+    as Cast(RequiredPart(L, depth), List)
+
+unittest "Required(L)" do
+    // TODO: evaluator cannot prove this yet
+    assert Required([1?, 2?]) == [1, 2]
+end

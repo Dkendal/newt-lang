@@ -1,0 +1,24 @@
+import { Key } from "./Key"
+
+// TODO: the original TS brands with a unique symbol key:
+//   declare const id: unique symbol
+//   export type Type<A extends any, Id extends Key> = {
+//       [id]: Id
+//   } & A
+// newtype has no `declare`/`unique symbol`/computed keys, so a string key
+// stands in as the brand.
+export type Type(A, Id)
+    where
+        A <: any,
+        Id <: Key
+    as
+        {
+            __id: Id
+        } & A
+
+unittest "Type(A, Id)" do
+    assert Type(number, 'eur') <: number
+    assert Type(number, 'eur') <: Type(number, 'eur')
+    assert not(Type(number, 'eur') <: Type(number, 'usd'))
+    assert not(number <: Type(number, 'eur'))
+end

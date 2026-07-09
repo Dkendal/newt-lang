@@ -1,0 +1,7 @@
+export type BuiltIn as
+    Function
+    | Error
+    | Date
+    | { readonly [Symbol.toStringTag]: string }
+    | RegExp
+    | Generator

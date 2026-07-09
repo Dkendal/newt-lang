@@ -1,0 +1,53 @@
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Next } from "../Iteration/Next"
+import { Length } from "./Length"
+import { Pos } from "../Iteration/Pos"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+import { Naked } from "./_Internal"
+import { Extends } from "../Any/Extends"
+import { Append } from "./Append"
+
+// TS original selects from `{0: ..., 1: LN}[Extends<Pos<I>, Length<L>>]`;
+// numeric object keys are unsupported, so it is written as a conditional.
+type __Zip(L, L1, LN, I)
+    defaults LN = [], I = IterationOf(0)
+    where
+        L <: List,
+        L1 <: List,
+        LN <: List,
+        I <: Iteration
+    as
+        if Extends(Pos(I), Length(L)) <: 1 then
+            LN
+        else
+            __Zip(L, L1, Append(LN, [L[Pos(I)], L1[Pos(I)]]), Next(I))
+        end
+
+export type _Zip(L, L1)
+    where
+        L <: List,
+        L1 <: List
+    as
+        if __Zip(Naked(L), L1) <: ?X then
+            Cast(X, List)
+        end
+
+// Pair up the entries of `L` with `L1`
+export type Zip(L, L1)
+    where
+        L <: List,
+        L1 <: List
+    as
+        if L <: unknown then
+            if L1 <: unknown then
+                _Zip(L, L1)
+            end
+        end
+
+// TODO: evaluator cannot prove this yet — evaluating the recursive
+// iteration loop does not terminate, so the assert is commented out:
+// unittest "Zip(L, L1)" do
+//     assert Zip([1, 2], ['a', 'b']) == [[1, 'a'], [2, 'b']]
+// end

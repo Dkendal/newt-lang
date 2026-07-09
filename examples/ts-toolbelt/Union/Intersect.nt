@@ -1,0 +1,25 @@
+import { Equals } from "../Any/Equals"
+
+// Get the overlapping members of `U1` and `U2`
+export type Intersect(U1, U2)
+    where
+        U1 <: any,
+        U2 <: any
+    as
+        // TS uses a `{1: U1, 0: never}[Equals<U1, U2>]` lookup here; numeric
+        // property names are not supported, so an equivalent tuple lookup is
+        // used.
+        if U1 <: unknown then
+            if U2 <: unknown then
+                [never, U1][Equals(U1, U2)]
+            end
+        end
+
+unittest "Intersect(U1, U2)" do
+    // TODO: evaluator cannot prove this yet (distribution over both unions
+    // and tuple lookup indexed by the result of Equals)
+    assert Intersect('a' | 'b' | 'c', 'b' | 'c' | 'd') == 'b' | 'c'
+    // TODO: evaluator cannot prove this yet (tuple lookup indexed by the
+    // result of Equals)
+    assert Intersect('a', 'b') == never
+end

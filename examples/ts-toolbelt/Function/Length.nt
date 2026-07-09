@@ -1,0 +1,14 @@
+import { Function } from "./Function"
+import { Parameters } from "./Parameters"
+import { Length as LLength } from "../List/Length"
+
+export type Length(Fn)
+    where Fn <: Function
+    as LLength(Parameters(Fn))
+
+unittest "Length(Fn)" do
+    // TODO: evaluator cannot prove this yet
+    assert Length((a1: any, a2: any) => {}) == 2
+    // TODO: evaluator cannot prove this yet
+    assert Length((...a: any[]) => any) == number
+end

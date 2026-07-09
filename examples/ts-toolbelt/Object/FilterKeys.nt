@@ -1,0 +1,37 @@
+import { Match } from "../Any/_Internal"
+import { Is } from "../Any/Is"
+
+export type _FilterKeys(O, M, match)
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        let picks =
+            map -? K in keyof O do
+                match Is(O[K], M, match) do
+                    1 -> never,
+                    0 -> K
+                end
+            end
+        in
+        picks[keyof O]
+
+// Filter out the keys of `O` which fields match `M`
+export type FilterKeys(O, M, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        if O <: unknown then
+            _FilterKeys(O, M, match)
+        end
+
+unittest "FilterKeys(O, M, match)" do
+    // TODO: evaluator cannot prove these yet (indexing a mapped type by
+    // `keyof O` is not evaluated)
+    assert FilterKeys({a: 1, b: 2, c: string}, string, 'equals') == 'a' | 'b'
+    assert FilterKeys({a: 1, b: 2, c: string}, number, 'extends->') == 'c'
+end

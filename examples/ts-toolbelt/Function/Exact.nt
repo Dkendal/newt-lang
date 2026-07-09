@@ -1,0 +1,28 @@
+import { Narrowable } from "./_Internal"
+
+// Force `A` to comply with `W`. `A` must be a shape of `W`. In other words,
+// `A` must extend `W` and have the same properties - no more, no less.
+export type Exact(A, W) as
+    if W <: unknown then
+        if A <: W then
+            if A <: Narrowable then
+                A
+            else
+                map K in keyof A do
+                    if K <: keyof W then
+                        Exact(A[K], W[K])
+                    else
+                        never
+                    end
+                end
+            end
+        else
+            W
+        end
+    end
+
+unittest "Exact(A, W)" do
+    assert Exact(1, number) == 1
+    assert Exact({a: 1}, {a: number}) == {a: 1}
+    assert Exact({a: 1, b: 2}, {a: number}) == {a: 1, b: never}
+end

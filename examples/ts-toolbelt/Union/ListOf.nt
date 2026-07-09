@@ -1,0 +1,37 @@
+import { Last } from "./Last"
+import { Prepend } from "../List/Prepend"
+import { Exclude } from "./Exclude"
+import { List } from "../List/List"
+import { Cast } from "../Any/Cast"
+import { Extends } from "../Any/Extends"
+
+// TS uses a `{0: ..., 1: LN}[Extends<[U], [never]>]` lookup here; numeric
+// property names are not supported, so an equivalent tuple lookup is used.
+type _ListOf(U, LN, LastU)
+    defaults
+        LN = [],
+        LastU = Last(U)
+    where
+        LN <: List
+    as
+        [
+            _ListOf(Exclude(U, LastU), Prepend(LN, LastU)),
+            LN
+        ][Extends([U], [never])]
+
+// Transform a [[Union]] into a [[List]]
+// (it might not preserve order)
+// ! must not be distributed
+export type ListOf(U)
+    where
+        U <: any
+    as
+        if _ListOf(U) <: ?X then
+            Cast(X, List)
+        end
+
+unittest "ListOf(U)" do
+    // TODO: evaluator cannot prove this yet (recursive union consumption via
+    // Last, which infers over an intersection of function types)
+    assert ListOf(1 | 2 | 3) == [1, 2, 3]
+end

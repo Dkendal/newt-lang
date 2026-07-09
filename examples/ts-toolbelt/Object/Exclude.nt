@@ -1,0 +1,20 @@
+import { ExcludeKeys } from "./ExcludeKeys"
+import { Match } from "../Any/_Internal"
+import { Pick } from "./Pick"
+
+// Exclude the fields of `O1` out of `O`
+// (If `match = 'default'`, no type checks are done)
+export type Exclude(O, O1, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        Pick(O, ExcludeKeys(O, O1, match))
+
+unittest "Exclude(O, O1, match)" do
+    // TODO: evaluator cannot prove this yet (depends on ./Pick which may
+    // not resolve)
+    assert Exclude({a: 1, b: 2, c: 3}, {a: 1, b: 2}, 'equals') == {c: 3}
+end

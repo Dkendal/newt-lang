@@ -1,0 +1,26 @@
+import { _Omit as _OOmit } from "../Object/Omit"
+import { _ListOf } from "../Object/ListOf"
+import { Key } from "./_Internal"
+import { List } from "./List"
+import { ObjectOf } from "./ObjectOf"
+
+export type _Omit(L, K)
+    where
+        L <: List,
+        K <: Key
+    as
+        _ListOf(_OOmit(ObjectOf(L), `${K & number}` | K))
+
+export type Omit(L, K)
+    where
+        L <: List,
+        K <: Key
+    as
+        if L <: unknown then
+            _Omit(L, K)
+        end
+
+unittest "Omit(L, K)" do
+    // TODO: evaluator cannot prove this yet
+    assert Omit([1, 2, 3], '0') == [2, 3]
+end

@@ -1,0 +1,14 @@
+import { Diff as ODiff } from "../Object/Diff"
+import { ListOf } from "../Object/ListOf"
+import { Match } from "../Any/_Internal"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type Diff(L, L1, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        L1 <: List,
+        match <: Match
+    as
+        ListOf(ODiff(ObjectOf(L), ObjectOf(L1), match))

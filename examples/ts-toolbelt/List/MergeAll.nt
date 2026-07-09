@@ -1,0 +1,18 @@
+import { MergeAll as OMergeAll } from "../Object/MergeAll"
+import { List } from "../List/List"
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Cast } from "../Any/Cast"
+
+export type MergeAll(L, Ls, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = undefined
+    where
+        L <: List,
+        Ls <: List(List),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as Cast(OMergeAll(L, Ls, depth, ignore, fill), List)

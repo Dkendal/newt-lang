@@ -1,0 +1,18 @@
+import { Function } from "./Function"
+import { List } from "../List/List"
+
+export type Return(F)
+    where F <: Function
+    as
+        if F <: (...args: List) => ?R then
+            R
+        end
+
+unittest "Return(F)" do
+    // TODO: evaluator cannot prove this yet (infer through rest-parameter
+    // function types)
+    assert Return(() => boolean) == boolean
+    // TODO: evaluator cannot prove this yet (infer through rest-parameter
+    // function types)
+    assert Return(() => true) == true
+end

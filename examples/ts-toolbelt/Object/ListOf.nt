@@ -1,0 +1,73 @@
+import { Cast } from "../Any/Cast"
+import { List } from "../List/List"
+import { Extends } from "../Any/Extends"
+import { Select } from "../Union/Select"
+import { Exclude } from "../Union/Exclude"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Pos } from "../Iteration/Pos"
+import { Key } from "../Iteration/Key"
+import { Append } from "../List/Append"
+import { Next } from "../Iteration/Next"
+import { ObjectOf } from "../List/ObjectOf"
+
+type AppendExists(O, LN, I)
+    where
+        O <: object,
+        LN <: List,
+        I <: Iteration
+    as
+        cond do
+            Key(I) <: keyof O -> Append(LN, O[Key(I)]),
+            Pos(I) <: keyof O -> Append(LN, O[Pos(I)]),
+            else -> LN
+        end
+
+// TS uses a `{0: ..., 1: ...}[Extends<[K], [never]>]` lookup here; numeric
+// property names are not supported, so an equivalent tuple lookup is used.
+type ___ListOf(O, K, LN, I)
+    defaults
+        LN = [],
+        I = IterationOf(0)
+    where
+        O <: object,
+        LN <: List,
+        I <: Iteration
+    as
+        [
+            ___ListOf(O, Exclude(K, Key(I)), AppendExists(O, LN, I), Next(I)),
+            LN
+        ][Extends([K], [never])]
+
+type __ListOf(O)
+    where O <: object
+    as
+        cond do
+            number <: keyof O -> O[number][],
+            string <: keyof O -> O[string][],
+            symbol <: keyof O -> O[symbol][],
+            else -> ___ListOf(O, Select(keyof O, number | `${number}`))
+        end
+
+export type _ListOf(O)
+    where O <: object
+    as
+        if __ListOf(O) <: ?X then
+            Cast(X, List)
+        end
+
+// Transform an [[Object]] into a [[List]]
+// (It will only pick numeric literal indexes)
+export type ListOf(O)
+    where O <: object
+    as
+        if O <: unknown then
+            _ListOf(O)
+        end
+
+unittest "ListOf(O)" do
+    // TODO: evaluator cannot prove this yet (recursive iteration over
+    // numeric keys; depends on ../Union/Select and ../Union/Exclude being
+    // ported)
+    assert ListOf(ObjectOf([1, 2, 3])) == [1, 2, 3]
+end

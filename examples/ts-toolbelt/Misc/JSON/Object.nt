@@ -1,0 +1,8 @@
+import { Value } from "./Value"
+
+// An object of JSON [[Value]]s
+// TODO: original TS uses an index signature `{[k: string]: Value}`;
+// the mapped form below is the closest expressible equivalent.
+export interface Object {
+    [k in string]: Value,
+}

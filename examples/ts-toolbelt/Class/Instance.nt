@@ -1,0 +1,18 @@
+import { Class } from "./Class"
+
+export type Instance(C)
+    where
+        C <: Class
+    as
+        if C <: Class(any[], ?R) then
+            R
+        else
+            any
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type SomeClass as Class([string, number], { a: string, b: number })
+
+unittest "Instance(C)" do
+    assert Instance(SomeClass) == { a: string, b: number }
+end

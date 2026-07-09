@@ -1,0 +1,52 @@
+import { Key } from "../../Any/Key"
+import { Merge as OMerge } from "../Merge"
+import { List } from "../../List/List"
+import { BuiltIn } from "../../Misc/BuiltIn"
+import { Tail } from "../../List/Tail"
+import { Depth } from "../_Internal"
+
+type MergeAt(O, Path, O1, depth)
+    where
+        Path <: List(Key),
+        depth <: Depth
+    as cond do
+        O <: BuiltIn -> O,
+        Path <: [] and O <: List -> OMerge(O, O1 & {}, depth),
+        Path <: [] and O <: object -> OMerge(O, O1 & {}, depth),
+        Path <: [] -> O,
+        else ->
+            map K in keyof O do
+                if K <: Path[0] then
+                    MergeAt(O[K], Tail(Path), O1, depth)
+                else
+                    O[K]
+                end
+            end
+    end
+
+// Complete the fields of `O` at `Path` with the ones of `O1`
+export type Merge(O, Path, O1, depth)
+    defaults depth = 'flat'
+    where
+        O <: object,
+        Path <: List(Key),
+        O1 <: object,
+        depth <: Depth
+    as
+        if Path <: unknown then
+            MergeAt(O, Path, O1, depth)
+        end
+
+// TODO: swap path & o1
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as {info: {name: string}, id: number}
+
+unittest "Merge(O, Path, O1, depth)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Merge and
+    // recursive MergeAt)
+    assert Merge(User, ['info'], {age: number}) == {
+        info: {name: string, age: number},
+        id: number
+    }
+end

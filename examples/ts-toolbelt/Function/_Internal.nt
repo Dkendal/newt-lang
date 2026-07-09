@@ -1,0 +1,24 @@
+// Describes function modes
+// `sync` : Normal function
+// `async`: Promised result
+export type Mode as 'sync' | 'async'
+
+// Describes function parameter input
+// `multi`: ( a, b, c ... n ) => X
+// `list` : ([a, b, c ... n]) => X
+export type Input as 'multi' | 'list'
+
+// Describes types that can be narrowed
+export type Narrowable as
+    string
+    | number
+    | bigint
+    | boolean
+
+unittest "_Internal" do
+    assert 'sync' <: Mode
+    assert 'list' <: Input
+    assert not('maybe' <: Mode)
+    assert 42 <: Narrowable
+    assert not([] <: Narrowable)
+end

@@ -1,0 +1,13 @@
+import { Boolean } from "../Boolean/_Internal"
+
+export type If(B, Then, Else)
+    defaults Else = never
+    where B <: Boolean
+    as
+        if B <: 1 then Then else Else end
+
+unittest "If(B, Then, Else)" do
+    assert If(1, 'a', 'b') == 'a'
+    assert If(0, 'a', 'b') == 'b'
+    assert If(0, 'a') == never
+end

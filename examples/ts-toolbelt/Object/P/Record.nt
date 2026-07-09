@@ -1,0 +1,93 @@
+import { Modx } from "../_Internal"
+import { IterationOf } from "../../Iteration/IterationOf"
+import { Iteration } from "../../Iteration/Iteration"
+import { Pos } from "../../Iteration/Pos"
+import { Next } from "../../Iteration/Next"
+import { Key } from "../../Any/Key"
+import { LastKey } from "../../List/LastKey"
+import { List } from "../../List/List"
+
+// NOTE: the TS sources bind the mapped-type variable as `Key`, shadowing the
+// imported `Key`; renamed to `P` here.
+type Record_RR(Path, A, I)
+    defaults I = IterationOf(0)
+    where
+        Path <: List(Key),
+        I <: Iteration
+    as
+        (map readonly P in Path[Pos(I)] do
+            if Pos(I) <: LastKey(Path) then
+                A
+            else
+                Record_RR(Path, A, Next(I))
+            end
+        end) & {}
+
+export type Record_RW(Path, A, I)
+    defaults I = IterationOf(0)
+    where
+        Path <: List(Key),
+        I <: Iteration
+    as
+        (map P in Path[Pos(I)] do
+            if Pos(I) <: LastKey(Path) then
+                A
+            else
+                Record_RW(Path, A, Next(I))
+            end
+        end) & {}
+
+type Record_OR(Path, A, I)
+    defaults I = IterationOf(0)
+    where
+        Path <: List(Key),
+        I <: Iteration
+    as
+        (map readonly ? P in Path[Pos(I)] do
+            if Pos(I) <: LastKey(Path) then
+                A
+            else
+                Record_OR(Path, A, Next(I))
+            end
+        end) & {}
+
+type Record_OW(Path, A, I)
+    defaults I = IterationOf(0)
+    where
+        Path <: List(Key),
+        I <: Iteration
+    as
+        (map ? P in Path[Pos(I)] do
+            if Pos(I) <: LastKey(Path) then
+                A
+            else
+                Record_OW(Path, A, Next(I))
+            end
+        end) & {}
+
+// Create an object filled with `A` for the fields at the end of `Path`
+export type Record(Path, A, modx)
+    defaults modx = ['!', 'W']
+    where
+        Path <: List(Key),
+        modx <: Modx
+    as
+        // Original TS indexes a two-level string-keyed table
+        // ({'!': {'R': ..., 'W': ...}, '?': ...}[modx[0]][modx[1]]); .nt
+        // object literals only accept identifier keys, so match on the
+        // modifier tuple instead.
+        match modx do
+            ['!', 'R'] -> Record_RR(Path, A),
+            ['!', 'W'] -> Record_RW(Path, A),
+            ['?', 'R'] -> Record_OR(Path, A),
+            ['?', 'W'] -> Record_OW(Path, A)
+        end
+
+unittest "Record(Path, A, modx)" do
+    // TODO: evaluator cannot prove this yet (depends on ../../Iteration and
+    // recursive Record_RW)
+    assert Record(['a', 'b'], number) == {a: {b: number}}
+    // TODO: evaluator cannot prove this yet (depends on ../../Iteration and
+    // recursive Record_OW)
+    assert Record(['a'], number, ['?', 'W']) == {a?: number}
+end

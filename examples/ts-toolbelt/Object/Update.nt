@@ -1,0 +1,38 @@
+import { Key } from "../Any/Key"
+import { x } from "../Any/x"
+import { Replace } from "../Union/Replace"
+
+// Update in `O` the fields of key `K` with `A`.
+// Use the `x` placeholder to get the current field type.
+export type Update(O, K, A)
+    where
+        O <: object,
+        K <: Key,
+        A <: any
+    as
+        map P in keyof O do
+            if P <: K then
+                Replace(A, x, O[P])
+            else
+                O[P]
+            end
+        end & {}
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as {
+    info: {
+        name: string,
+        age: number,
+        payment: {}
+    },
+    id: number
+}
+
+unittest "Update(O, K, A)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Union/Replace and
+    // the ../Any/x placeholder)
+    assert Update(User, 'id' | 'info', x | null) == {
+        info: {name: string, age: number, payment: {}} | null,
+        id: number | null
+    }
+end

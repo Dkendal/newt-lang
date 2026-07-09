@@ -1,0 +1,32 @@
+import { List } from "../List/List"
+import { Literal } from "./_Internal"
+import { Cast } from "../Any/Cast"
+
+type _Join(T, D)
+    where
+        T <: List,
+        D <: string
+    as match T do
+        [] -> '',
+        [Literal] -> `${T[0]}`,
+        [Literal, ...?R] -> `${T[0]}${D}${_Join(R, D)}`,
+        else -> string
+    end
+
+// Concat many literals together
+export type Join(T, D)
+    defaults D = ''
+    where
+        T <: List(Literal),
+        D <: string
+    as
+        if _Join(T, D) <: ?X then
+            Cast(X, string)
+        end
+
+unittest "Join(T, D)" do
+    // TODO: evaluator cannot prove this yet
+    assert Join(['paris', 'london', 'milan'], ', ') == 'paris, london, milan'
+    // TODO: evaluator cannot prove this yet
+    assert Join([1, 2, 3]) == '123'
+end

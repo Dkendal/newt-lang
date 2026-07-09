@@ -1,0 +1,85 @@
+// Ported from ts-toolbelt sources/Number/Sub.ts
+//
+// The original TS defers recursion through {0, 1, 2}-keyed object lookups
+// ({0: recurse, 1: done, 2: overflow}[cond]); numeric object keys are not
+// supported, so `cond` expressions with the same selection logic are used.
+
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Pos } from "../Iteration/Pos"
+import { Prev } from "../Iteration/Prev"
+import { Next } from "../Iteration/Next"
+import { _IsNegative } from "./IsNegative"
+import { Cast } from "../Any/Cast"
+
+type _SubPositive(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        cond do
+            Pos(N2) <: 0 -> N1,                            // If successful
+            number <: Pos(N2) -> number,                   // If un-success
+            else -> _SubPositive(Prev(N1), Prev(N2))       // Or continue
+        end
+
+type SubPositive(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        if _SubPositive(N1, N2) <: ?X then
+            Cast(X, Iteration)
+        end
+
+type _SubNegative(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        cond do
+            Pos(N2) <: 0 -> N1,                            // If successful
+            number <: Pos(N2) -> number,                   // If un-success
+            else -> _SubNegative(Next(N1), Next(N2))       // Or continue
+        end
+
+type SubNegative(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        if _SubNegative(N1, N2) <: ?X then
+            Cast(X, Iteration)
+        end
+
+// TODO: original TS selects via {0: SubPositive, 1: SubNegative}[_IsNegative<N2>];
+// numeric object keys are not supported, so a `match` is used.
+export type _Sub(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        match _IsNegative(N2) do
+            1 -> SubNegative(N1, N2),
+            else -> SubPositive(N1, N2)
+        end
+
+// Subtract a number from another one
+export type Sub(N1, N2)
+    where
+        N1 <: number,
+        N2 <: number
+    as
+        if N1 <: unknown then
+            if N2 <: unknown then
+                _Sub(IterationOf(N1), IterationOf(N2))[0]
+            end
+        end
+
+unittest "Sub(N1, N2)" do
+    // TODO: evaluator cannot prove this yet (recursive alias evaluation and
+    // template-literal interpolation inside IterationOf)
+    assert Sub(2, 10) == -8
+    // TODO: evaluator cannot prove this yet
+    assert Sub(0, 40) == -40
+end

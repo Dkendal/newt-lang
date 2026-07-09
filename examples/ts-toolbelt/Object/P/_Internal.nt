@@ -1,0 +1,2 @@
+// to reach a property we use `Pos(I) <: LastIndex(Path)`
+// to reach an object  we use `Pos(I) <: Length(Path)`

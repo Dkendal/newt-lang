@@ -1,0 +1,21 @@
+import { IntersectOf } from "./IntersectOf"
+
+// Get the last item within an [[Union]]
+// (it might not preserve order)
+export type Last(U)
+    where
+        U <: any
+    as
+        // Distribute U to a union of functions, intersect them, then the
+        // inferred parameter of the overloaded intersection is the last
+        // member (i.e. Parameters<((a: 1) => void) & ((a: 2) => void)> => [2])
+        let fns = if U <: unknown then (x: U) => void end in
+        if IntersectOf(fns) <: (x: ?P) => void then
+            P
+        end
+
+unittest "Last(U)" do
+    // TODO: evaluator cannot prove this yet (infer over an intersection of
+    // function types)
+    assert Last(1 | 2 | 3) == 3
+end

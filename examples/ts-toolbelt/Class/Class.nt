@@ -1,0 +1,20 @@
+import { List } from "../List/List"
+
+// TS original: { new (...args: P): R } — a construct signature; the bare
+// constructor type `new (...args: P) => R` is structurally equivalent.
+export type Class(P, R)
+    defaults
+        P = any[],
+        R = object
+    where
+        P <: List,
+        R <: object
+    as new (...args: P) => R
+
+// TODO allow for types in unittest blocks that aren't emitted
+type Test0 as Class([string, number], { a: string, b: number })
+
+unittest "Class(P, R)" do
+    assert Test0 <: Class
+    assert Test0 == Class([string, number], { a: string, b: number })
+end

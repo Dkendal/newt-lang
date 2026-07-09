@@ -1,0 +1,12 @@
+import { Tail } from "./Tail"
+import { Length } from "./Length"
+import { List } from "./List"
+
+export type Last(L)
+    where L <: List
+    as L[Length(Tail(L))]
+
+unittest "Last(L)" do
+    // TODO: evaluator cannot prove this yet
+    assert Last([1, 2, 3]) == 3
+end

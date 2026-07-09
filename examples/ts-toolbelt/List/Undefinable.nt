@@ -1,0 +1,14 @@
+import { Key } from "./_Internal"
+import { List } from "./List"
+import { Update } from "../Object/Update"
+import { x } from "../Any/x"
+import { Cast } from "../Any/Cast"
+
+// Make some entries of `L` not `undefined` (deeply or not)
+export type Undefinable(L, K)
+    defaults K = Key
+    where
+        L <: List,
+        K <: Key
+    as
+        Cast(Update(L, `${K & number}` | K, x | undefined), List)

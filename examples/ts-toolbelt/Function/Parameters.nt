@@ -1,0 +1,11 @@
+import { Function } from "./Function"
+
+export type Parameters(F)
+    where F <: Function
+    as if F <: (...args: ?L) => any then L end
+
+unittest "Parameters(F)" do
+    assert Parameters((name: string, age: number) => {}) <: [string, number]
+    // TODO: evaluator cannot prove this yet
+    assert Parameters((name: string, age: number) => {}) == [string, number]
+end

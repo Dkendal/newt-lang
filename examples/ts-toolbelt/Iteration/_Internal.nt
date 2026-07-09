@@ -1,0 +1,14 @@
+// Ported from ts-toolbelt sources/Iteration/_Internal.ts
+//
+// The original file also contains `IterationOfGenerator`, a value-level
+// helper used to generate the `IterationMap` source; value-level code has no
+// .nt equivalent and is omitted.
+
+// Describes how to perform iterations
+export type Way as '->' | '<-'
+
+unittest "Way" do
+    assert '->' <: Way
+    assert '<-' <: Way
+    assert not('<->' <: Way)
+end

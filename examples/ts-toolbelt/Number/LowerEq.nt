@@ -1,0 +1,20 @@
+// Ported from ts-toolbelt sources/Number/LowerEq.ts
+
+import { GreaterEq } from "./GreaterEq"
+
+// Check if a number is lower or equal to another one
+export type LowerEq(N1, N2)
+    where
+        N1 <: number,
+        N2 <: number
+    as GreaterEq(N2, N1)
+
+unittest "LowerEq(N1, N2)" do
+    // TODO: evaluator cannot prove this yet (recursive alias evaluation and
+    // template-literal interpolation inside IterationOf)
+    assert LowerEq(7, 5) == 0
+    // TODO: evaluator cannot prove this yet
+    assert LowerEq(5, 5) == 1
+    // TODO: evaluator cannot prove this yet
+    assert LowerEq(5, 7) == 1
+end

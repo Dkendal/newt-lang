@@ -1,0 +1,33 @@
+// Ported from ts-toolbelt sources/Number/Lower.ts
+
+import { _Greater } from "./Greater"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+
+export type _Lower(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as _Greater(N2, N1)
+
+// Check if a number is lower than another one
+export type Lower(N1, N2)
+    where
+        N1 <: number,
+        N2 <: number
+    as
+        if N1 <: unknown then
+            if N2 <: unknown then
+                _Lower(IterationOf(N1), IterationOf(N2))
+            end
+        end
+
+unittest "Lower(N1, N2)" do
+    // TODO: evaluator cannot prove this yet (recursive alias evaluation and
+    // template-literal interpolation inside IterationOf)
+    assert Lower(7, 5) == 0
+    // TODO: evaluator cannot prove this yet
+    assert Lower(5, 5) == 0
+    // TODO: evaluator cannot prove this yet
+    assert Lower(5, 7) == 1
+end

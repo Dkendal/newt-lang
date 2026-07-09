@@ -1,0 +1,17 @@
+// Remove `M` out of `U`
+export type Exclude(U, M)
+    where
+        U <: any,
+        M <: any
+    as
+        if U <: M then
+            never
+        else
+            U
+        end
+
+unittest "Exclude(U, M)" do
+    assert Exclude('a' | 'b' | 'c', 'a') == 'b' | 'c'
+    assert Exclude(string | number, number) == string
+    assert Exclude('a' | 'b', 'a' | 'b') == never
+end

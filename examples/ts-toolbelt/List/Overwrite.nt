@@ -1,0 +1,10 @@
+import { Overwrite as OOverwrite } from "../Object/Overwrite"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+
+export type Overwrite(L, L1)
+    where
+        L <: List,
+        L1 <: object
+    as
+        Cast(OOverwrite(L, L1), List)

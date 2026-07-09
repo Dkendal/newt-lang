@@ -1,0 +1,16 @@
+import { Class } from "./Class"
+
+export type Parameters(C)
+    where
+        C <: Class
+    as
+        if C <: Class(?P, any) then
+            P
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as Class([string, string], { firstname: string, lastname: string })
+
+unittest "Parameters(C)" do
+    assert Parameters(User) == [string, string]
+end

@@ -1,0 +1,79 @@
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Next } from "../Iteration/Next"
+import { Pos } from "../Iteration/Pos"
+import { At } from "../Any/At"
+import { Cast } from "../Any/Cast"
+import { NonNullable } from "../Union/NonNullable"
+import { Update } from "../List/Update"
+import { Key } from "../Iteration/Key"
+import { Key as AKey } from "../Any/Key"
+import { List } from "../List/List"
+import { Length } from "../List/Length"
+import { Extends } from "../Any/Extends"
+
+type ValidatePath(O, Path, I)
+    where
+        Path <: List(AKey),
+        I <: Iteration
+    as Update(
+        Path,
+        Key(I),
+        if [At(O & {}, Path[Pos(I)])] <: [never] then
+            keyof O
+        else
+            Path[Pos(I)]
+        end
+    )
+
+// TODO: the original TS recurses through an object literal indexed by 0 | 1:
+//   { 0: __ValidPath<...>, 1: Path }[Extends<Pos<I>, Length<Path>>]
+// newtype does not support numeric object keys, so an indexed tuple is used
+// instead (same 0 | 1 selection).
+type __ValidPath(O, Path, I)
+    defaults I = IterationOf(0)
+    where
+        Path <: List(AKey),
+        I <: Iteration
+    as [
+        __ValidPath(NonNullable(At(O & {}, Path[Pos(I)])), ValidatePath(O, Path, I), Next(I)),
+        Path
+    ][Extends(Pos(I), Length(Path))]
+
+export type _ValidPath(O, Path)
+    where
+        O <: object,
+        Path <: List(AKey)
+    as
+        if __ValidPath(O, Path) <: ?X then
+            Cast(X, List(AKey))
+        end
+
+export type ValidPath(O, Path)
+    where
+        O <: object,
+        Path <: List(AKey)
+    as
+        if O <: unknown then
+            if Path <: unknown then
+                _ValidPath(O, Path)
+            end
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type Nested as {
+    a: {
+        b: {
+            c: 1
+        }
+    }
+}
+
+unittest "ValidPath(O, Path)" do
+    // TODO: evaluator cannot prove this yet (recursive alias over iteration
+    // counters)
+    assert ValidPath(Nested, ['a', 'b']) == ['a', 'b']
+    // TODO: evaluator cannot prove this yet (recursive alias over iteration
+    // counters)
+    assert ValidPath(Nested, ['a']) == ['a']
+end

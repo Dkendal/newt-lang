@@ -1,0 +1,205 @@
+import { At } from "../Any/At"
+import { Key } from "../Any/Key"
+import { List } from "../List/List"
+import { Depth } from "./_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { _Omit } from "./Omit"
+import { Length } from "../List/Length"
+import { Has } from "../Union/Has"
+
+type Longer(L, L1)
+    where
+        L <: List,
+        L1 <: List
+    as
+        if L <: unknown then
+            if L1 <: unknown then
+                if Has(keyof L, keyof L1) <: 1 then 1 else 0 end
+            end
+        end
+
+type PatchProp(OK, O1K, fill, OKeys, K)
+    where
+        OKeys <: Key,
+        K <: Key
+    as
+        if K <: OKeys then
+            if OK <: fill then O1K else OK end
+        else
+            O1K
+        end
+
+type PatchFlatObject(O, O1, fill, OKeys)
+    defaults OKeys = keyof O
+    where
+        O <: object,
+        O1 <: object,
+        OKeys <: Key
+    as
+        (map K in keyof (O & _Omit(O1, OKeys)) do
+            PatchProp(At(O, K), At(O1, K), fill, OKeys, K)
+        end) & {}
+
+type PatchFlatList(L, L1, ignore, fill)
+    where
+        L <: List,
+        L1 <: List,
+        ignore <: object
+    as
+        if number <: Length(L | L1) then
+            PatchFlatChoice(L[number], L1[number], ignore, fill)[]
+        else
+            if Longer(L, L1) <: 1 then
+                map K in keyof L do
+                    PatchProp(L[K], At(L1, K), fill, keyof L, K)
+                end
+            else
+                map K in keyof L1 do
+                    PatchProp(At(L, K), L1[K], fill, keyof L, K)
+                end
+            end
+        end
+
+export type PatchFlatChoice(O, O1, ignore, fill)
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object
+    as cond do
+        O <: ignore -> O,
+        O1 <: ignore -> O,
+        O <: List and O1 <: List -> PatchFlatList(O, O1, ignore, fill),
+        else -> PatchFlatObject(O, O1, fill)
+    end
+
+export type PatchFlat(O, O1, ignore, fill)
+    defaults
+        ignore = BuiltIn,
+        fill = never
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object
+    as
+        if O <: unknown then
+            if O1 <: unknown then
+                PatchFlatChoice(O, O1, ignore, fill)
+            end
+        end
+
+type PatchDeepList(L, L1, ignore, fill)
+    where
+        L <: List,
+        L1 <: List,
+        ignore <: object
+    as
+        if number <: Length(L | L1) then
+            PatchDeepChoice(L[number], L1[number], ignore, fill, never, any)[]
+        else
+            if Longer(L, L1) <: 1 then
+                map K in keyof L do
+                    PatchDeepChoice(L[K], At(L1, K), ignore, fill, keyof L, K)
+                end
+            else
+                map K in keyof L1 do
+                    PatchDeepChoice(At(L, K), L1[K], ignore, fill, keyof L, K)
+                end
+            end
+        end
+
+type PatchDeepObject(O, O1, ignore, fill, OKeys)
+    defaults OKeys = keyof O
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object,
+        OKeys <: Key
+    as
+        map K in keyof (O & _Omit(O1, OKeys)) do
+            PatchDeepChoice(At(O, K), At(O1, K), ignore, fill, OKeys, K)
+        end
+
+type PatchDeepChoice(OK, O1K, ignore, fill, OKeys, K)
+    where
+        ignore <: object,
+        OKeys <: Key,
+        K <: Key
+    as cond do
+        [OK] <: [never] -> PatchProp(OK, O1K, fill, OKeys, K),
+        [O1K] <: [never] -> PatchProp(OK, O1K, fill, OKeys, K),
+        OK <: ignore -> PatchProp(OK, O1K, fill, OKeys, K),
+        O1K <: ignore -> PatchProp(OK, O1K, fill, OKeys, K),
+        OK <: List and O1K <: List -> PatchDeepList(OK, O1K, ignore, fill),
+        OK <: List -> PatchProp(OK, O1K, fill, OKeys, K),
+        OK <: object and O1K <: object -> PatchDeepObject(OK, O1K, ignore, fill),
+        else -> PatchProp(OK, O1K, fill, OKeys, K)
+    end
+
+export type PatchDeep(O, O1, ignore, fill)
+    where
+        O <: object,
+        O1 <: object,
+        ignore <: object
+    as
+        if O <: unknown then
+            if O1 <: unknown then
+                PatchDeepChoice(O, O1, ignore, fill, 'x', 'y') // dummy x, y
+            end
+        end
+
+// Complete the fields of `O` with the ones of `O1`. This is a version of
+// [[Merge]] that does NOT handle optional fields, it only completes fields of
+// `O` with the ones of `O1`.
+export type Patch(O, O1, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = never
+    where
+        O <: object,
+        O1 <: object,
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        // NOTE: quoted property names are unsupported; identifier keys
+        // `flat`/`deep` denote the same string keys as TS `'flat'`/`'deep'`.
+        {
+            flat: PatchFlat(O, O1, ignore, fill),
+            deep: PatchDeep(O, O1, ignore, fill)
+        }[depth]
+
+// TODO allow for types in unittest blocks that aren't emitted
+type O0 as {
+    name?: string,
+    age?: number,
+    zip?: string,
+    pay: {
+        cvv?: number
+    }
+}
+
+type O1 as {
+    age: number,
+    zip?: number,
+    city: string,
+    pay: {
+        cvv: number,
+        ccn?: string
+    }
+}
+
+unittest "Patch(O, O1, depth)" do
+    // TODO: evaluator cannot prove this yet (deep recursion through the
+    // PatchFlat / _Internal Depth machinery)
+    assert Patch(O0, O1, 'deep') == {
+        name?: string,
+        age?: number,
+        zip?: string | number,
+        pay: {
+            cvv?: number,
+            ccn?: string
+        },
+        city: string
+    }
+end

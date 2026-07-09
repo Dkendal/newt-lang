@@ -1,0 +1,20 @@
+import { OptionalPart } from "./Optional"
+import { Depth } from "./_Internal"
+
+// Make all fields of `O` optional (deeply or not)
+export type Partial(O, depth)
+    defaults depth = 'flat'
+    where
+        O <: object,
+        depth <: Depth
+    as OptionalPart(O, depth)
+
+// TODO allow for types in unittest blocks that aren't emitted
+type L as {a: {b: {c: 2}}, b: 1}
+
+unittest "Partial(O, depth)" do
+    assert Partial(L) == {a?: {b: {c: 2}}, b?: 1}
+    // TODO: evaluator cannot prove this yet (deep recursion through
+    // OptionalPart / _Internal Depth machinery)
+    assert Partial(L, 'deep') == {a?: {b?: {c?: 2}}, b?: 1}
+end

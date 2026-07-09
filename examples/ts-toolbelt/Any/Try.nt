@@ -1,0 +1,13 @@
+export type Try(A1, A2, Catch)
+    defaults Catch = never
+    where
+        A1 <: any,
+        A2 <: any
+    as
+        if A1 <: A2 then A1 else Catch end
+
+unittest "Try(A1, A2, Catch)" do
+    assert Try('42', string) == '42'
+    assert Try('42', number) == never
+    assert Try('42', number, 'tried') == 'tried'
+end

@@ -1,0 +1,12 @@
+import { List } from "../List/List"
+
+export type Function(P, R)
+    defaults P = any, R = any
+    where P <: List, R <: any
+    as (...args: P) => R
+
+unittest "Function(P, R)" do
+    assert Function([string, number], boolean) <: (a: string, b: number) => boolean
+    assert (a: string, b: number) => boolean <: Function([string, number], boolean)
+    assert (name: string, age: number) => {} <: Function
+end

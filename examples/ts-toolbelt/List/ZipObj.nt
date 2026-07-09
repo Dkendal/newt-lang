@@ -1,0 +1,55 @@
+import { Length } from "./Length"
+import { Pos } from "../Iteration/Pos"
+import { Next } from "../Iteration/Next"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Cast } from "../Any/Cast"
+import { Record } from "../Object/Record"
+import { Key } from "../Any/Key"
+import { List } from "./List"
+import { Naked } from "./_Internal"
+import { Extends } from "../Any/Extends"
+import { PatchFlat } from "../Object/Patch"
+
+// TS original selects from `{0: ..., 1: O}[Extends<Pos<I>, Length<LKeys>>]`;
+// numeric object keys are unsupported, so it is written as a conditional.
+type __ZipObj(LKeys, LFields, O, I)
+    defaults O = {}, I = IterationOf(0)
+    where
+        LKeys <: List(Key),
+        LFields <: List,
+        O <: object,
+        I <: Iteration
+    as
+        if Extends(Pos(I), Length(LKeys)) <: 1 then
+            O
+        else
+            __ZipObj(LKeys, LFields, PatchFlat(O, Record(LKeys[Pos(I)], LFields[Pos(I)])), Next(I))
+        end
+
+export type _ZipObj(LKeys, LFields)
+    where
+        LKeys <: List(Key),
+        LFields <: List
+    as
+        if __ZipObj(Naked(LKeys), LFields) <: ?X then
+            Cast(X, object)
+        end
+
+// Create an Object from Lists of keys & fields
+export type ZipObj(LKeys, LFields)
+    where
+        LKeys <: List(Key),
+        LFields <: List
+    as
+        if LKeys <: unknown then
+            if LFields <: unknown then
+                _ZipObj(LKeys, LFields)
+            end
+        end
+
+// TODO: evaluator cannot prove this yet — evaluating the recursive
+// iteration loop does not terminate, so the assert is commented out:
+// unittest "ZipObj(LKeys, LFields)" do
+//     assert ZipObj(['a', 'b'], [1, 2]) == {a: 1, b: 2}
+// end

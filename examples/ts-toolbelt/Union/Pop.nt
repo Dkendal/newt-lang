@@ -1,0 +1,16 @@
+import { Exclude } from "./Exclude"
+import { Last } from "./Last"
+
+// Remove an item out of `U`
+// (it might not preserve order)
+export type Pop(U)
+    where
+        U <: any
+    as
+        Exclude(U, Last(U))
+
+unittest "Pop(U)" do
+    // TODO: evaluator cannot prove this yet (depends on Last, which infers
+    // over an intersection of function types)
+    assert Pop(1 | 2 | 3) == 1 | 2
+end

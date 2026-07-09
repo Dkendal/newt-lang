@@ -1,0 +1,18 @@
+// All primitive types
+export type Primitive as
+    boolean
+    | string
+    | number
+    | bigint
+    | symbol
+    | undefined
+    | null
+
+unittest "Primitive" do
+    assert true <: Primitive
+    assert 'hello' <: Primitive
+    assert 42 <: Primitive
+    assert undefined <: Primitive
+    assert null <: Primitive
+    assert not({} <: Primitive)
+end

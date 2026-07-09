@@ -1,0 +1,19 @@
+import { Replace as OReplace } from "../Object/Replace"
+import { Match } from "../Any/_Internal"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+
+// Update with `A` the entries of `L` that match `M`
+export type Replace(L, M, A, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        M <: any,
+        A <: any,
+        match <: Match
+    as Cast(OReplace(L, M, A, match), List)
+
+unittest "Replace(L, M, A)" do
+    // TODO: evaluator cannot prove this yet
+    assert Replace([1, 'a', 2], string, 0) == [1, 0, 2]
+end

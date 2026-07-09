@@ -1,0 +1,36 @@
+import { Key } from "../Any/Key"
+
+type __Pick(O, K)
+    where
+        O <: object,
+        K <: keyof O
+    as
+        (map P in K do
+            O[P]
+        end) & {}
+
+export type _Pick(O, K)
+    where
+        O <: object,
+        K <: Key
+    as __Pick(O, keyof O & K)
+
+// Extract out of `O` the fields of key `K`
+export type Pick(O, K)
+    where
+        O <: object,
+        K <: Key
+    as
+        if O <: unknown then
+            _Pick(O, K)
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as { name: string, age: number }
+
+unittest "Pick(O, K)" do
+    // TODO: evaluator cannot prove these yet (it does not reduce the
+    // `keyof O & K` intersection inside the mapped type)
+    assert Pick(User, 'name') == { name: string }
+    assert Pick(User, 'name' | 'zzz') == { name: string }
+end

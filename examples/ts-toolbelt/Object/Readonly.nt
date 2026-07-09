@@ -1,0 +1,54 @@
+import { _Pick } from "./Pick"
+import { Depth } from "./_Internal"
+import { Key } from "../Any/Key"
+import { PatchFlat } from "./Patch"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+// TS `+readonly` is the same as plain `readonly`
+export type ReadonlyFlat(O) as
+    map readonly K in keyof O do O[K] end & {}
+
+export type ReadonlyDeep(O) as
+    map readonly K in keyof O do
+        if O[K] <: BuiltIn then
+            O[K]
+        else
+            ReadonlyDeep(O[K])
+        end
+    end
+
+export type ReadonlyPart(O, depth)
+    where
+        O <: object,
+        depth <: Depth
+    as
+        match depth do
+            'flat' -> ReadonlyFlat(O),
+            'deep' -> ReadonlyDeep(O)
+        end
+
+export type _Readonly(O, K, depth)
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        PatchFlat(ReadonlyPart(_Pick(O, K), depth), O)
+
+// Make some fields of `O` readonly (deeply or not)
+export type Readonly(O, K, depth)
+    defaults K = Key, depth = 'flat'
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        if O <: unknown then
+            _Readonly(O, K, depth)
+        end
+
+unittest "Readonly(O, K, depth)" do
+    assert ReadonlyFlat({a: 1, b: 2}) == {readonly a: 1, readonly b: 2}
+    // TODO: evaluator cannot prove this yet (depends on ./Pick and ./Patch)
+    assert Readonly({a: 1, b: 2}, 'a') == {readonly a: 1, b: 2}
+end

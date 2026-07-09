@@ -1,0 +1,12 @@
+import { Depth } from "../Object/_Internal"
+import { ReadonlyPart } from "../Object/Readonly"
+import { List } from "./List"
+import { Cast } from "../Any/Cast"
+
+// Make `L` readonly (deeply or not)
+export type Readonly(L, depth)
+    defaults depth = 'flat'
+    where
+        L <: List,
+        depth <: Depth
+    as Cast(ReadonlyPart(L, depth), List)

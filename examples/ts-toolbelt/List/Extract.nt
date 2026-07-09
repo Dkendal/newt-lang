@@ -1,0 +1,11 @@
+import { KeySet } from "./KeySet"
+import { Pick } from "./Pick"
+import { List } from "./List"
+
+export type Extract(L, From, To)
+    where
+        L <: List,
+        From <: number,
+        To <: number
+    as
+        Pick(L, KeySet(From, To))

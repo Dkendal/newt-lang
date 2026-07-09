@@ -1,0 +1,25 @@
+import { _Pick as _OPick } from "../Object/Pick"
+import { _ListOf } from "../Object/ListOf"
+import { Key } from "./_Internal"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type _Pick(L, K)
+    where
+        L <: List,
+        K <: Key
+    as _ListOf(_OPick(ObjectOf(L), `${K & number}` | K))
+
+export type Pick(L, K)
+    where
+        L <: List,
+        K <: Key
+    as
+        if L <: unknown then
+            _Pick(L, K)
+        end
+
+unittest "Pick(L, K)" do
+    // TODO: evaluator cannot prove this yet
+    assert Pick([1, 2, 3], '0' | '1') == [1, 2]
+end

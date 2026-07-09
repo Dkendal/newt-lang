@@ -1,0 +1,81 @@
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Has } from "../Union/Has"
+import { If } from "./If"
+import { Key } from "./Key"
+
+export type ComputeRaw(A)
+    where
+        A <: any
+    as
+        if A <: Function then
+            A
+        else
+            map K in keyof A do A[K] end & unknown
+        end
+
+type ComputeFlat(A)
+    where
+        A <: any
+    as
+        cond do
+            A <: BuiltIn -> A,
+            A <: Array(any) ->
+                if A <: Array(Record(Key, any)) then
+                    Array(map K in keyof A[number] do A[number][K] end & unknown)
+                else
+                    A
+                end,
+            A <: ReadonlyArray(any) ->
+                if A <: ReadonlyArray(Record(Key, any)) then
+                    ReadonlyArray(map K in keyof A[number] do A[number][K] end & unknown)
+                else
+                    A
+                end,
+            else -> map K in keyof A do A[K] end & unknown
+        end
+
+type ComputeDeep(A, Seen)
+    defaults Seen = never
+    where
+        A <: any
+    as
+        if A <: BuiltIn then
+            A
+        else
+            If(Has(Seen, A), A, cond do
+                A <: Array(any) ->
+                    if A <: Array(Record(Key, any)) then
+                        Array(map K in keyof A[number] do ComputeDeep(A[number][K], A | Seen) end & unknown)
+                    else
+                        A
+                    end,
+                A <: ReadonlyArray(any) ->
+                    if A <: ReadonlyArray(Record(Key, any)) then
+                        ReadonlyArray(map K in keyof A[number] do ComputeDeep(A[number][K], A | Seen) end & unknown)
+                    else
+                        A
+                    end,
+                else -> map K in keyof A do ComputeDeep(A[K], A | Seen) end & unknown
+            end)
+        end
+
+export type Compute(A, depth)
+    defaults depth = 'deep'
+    where
+        A <: any,
+        depth <: Depth
+    as
+        // Original TS indexes an object literal with string-literal keys
+        // ({'flat': ..., 'deep': ...}[depth]); .nt object literals only
+        // accept identifier keys, so this is expressed as a `match` instead.
+        match depth do
+            'flat' -> ComputeFlat(A),
+            'deep' -> ComputeDeep(A)
+        end
+
+unittest "Compute(A, depth)" do
+    // TODO: evaluator cannot prove this yet (imports `BuiltIn`/`Has`/`Depth`
+    // and the builtin `Record` are unresolved, so the claim is indeterminate)
+    assert Compute({x: 'x'} & {y: 'y'}) == {x: 'x', y: 'y'}
+end

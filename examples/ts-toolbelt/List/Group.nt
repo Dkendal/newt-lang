@@ -1,0 +1,41 @@
+import { _Drop } from "./Drop"
+import { _Take } from "./Take"
+import { Cast } from "../Any/Cast"
+import { Append } from "./Append"
+import { List } from "./List"
+import { Extends } from "../Any/Extends"
+
+// TS original selects from `{0: ..., 1: LN}[Extends<L, List<never>>]`;
+// numeric object keys are unsupported, so it is written as a conditional.
+type __Group(L, N, LN)
+    defaults LN = []
+    where
+        L <: List,
+        N <: number,
+        LN <: List
+    as
+        if Extends(L, List(never)) <: 1 then
+            LN
+        else
+            __Group(_Drop(L, N), N, Append(LN, _Take(L, N)))
+        end
+
+export type _Group(L, N)
+    where
+        L <: List,
+        N <: number
+    as
+        if __Group(L, N) <: ?X then
+            Cast(X, List)
+        end
+
+export type Group(L, N)
+    where
+        L <: List,
+        N <: number
+    as
+        if L <: unknown then
+            if N <: unknown then
+                _Group(L, N)
+            end
+        end

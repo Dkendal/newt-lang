@@ -1,0 +1,61 @@
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Merge } from "./Merge"
+import { Pos } from "../Iteration/Pos"
+import { Next } from "../Iteration/Next"
+import { Length } from "../List/Length"
+import { Cast } from "../Any/Cast"
+import { List } from "../List/List"
+import { Extends } from "../Any/Extends"
+import { Depth } from "./_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+type __Assign(O, Os, depth, ignore, fill, I)
+    defaults I = IterationOf(0)
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any,
+        I <: Iteration
+    as
+        match Extends(Pos(I), Length(Os)) do
+            0 -> __Assign(Merge(Os[Pos(I)], O, depth, ignore, fill), Os, depth, ignore, fill, Next(I)),
+            1 -> O
+        end
+
+export type _Assign(O, Os, depth, ignore, fill)
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        if __Assign(O, Os, depth, ignore, fill) <: ?X then
+            Cast(X, object)
+        end
+
+// Assign a list of objects into `O` with `Merge`. Merges from right to
+// left, first items get overridden by the next ones (last-in overrides).
+export type Assign(O, Os, depth, ignore, fill)
+    defaults depth = 'flat', ignore = BuiltIn, fill = undefined
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        if O <: unknown then
+            if Os <: unknown then
+                _Assign(O, Os, depth, ignore, fill)
+            end
+        end
+
+unittest "Assign(O, Os)" do
+    // TODO: evaluator cannot prove this yet (depends on ./Merge, and the
+    // recursive iteration-driven __Assign alias)
+    assert Assign({a: 1}, [{a: 2, b: string}]) == {a: 2, b: string}
+end

@@ -1,0 +1,29 @@
+// Get the keys of `O` that are `Compulsory`
+// (warning: needs `--strictNullChecks` enabled)
+export type _CompulsoryKeys(O)
+    where
+        O <: object
+    as
+        let picks =
+            map -? K in keyof O do
+                if [O[K] & (undefined | null)] <: [never] then
+                    K
+                end
+            end
+        in
+        picks[keyof O]
+
+export type CompulsoryKeys(O)
+    where
+        O <: object
+    as
+        if O <: unknown then
+            _CompulsoryKeys(O)
+        end
+
+unittest "CompulsoryKeys(O)" do
+    // TODO: evaluator cannot prove these yet (indexing a mapped type by
+    // `keyof O` is not evaluated)
+    assert CompulsoryKeys({a: 1, b: 2 | undefined, c: 3 | null}) == 'a'
+    assert CompulsoryKeys({a: 1, b: 2}) == 'a' | 'b'
+end

@@ -1,0 +1,8 @@
+import { RequiredKeys as ORequiredKeys } from "../Object/RequiredKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+// Get the keys of `L` that are required
+export type RequiredKeys(L)
+    where L <: List
+    as ORequiredKeys(ObjectOf(L))

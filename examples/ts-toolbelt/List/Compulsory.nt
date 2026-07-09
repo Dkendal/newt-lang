@@ -1,0 +1,21 @@
+import { Depth } from "../Object/_Internal"
+import { CompulsoryPart } from "../Object/Compulsory"
+import { List } from "./List"
+import { _Pick } from "../Object/Pick"
+import { Cast } from "../Any/Cast"
+
+export type Compulsory(L, depth)
+    defaults depth = 'flat'
+    where
+        L <: List,
+        depth <: Depth
+    as
+        Cast(CompulsoryPart(L, depth), List)
+
+unittest "Compulsory(L, depth)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Object/Compulsory
+    // and ../Object/_Internal being ported)
+    assert Compulsory([1, 2, 3?, 4?]) == [1, 2, 3, 4]
+    // TODO: evaluator cannot prove this yet
+    assert Compulsory(['a', 'b' | undefined, 'c', 'd', 'e' | null]) == ['a', 'b', 'c', 'd', 'e']
+end

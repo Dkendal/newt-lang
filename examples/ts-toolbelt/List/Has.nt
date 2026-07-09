@@ -1,0 +1,16 @@
+import { Match } from "../Any/_Internal"
+import { Has as OHas } from "../Object/Has"
+import { Key } from "./_Internal"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type Has(L, K, M, match)
+    defaults
+        M = any,
+        match = 'default'
+    where
+        L <: List,
+        K <: Key,
+        M <: any,
+        match <: Match
+    as OHas(ObjectOf(L), `${K & number}` | K, M, match)

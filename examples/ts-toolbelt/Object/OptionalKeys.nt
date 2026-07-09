@@ -1,0 +1,28 @@
+import { _Pick } from "./Pick"
+
+// NOTE: the TS original uses the builtin `Pick<O, K>` here; `_Pick` is the
+// ts-toolbelt equivalent (a modifier-preserving mapped pick).
+export type _OptionalKeys(O)
+    where
+        O <: object
+    as
+        (map -? K in keyof O do
+            if {} <: _Pick(O, K) then K end
+        end)[keyof O]
+
+// Get the keys of `O` that are optional
+export type OptionalKeys(O)
+    where
+        O <: object
+    as
+        if O <: unknown then
+            _OptionalKeys(O)
+        end
+
+unittest "OptionalKeys(O)" do
+    // TODO: evaluator cannot prove this yet (mapped type with conditional
+    // body indexed by `[keyof O]`)
+    assert OptionalKeys({a?: 1, b: 2, c?: 3}) == 'a' | 'c'
+    // TODO: evaluator cannot prove this yet (same keys idiom)
+    assert OptionalKeys({a: 1, b: 2}) == never
+end

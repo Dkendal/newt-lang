@@ -1,0 +1,82 @@
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Pos } from "../Iteration/Pos"
+import { Prepend } from "./Prepend"
+import { Way } from "../Iteration/_Internal"
+import { List } from "./List"
+import { Prev } from "../Iteration/Prev"
+import { Cast } from "../Any/Cast"
+import { Tail } from "./Tail"
+import { Extends } from "../Any/Extends"
+
+// TS original selects from `{0: ..., 1: LN}[Extends<-1, Pos<I>>]`;
+// numeric object keys are unsupported, so it is written as a conditional.
+// starts in reverse from `N` till `N` = 0
+type TakeForth(L, N, I, LN)
+    defaults I = Prev(N), LN = []
+    where
+        L <: List,
+        N <: Iteration,
+        I <: Iteration,
+        LN <: List
+    as
+        if Extends(-1, Pos(I)) <: 1 then
+            LN
+        else
+            TakeForth(L, N, Prev(I), Prepend(LN, L[Pos(I)]))
+        end
+
+// starts in reverse from the end till `N` = 0
+type TakeBack(L, N)
+    where
+        L <: List,
+        N <: Iteration
+    as
+        if Extends(0, Pos(N)) <: 1 then
+            L
+        else
+            TakeBack(Tail(L), Prev(N))
+        end
+
+type __Take(L, N, way)
+    where
+        L <: List,
+        N <: Iteration,
+        way <: Way
+    as
+        match way do
+            '->' -> TakeForth(L, N),
+            '<-' -> TakeBack(L, N)
+        end
+
+export type _Take(L, N, way)
+    defaults way = '->'
+    where
+        L <: List,
+        N <: number,
+        way <: Way
+    as
+        if __Take(L, IterationOf(N), way) <: ?X then
+            Cast(X, List)
+        end
+
+// Extract `N` entries out of `L`
+export type Take(L, N, way)
+    defaults way = '->'
+    where
+        L <: List,
+        N <: number,
+        way <: Way
+    as
+        if L <: unknown then
+            if N <: unknown then
+                _Take(L, N, way)
+            end
+        end
+
+// TODO: evaluator cannot prove these yet — evaluating the recursive
+// iteration loop does not terminate, so the asserts are commented out:
+// unittest "Take(L, N, way)" do
+//     assert Take([1, 2, 3], 2) == [1, 2]
+//     assert Take([1, 2, 3], 2, '<-') == [2, 3]
+// end

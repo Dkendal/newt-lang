@@ -1,0 +1,46 @@
+import { Pick } from "./Pick"
+import { Depth } from "./_Internal"
+import { Key } from "../Any/Key"
+import { PatchFlat } from "./Patch"
+import { Equals } from "../Any/Equals"
+
+export type OptionalFlat(O) as
+    (map ? K in keyof O do O[K] end) & {}
+
+export type OptionalDeep(O) as
+    map ? K in keyof O do
+        OptionalDeep(O[K])
+    end
+
+export type OptionalPart(O, depth)
+    where
+        O <: object,
+        depth <: Depth
+    as
+        match depth do
+            'flat' -> OptionalFlat(O),
+            'deep' -> OptionalDeep(O)
+        end
+
+// Make some fields of `O` optional (deeply or not)
+// NOTE: the TS original selects via `{1: ..., 0: ...}[Equals<Key, K>]`;
+// numeric-literal object keys are unsupported, so we branch on the result.
+export type Optional(O, K, depth)
+    defaults K = Key, depth = 'flat'
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        if Equals(Key, K) <: 1 then
+            OptionalPart(O, depth)
+        else
+            PatchFlat(OptionalPart(Pick(O, K), depth), O)
+        end
+
+unittest "Optional(O, K, depth)" do
+    assert OptionalFlat({a: 1, b: 2}) == {a?: 1, b?: 2}
+    assert Optional({a: 1, b: 2}) == {a?: 1, b?: 2}
+    // TODO: evaluator cannot prove this yet (depends on ./Pick and ./Patch)
+    assert Optional({a: 1, b: 2}, 'a') == {a?: 1, b: 2}
+end

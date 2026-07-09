@@ -1,0 +1,13 @@
+import { FilterKeys as OFilterKeys } from "../Object/FilterKeys"
+import { Match } from "../Any/_Internal"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type FilterKeys(L, M, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        M <: any,
+        match <: Match
+    as
+        OFilterKeys(ObjectOf(L), M, match)

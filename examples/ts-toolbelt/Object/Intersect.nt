@@ -1,0 +1,20 @@
+import { IntersectKeys } from "./IntersectKeys"
+import { Match } from "../Any/_Internal"
+import { Pick } from "./Pick"
+
+// Get the intersecting fields of `O` & `O1`
+// (If `match = 'default'`, no type checks are done)
+export type Intersect(O, O1, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        Pick(O, IntersectKeys(O, O1, match))
+
+unittest "Intersect(O, O1, match)" do
+    // TODO: evaluator cannot prove this yet (depends on ./IntersectKeys and
+    // ./Pick being ported)
+    assert Intersect({a: number, b: string}, {a: number, c: boolean}) == {a: number}
+end

@@ -1,0 +1,19 @@
+// Ported from ts-toolbelt sources/Iteration/Prev.ts
+//
+// Original TS: `IterationMap[I[2]]`; `IterationMap` is a generic lookup type
+// here (see ./Iteration.nt).
+
+import { Iteration, IterationMap } from "./Iteration"
+
+// Move `I`'s position backwards
+export type Prev(I)
+    where I <: Iteration
+    as IterationMap(I[2])
+
+// TODO allow for types in unittest blocks that aren't emitted
+type I20 as [20, '+', '19', '21', '-20']
+
+unittest "Prev(I)" do
+    assert Prev(I20) == [19, '+', '18', '20', '-19']
+    assert Prev(I20) <: Iteration
+end

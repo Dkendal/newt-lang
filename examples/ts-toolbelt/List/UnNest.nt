@@ -1,0 +1,94 @@
+import { Concat } from "./Concat"
+import { Append } from "./Append"
+import { Cast } from "../Any/Cast"
+import { Length } from "./Length"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Next } from "../Iteration/Next"
+import { Pos } from "../Iteration/Pos"
+import { List } from "./List"
+import { UnionOf } from "./UnionOf"
+import { Naked } from "./_Internal"
+import { Extends } from "../Any/Extends"
+import { Boolean } from "../Boolean/_Internal"
+import { Not } from "../Boolean/Not"
+import { And } from "../Boolean/And"
+
+type UnNestLoose(L)
+    where L <: List
+    as
+        (if UnionOf(L) <: ?UL then    // make `L` a union
+            if UL <: unknown then     // for each in union
+                if UL <: List then    // if its an array
+                    UnionOf(UL)       // make it a union
+                else
+                    UL                // or leave as it is
+                end
+            end
+        end)[] & {}                   // make result array
+
+type Flatter(L, LN, I)
+    where
+        L <: List,
+        LN <: List,
+        I <: Iteration
+    as
+        if L[Pos(I)] <: ?LP then // handle if undefined
+            if LP <: List then
+                Concat(LN, L[Pos(I)]) // if it's a  list
+            else
+                Append(LN, L[Pos(I)]) // if it's an item
+            end
+        end
+
+// TS original selects from `{0: ..., 1: LN}[Extends<Pos<I>, Length<L>>]`;
+// numeric object keys are unsupported, so it is written as a conditional.
+type UnNestStrict(L, LN, I)
+    defaults LN = [], I = IterationOf(0)
+    where
+        L <: List,
+        LN <: List,
+        I <: Iteration
+    as
+        if Extends(Pos(I), Length(L)) <: 1 then
+            LN
+        else
+            UnNestStrict(L, Flatter(L, LN, I), Next(I))
+        end
+
+type __UnNest(L, strict)
+    where
+        L <: List,
+        strict <: Boolean
+    as
+        if And(Not(Extends(number, Length(L))), strict) <: 1 then
+            UnNestStrict(L)
+        else
+            UnNestLoose(L)
+        end
+
+export type _UnNest(L, strict)
+    where
+        L <: List,
+        strict <: Boolean
+    as
+        if __UnNest(Naked(L), strict) <: ?X then
+            Cast(X, List)
+        end
+
+// Remove a dimension of `L`; `strict = 0` does not preserve tuples
+export type UnNest(L, strict)
+    defaults strict = 1
+    where
+        L <: List,
+        strict <: Boolean
+    as
+        if L <: unknown then
+            _UnNest(L, strict)
+        end
+
+// TODO: evaluator cannot prove this yet — evaluating the recursive
+// iteration loop does not terminate, so the assert is commented out:
+// unittest "UnNest(L, strict)" do
+//     assert UnNest([[1], [2, 3], 4]) == [1, 2, 3, 4]
+// end

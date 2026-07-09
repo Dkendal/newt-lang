@@ -1,0 +1,87 @@
+// Ported from ts-toolbelt sources/Number/Add.ts
+//
+// The original TS defers recursion through {0, 1, 2}-keyed object lookups
+// ({0: recurse, 1: done, 2: overflow}[cond]); numeric object keys are not
+// supported, so `cond` expressions with the same selection logic are used.
+
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Pos } from "../Iteration/Pos"
+import { Prev } from "../Iteration/Prev"
+import { Next } from "../Iteration/Next"
+import { _IsNegative } from "./IsNegative"
+import { Cast } from "../Any/Cast"
+
+type _AddPositive(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        cond do
+            Pos(N2) <: 0 -> N1,                            // If successful
+            number <: Pos(N2) -> IterationOf(number),      // If un-success
+            else -> _AddPositive(Next(N1), Prev(N2))       // Or continue
+        end
+
+type AddPositive(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        if _AddPositive(N1, N2) <: ?X then
+            Cast(X, Iteration)
+        end
+
+type _AddNegative(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        cond do
+            Pos(N2) <: 0 -> N1,                            // If successful
+            number <: Pos(N2) -> number,                   // If un-success
+            else -> _AddNegative(Prev(N1), Next(N2))       // Or continue
+        end
+
+type AddNegative(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        if _AddNegative(N1, N2) <: ?X then
+            Cast(X, Iteration)
+        end
+
+// TODO: original TS selects via {0: AddPositive, 1: AddNegative}[_IsNegative<N2>];
+// numeric object keys are not supported, so a `match` is used.
+export type _Add(N1, N2)
+    where
+        N1 <: Iteration,
+        N2 <: Iteration
+    as
+        match _IsNegative(N2) do
+            1 -> AddNegative(N1, N2),
+            else -> AddPositive(N1, N2)
+        end
+
+// Add a number to another one
+export type Add(N1, N2)
+    where
+        N1 <: number,
+        N2 <: number
+    as
+        if N1 <: unknown then
+            if N2 <: unknown then
+                _Add(IterationOf(N1), IterationOf(N2))[0]
+            end
+        end
+
+unittest "Add(N1, N2)" do
+    // TODO: evaluator cannot prove this yet (recursive alias evaluation and
+    // template-literal interpolation inside IterationOf)
+    assert Add(2, 10) == 12
+    // TODO: evaluator cannot prove this yet
+    assert Add(0, 40) == 40
+    // TODO: evaluator cannot prove this yet
+    assert Add(-20, 40) == 20
+end

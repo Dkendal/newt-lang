@@ -1,0 +1,43 @@
+import { Key } from "../Any/Key"
+import { Cast } from "../Any/Cast"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Next } from "../Iteration/Next"
+import { Pos } from "../Iteration/Pos"
+import { List } from "../List/List"
+import { Length } from "../List/Length"
+import { At } from "../Any/At"
+
+type _Path(O, P, I)
+    defaults I = IterationOf(0)
+    where
+        P <: List(Key),
+        I <: Iteration
+    as
+        if Pos(I) <: Length(P) then
+            O
+        else
+            _Path(At(O, P[Pos(I)]), P, Next(I))
+        end
+
+// Get in `O` the type of nested properties
+export type Path(O, P)
+    where
+        O <: any,
+        P <: List(Key)
+    as
+        if _Path(O & {}, P) <: ?X then
+            Cast(X, any)
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as { name: string, friends: [{ name: string }] }
+
+// TODO: evaluator cannot prove these yet — evaluating `_Path` does not
+// terminate (the `Pos(I) <: Length(P)` guard stays indeterminate, so the
+// recursive branch expands forever). Asserts are commented out to keep the
+// file compiling; they hold in TypeScript.
+// unittest "Path(O, P)" do
+//     assert Path(User, ['name']) == string
+//     assert Path(User, ['friends', '0', 'name']) == string
+// end

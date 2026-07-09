@@ -1,0 +1,14 @@
+import { OptionalKeys as OOptionalKeys } from "../Object/OptionalKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type OptionalKeys(L)
+    where
+        L <: List
+    as
+        OOptionalKeys(ObjectOf(L))
+
+unittest "OptionalKeys(L)" do
+    // TODO: evaluator cannot prove this yet
+    assert OptionalKeys([1, 2?]) == '1'
+end

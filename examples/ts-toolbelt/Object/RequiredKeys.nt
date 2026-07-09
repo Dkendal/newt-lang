@@ -1,0 +1,30 @@
+import { _Pick } from "./Pick"
+
+export type _RequiredKeys(O)
+    where
+        O <: object
+    as
+        let picks =
+            map -? K in keyof O do
+                // The original TS uses the global `Pick`; `_Pick` is
+                // equivalent here since K comes from `keyof O`.
+                if {} <: _Pick(O, K) then never else K end
+            end
+        in
+        picks[keyof O]
+
+// Get the keys of `O` that are required
+export type RequiredKeys(O)
+    where
+        O <: object
+    as
+        if O <: unknown then
+            _RequiredKeys(O)
+        end
+
+unittest "RequiredKeys(O)" do
+    // TODO: evaluator cannot prove these yet (mapped type with conditional
+    // body indexed by `[keyof O]`)
+    assert RequiredKeys({a: 1, b?: 2}) == 'a'
+    assert RequiredKeys({a: 1, b: 2}) == 'a' | 'b'
+end

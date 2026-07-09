@@ -1,0 +1,37 @@
+import { Match } from "../Any/_Internal"
+import { Is } from "../Any/Is"
+
+export type _SelectKeys(O, M, match)
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        let picks =
+            map -? K in keyof O do
+                match Is(O[K], M, match) do
+                    1 -> K,
+                    0 -> never
+                end
+            end
+        in
+        picks[keyof O]
+
+// Get the keys of `O` which fields match `M`
+export type SelectKeys(O, M, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        if O <: unknown then
+            _SelectKeys(O, M, match)
+        end
+
+unittest "SelectKeys(O, M, match)" do
+    // TODO: evaluator cannot prove these yet (mapped type with conditional
+    // body indexed by `[keyof O]`)
+    assert SelectKeys({a: 1, b: 2, c: string}, number, 'extends->') == 'a' | 'b'
+    assert SelectKeys({a: 1, b: 2, c: string}, string, 'equals') == 'c'
+end

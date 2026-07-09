@@ -1,0 +1,19 @@
+import { Key } from "./_Internal"
+import { Either as OEither } from "../Object/Either"
+import { ObjectOf } from "./ObjectOf"
+import { _ListOf } from "../Object/ListOf"
+import { List } from "./List"
+import { Boolean } from "../Boolean/_Internal"
+
+export type Either(L, K, strict)
+    defaults strict = 1
+    where
+        L <: List,
+        K <: Key,
+        strict <: Boolean
+    as
+        if OEither(ObjectOf(L), `${K & number}` | K, strict) <: ?OE then
+            if OE <: unknown then
+                _ListOf(OE & {})
+            end
+        end

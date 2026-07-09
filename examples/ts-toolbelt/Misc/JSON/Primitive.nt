@@ -1,0 +1,10 @@
+// Basic JSON Value
+export type Primitive as string | number | boolean | null
+
+unittest "Primitive" do
+    assert 'json' <: Primitive
+    assert 0 <: Primitive
+    assert false <: Primitive
+    assert null <: Primitive
+    assert not(undefined <: Primitive)
+end

@@ -1,0 +1,39 @@
+import { Match } from "./_Internal"
+import { Extends } from "./Extends"
+import { Equals } from "./Equals"
+import { Contains } from "./Contains"
+
+export type Is(A, A1, match)
+    defaults match = 'default'
+    where
+        A <: any,
+        A1 <: any,
+        match <: Match
+    as
+        // Original TS indexes an object literal with string-literal keys
+        // ({'default': ..., ...}[match]); .nt object literals only accept
+        // identifier keys, so this is expressed as a `match` instead.
+        match match do
+            'default' -> Extends(A, A1),
+            'contains->' -> Contains(A, A1),
+            'extends->' -> Extends(A, A1),
+            '<-contains' -> Contains(A1, A),
+            '<-extends' -> Extends(A1, A),
+            'equals' -> Equals(A1, A)
+        end
+
+unittest "Is(A, A1, match)" do
+    assert Is('a', 'a' | 'b', 'extends->') == 1
+    // TODO: evaluator cannot prove this yet (nested conditional in Extends
+    // should distribute over the union, yielding 0 | 1)
+    assert Is('a' | 'b', 'a', 'extends->') == 0 | 1
+    // TODO: evaluator cannot prove this yet (same distribution gap)
+    assert Is('a', 'a' | 'b', '<-extends') == 0 | 1
+    assert Is('a' | 'b', 'a', '<-extends') == 1
+    assert Is('a', 'a' | 'b', 'contains->') == 1
+    assert Is('a' | 'b', 'a', 'contains->') == 0
+    assert Is('a', 'a' | 'b', '<-contains') == 0
+    assert Is('a' | 'b', 'a', '<-contains') == 1
+    assert Is('a', 'a' | 'b', 'equals') == 0
+    assert Is('b' | 'a', 'a' | 'b', 'equals') == 1
+end

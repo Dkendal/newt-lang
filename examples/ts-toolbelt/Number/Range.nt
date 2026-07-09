@@ -1,0 +1,87 @@
+// Ported from ts-toolbelt sources/Number/Range.ts
+//
+// The original TS defers recursion through {0, 1}-keyed object lookups
+// ({0: recurse, 1: L}[Extends<From, To>]); numeric object keys are not
+// supported, so `match` expressions with the same selection logic are used.
+
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Prepend } from "../List/Prepend"
+import { Prev } from "../Iteration/Prev"
+import { Next } from "../Iteration/Next"
+import { Cast } from "../Any/Cast"
+import { Way } from "../Iteration/_Internal"
+import { List } from "../List/List"
+import { Extends } from "../Any/Extends"
+import { Pos } from "../Iteration/Pos"
+
+type RangeForth(From, To, L)
+    defaults L = []
+    where
+        From <: Iteration,
+        To <: Iteration,
+        L <: List
+    as
+        match Extends(From, To) do
+            1 -> L,
+            else -> RangeForth(Prev(From), To, Prepend(L, Pos(From)))
+        end
+
+type RangeBack(From, To, L)
+    defaults L = []
+    where
+        From <: Iteration,
+        To <: Iteration,
+        L <: List
+    as
+        match Extends(From, To) do
+            1 -> L,
+            else -> RangeBack(Next(From), To, Prepend(L, Pos(From)))
+        end
+
+// TODO: original TS selects via {'->': ..., '<-': ...}[way]; quoted object
+// keys are not supported, so a `match` on `way` is used.
+type __Range(From, To, way)
+    where
+        From <: Iteration,
+        To <: Iteration,
+        way <: Way
+    as
+        match way do
+            '->' -> RangeForth(To, Prev(From)),  // Reverse logic to work naturally #`Prepend`
+            '<-' -> RangeBack(From, Next(To))    // Works in reverse mode (default) #`Prepend`
+        end
+
+export type _Range(From, To, way)
+    where
+        From <: number,
+        To <: number,
+        way <: Way
+    as
+        if __Range(IterationOf(From), IterationOf(To), way) <: ?X then
+            Cast(X, (string | number)[])
+        end
+
+// Create a range of numbers
+export type Range(From, To, way)
+    defaults way = '->'
+    where
+        From <: number,
+        To <: number,
+        way <: Way
+    as
+        if From <: unknown then
+            if To <: unknown then
+                _Range(From, To, way)
+            end
+        end
+
+unittest "Range(From, To, way)" do
+    // TODO: evaluator cannot prove this yet (recursive alias evaluation and
+    // template-literal interpolation inside IterationOf)
+    assert Range(-2, 1) == [-2, -1, 0, 1]
+    // TODO: evaluator cannot prove this yet
+    assert Range(-2, 1, '->') == [-2, -1, 0, 1]
+    // TODO: evaluator cannot prove this yet
+    assert Range(-2, 1, '<-') == [1, 0, -1, -2]
+end

@@ -1,0 +1,15 @@
+// Ported from ts-toolbelt sources/Iteration/Pos.ts
+
+import { Iteration } from "./Iteration"
+
+// Get the position of `I` (**number**)
+export type Pos(I)
+    where I <: Iteration
+    as I[0]
+
+// TODO allow for types in unittest blocks that aren't emitted
+type I20 as [20, '+', '19', '21', '-20']
+
+unittest "Pos(I)" do
+    assert Pos(I20) == 20
+end

@@ -1,0 +1,19 @@
+// Ported from ts-toolbelt sources/Iteration/Next.ts
+//
+// Original TS: `IterationMap[I[3]]`; `IterationMap` is a generic lookup type
+// here (see ./Iteration.nt).
+
+import { Iteration, IterationMap } from "./Iteration"
+
+// Move `I`'s position forward
+export type Next(I)
+    where I <: Iteration
+    as IterationMap(I[3])
+
+// TODO allow for types in unittest blocks that aren't emitted
+type I20 as [20, '+', '19', '21', '-20']
+
+unittest "Next(I)" do
+    assert Next(I20) == [21, '+', '20', '22', '-21']
+    assert Next(I20) <: Iteration
+end

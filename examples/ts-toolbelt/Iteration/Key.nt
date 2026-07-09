@@ -1,0 +1,17 @@
+// Ported from ts-toolbelt sources/Iteration/Key.ts
+
+import { Iteration } from "./Iteration"
+
+// Get the position of `I` (**string**)
+export type Key(I)
+    where I <: Iteration
+    as `${I[0]}`
+
+// TODO allow for types in unittest blocks that aren't emitted
+type I20 as [20, '+', '19', '21', '-20']
+
+unittest "Key(I)" do
+    // TODO: evaluator cannot prove this yet (an indexed access `${I[0]}` inside
+    // a template literal is not reduced to a string literal)
+    assert Key(I20) == '20'
+end

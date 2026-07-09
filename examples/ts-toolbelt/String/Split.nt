@@ -1,0 +1,46 @@
+import { Cast } from "../Any/Cast"
+import { Pop } from "../List/Pop"
+
+type __Split(S, D, T)
+    defaults T = []
+    where
+        S <: string,
+        D <: string,
+        T <: string[]
+    as
+        if S <: `${?BS}${D}${?AS}` then
+            __Split(AS, D, [...T, BS])
+        else
+            [...T, S]
+        end
+
+type _Split(S, D)
+    defaults D = ''
+    where
+        S <: string,
+        D <: string
+    as
+        if D <: '' then
+            Pop(__Split(S, D))
+        else
+            __Split(S, D)
+        end
+
+// Split `S` by `D` into a List
+export type Split(S, D)
+    defaults D = ''
+    where
+        S <: string,
+        D <: string
+    as
+        if _Split(S, D) <: ?X then
+            Cast(X, string[])
+        end
+
+unittest "Split(S, D)" do
+    // TODO: evaluator cannot prove this yet — `infer` inside template literals
+    // does not bind, which makes the recursive `__Split` overflow the stack.
+    // Re-enable once the evaluator supports template-literal inference:
+    // assert Split('paris, london, milan', ', ') == ['paris', 'london', 'milan']
+    // assert Split('abc') == ['a', 'b', 'c']
+end

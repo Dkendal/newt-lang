@@ -1,0 +1,22 @@
+import { Keys } from "./Keys"
+
+export type KnownKeys(O)
+    where
+        O <: object
+    as
+        let filtered = map K in keyof O do
+            cond do
+                string <: K -> never,
+                number <: K -> never,
+                else -> K
+            end
+        end in
+        if filtered <: (map K in keyof O do ?U end) then
+            U & Keys(O)
+        end
+
+unittest "KnownKeys(O)" do
+    // TODO: evaluator cannot prove this yet (infer `?U` inside a mapped
+    // type is not evaluated)
+    assert KnownKeys({a: string, b: number}) == 'a' | 'b'
+end

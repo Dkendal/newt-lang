@@ -1,0 +1,19 @@
+import { FilterKeys } from "./FilterKeys"
+import { Match } from "../Any/_Internal"
+import { Pick } from "./Pick"
+
+// Filter out of `O` the fields that match `M`
+export type Filter(O, M, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        Pick(O, FilterKeys(O, M, match))
+
+unittest "Filter(O, M, match)" do
+    // TODO: evaluator cannot prove this yet (depends on ./Pick which may
+    // not resolve)
+    assert Filter({a: 1, b: 2, c: string}, string, 'equals') == {a: 1, b: 2}
+end

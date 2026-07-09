@@ -1,0 +1,22 @@
+// TODO: requires generic function types, which do not parse. Original TS
+// (credit https://stackoverflow.com/a/52473108/3570903):
+//
+//   export type Equals<A1 extends any, A2 extends any> =
+//       (<A>() => A extends A2 ? 1 : 0) extends (<A>() => A extends A1 ? 1 : 0)
+//       ? 1
+//       : 0
+//
+// Closest expressible form: mutual assignability of the tuple-wrapped
+// operands (wrapping prevents union distribution). Unlike the TS original
+// this cannot distinguish `readonly` modifiers.
+export type Equals(A1, A2)
+    where
+        A1 <: any,
+        A2 <: any
+    as
+        if [A1] == [A2] then 1 else 0 end
+
+unittest "Equals(A1, A2)" do
+    assert Equals(42 | 0, 42 | 0) == 1
+    assert Equals({a: string}, {b: string}) == 0
+end

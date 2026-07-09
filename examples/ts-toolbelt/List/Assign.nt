@@ -1,0 +1,24 @@
+import { Assign as OAssign } from "../Object/Assign"
+import { List } from "./List"
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Cast } from "../Any/Cast"
+
+export type Assign(L, Ls, depth, ignore, fill)
+    defaults depth = 'flat', ignore = BuiltIn, fill = never
+    where
+        L <: List,
+        Ls <: List(List),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        Cast(OAssign(L, Ls, depth, ignore, fill), List)
+
+unittest "Assign(L, Ls)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Object/Assign,
+    // ../Object/_Internal and ../Misc/BuiltIn being ported)
+    assert Assign([1, 2, 3], [[2, 1]]) == [2, 1, 3]
+    // TODO: evaluator cannot prove this yet
+    assert Assign([], [[1, 2, 3, 4], [2, 4, 6]]) == [2, 4, 6, 4]
+end

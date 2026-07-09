@@ -1,0 +1,14 @@
+import { Match } from "../Any/_Internal"
+import { ListOf } from "../Object/ListOf"
+import { Exclude as OExclude } from "../Object/Exclude"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type Exclude(L, L1, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        L1 <: List,
+        match <: Match
+    as
+        ListOf(OExclude(ObjectOf(L), ObjectOf(L1), match))

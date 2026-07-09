@@ -1,0 +1,17 @@
+import { Split } from "./Split"
+import { At as AAt } from "../Any/At"
+
+// Get the character at position `K`
+export type At(S, K)
+    where
+        S <: string,
+        K <: number
+    as AAt(Split(S, ''), K)
+
+unittest "At(S, K)" do
+    // TODO: evaluator cannot prove this yet — `infer` inside template literals
+    // does not bind, which makes the recursive `__Split` overflow the stack.
+    // Re-enable once the evaluator supports template-literal inference:
+    // assert At('hello', 0) == 'h'
+    // assert At('hello', 4) == 'o'
+end

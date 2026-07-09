@@ -1,0 +1,32 @@
+// Ported from ts-toolbelt sources/Number/Absolute.ts
+
+import { _Negate } from "./Negate"
+import { _IsNegative } from "./IsNegative"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+
+// TODO: original TS selects via {0: N, 1: _Negate<N>}[_IsNegative<N>];
+// numeric object keys are not supported, so a `match` is used.
+export type _Absolute(N)
+    where N <: Iteration
+    as
+        match _IsNegative(N) do
+            1 -> _Negate(N),
+            else -> N
+        end
+
+// Get the absolute value of a number
+export type Absolute(N)
+    where N <: number
+    as
+        if N <: unknown then
+            _Absolute(IterationOf(N))[0]
+        end
+
+unittest "Absolute(N)" do
+    // TODO: evaluator cannot prove this yet (template-literal interpolation
+    // inside IterationOf is not evaluated to a string literal)
+    assert Absolute(-20) == 20
+    // TODO: evaluator cannot prove this yet
+    assert Absolute(20) == 20
+end

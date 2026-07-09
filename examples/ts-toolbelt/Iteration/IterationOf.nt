@@ -1,0 +1,23 @@
+// Ported from ts-toolbelt sources/Iteration/IterationOf.ts
+//
+// The original TS indexes the `IterationMap` object type:
+//     `${N}` extends keyof IterationMap ? IterationMap[`${N}`] : IterationMap['__']
+// Here `IterationMap` is a generic lookup type and `IterationKey` stands in
+// for `keyof IterationMap` (see ./Iteration.nt).
+
+import { IterationKey, IterationMap } from "./Iteration"
+
+export type IterationOf(N)
+    where N <: number
+    as
+        if `${N}` <: IterationKey then
+            IterationMap(`${N}`)
+        else
+            IterationMap('__')
+        end
+
+unittest "IterationOf(N)" do
+    // TODO: evaluator cannot prove this yet (`${N}` over a substituted type
+    // parameter is not reduced to a string literal; a direct `${0}` does reduce)
+    assert IterationOf(0) == [0, '0', '-1', '1', '0']
+end

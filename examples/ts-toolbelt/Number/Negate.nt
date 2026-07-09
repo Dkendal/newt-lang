@@ -1,0 +1,27 @@
+// Ported from ts-toolbelt sources/Number/Negate.ts
+//
+// Original TS: `IterationMap[N[4]]`; `IterationMap` is a generic lookup type
+// here (see ../Iteration/Iteration.nt).
+
+import { Iteration, IterationMap } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+
+export type _Negate(N)
+    where N <: Iteration
+    as IterationMap(N[4])
+
+// Negate a number
+export type Negate(N)
+    where N <: number
+    as
+        if N <: unknown then
+            _Negate(IterationOf(N))[0]
+        end
+
+unittest "Negate(N)" do
+    // TODO: evaluator cannot prove this yet (template-literal interpolation
+    // inside IterationOf is not evaluated to a string literal)
+    assert Negate(-10) == 10
+    // TODO: evaluator cannot prove this yet
+    assert Negate(10) == -10
+end

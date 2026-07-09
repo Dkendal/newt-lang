@@ -1,0 +1,49 @@
+import { Prepend } from "./Prepend"
+import { Pos } from "../Iteration/Pos"
+import { Next } from "../Iteration/Next"
+import { Length } from "./Length"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+import { Naked } from "./_Internal"
+import { Extends } from "../Any/Extends"
+
+type __Reverse(L, LO, I)
+    defaults I = IterationOf(0)
+    where
+        L <: List,
+        LO <: List,
+        I <: Iteration
+    as
+        // TS uses a `{0: ..., 1: ...}[...]` lookup here; numeric property
+        // names are not supported, so an equivalent tuple lookup is used.
+        [
+            __Reverse(L, Prepend(LO, L[Pos(I)]), Next(I)),
+            LO
+        ][Extends(Pos(I), Length(L))]
+
+export type _Reverse(L, LO)
+    defaults LO = []
+    where
+        L <: List,
+        LO <: List
+    as
+        if __Reverse(Naked(L), LO) <: ?X then
+            Cast(X, List)
+        end
+
+// Turn a List the other way around
+export type Reverse(L)
+    where L <: List
+    as
+        if L <: unknown then
+            _Reverse(L)
+        end
+
+unittest "Reverse(L)" do
+    // TODO: evaluator cannot prove this yet
+    assert Reverse([1, 2, 3]) == [3, 2, 1]
+    // TODO: evaluator cannot prove this yet
+    assert Reverse([]) == []
+end

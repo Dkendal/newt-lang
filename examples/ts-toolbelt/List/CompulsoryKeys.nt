@@ -1,0 +1,10 @@
+import { CompulsoryKeys as OCompulsoryKeys } from "../Object/CompulsoryKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+// (needs `--strictNullChecks` enabled)
+export type CompulsoryKeys(L)
+    where
+        L <: List
+    as
+        OCompulsoryKeys(ObjectOf(L))

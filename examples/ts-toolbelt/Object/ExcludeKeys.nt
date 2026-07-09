@@ -1,0 +1,56 @@
+import { Exclude } from "../Union/Exclude"
+import { Match } from "../Any/_Internal"
+import { Is } from "../Any/Is"
+import { At } from "../Any/At"
+import { Keys } from "../Any/Keys"
+
+export type _ExcludeMatch(O, O1, match)
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        let picks =
+            map -? K in keyof O do
+                match Is(O[K], At(O1, K), match) do
+                    1 -> never,
+                    0 -> K
+                end
+            end
+        in
+        picks[keyof O]
+
+type ExcludeMatch(O, O1, match)
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        if O <: unknown then
+            _ExcludeMatch(O, O1, match)
+        end
+
+// Exclude the keys of `O1` out of the keys of `O`
+// (If `match = 'default'`, no type checks are done)
+export type ExcludeKeys(O, O1, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        match match do
+            'default' -> Exclude(Keys(O), Keys(O1)),
+            'contains->' -> ExcludeMatch(O, O1, 'contains->'),
+            'extends->' -> ExcludeMatch(O, O1, 'extends->'),
+            '<-contains' -> ExcludeMatch(O, O1, '<-contains'),
+            '<-extends' -> ExcludeMatch(O, O1, '<-extends'),
+            'equals' -> ExcludeMatch(O, O1, 'equals')
+        end
+
+unittest "ExcludeKeys(O, O1, match)" do
+    // TODO: evaluator cannot prove these yet (indexing a mapped type by
+    // `keyof O` is not evaluated)
+    assert ExcludeKeys({a: 1, b: 2, c: 3}, {a: 1, b: 2}, 'equals') == 'c'
+    assert ExcludeKeys({a: 1, b: 2, c: 3}, {a: string, b: 2}, 'equals') == 'a' | 'c'
+end

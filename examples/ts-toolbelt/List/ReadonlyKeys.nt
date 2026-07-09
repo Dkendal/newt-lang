@@ -1,0 +1,8 @@
+import { ReadonlyKeys as OReadonlyKeys } from "../Object/ReadonlyKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+// Get the keys of `L` that are readonly
+export type ReadonlyKeys(L)
+    where L <: List
+    as OReadonlyKeys(ObjectOf(L))

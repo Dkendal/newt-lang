@@ -1,0 +1,10 @@
+// Add `undefined | null` to `U`
+export type Nullable(U)
+    where
+        U <: any
+    as
+        U | undefined | null
+
+unittest "Nullable(U)" do
+    assert Nullable(string) == string | undefined | null
+end

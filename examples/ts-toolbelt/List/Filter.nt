@@ -1,0 +1,14 @@
+import { Filter as OFilter } from "../Object/Filter"
+import { ListOf } from "../Object/ListOf"
+import { Match } from "../Any/_Internal"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type Filter(L, M, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        M <: any,
+        match <: Match
+    as
+        ListOf(OFilter(ObjectOf(L), M, match))

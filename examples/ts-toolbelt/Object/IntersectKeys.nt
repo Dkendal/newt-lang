@@ -1,0 +1,55 @@
+import { Match } from "../Any/_Internal"
+import { Is } from "../Any/Is"
+import { At } from "../Any/At"
+import { Keys } from "../Any/Keys"
+
+export type _IntersectMatch(O, O1, match)
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        let picks =
+            map -? K in keyof O do
+                match Is(O[K], At(O1, K), match) do
+                    1 -> K,
+                    0 -> never
+                end
+            end
+        in
+        picks[keyof O]
+
+type IntersectMatch(O, O1, match)
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        if O <: unknown then
+            _IntersectMatch(O, O1, match)
+        end
+
+// Get the intersecting keys of `O` & `O1`
+// (If `match = 'default'`, no type checks are done)
+export type IntersectKeys(O, O1, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        O1 <: object,
+        match <: Match
+    as
+        match match do
+            'default' -> Keys(O) & Keys(O1),
+            'contains->' -> IntersectMatch(O, O1, 'contains->'),
+            'extends->' -> IntersectMatch(O, O1, 'extends->'),
+            '<-contains' -> IntersectMatch(O, O1, '<-contains'),
+            '<-extends' -> IntersectMatch(O, O1, '<-extends'),
+            'equals' -> IntersectMatch(O, O1, 'equals')
+        end
+
+unittest "IntersectKeys(O, O1, match)" do
+    // TODO: evaluator cannot prove this yet (indexing a mapped type by
+    // `keyof O` is not evaluated)
+    assert IntersectKeys({a: 1, b: 2, c: 3}, {a: 1, b: string}, 'equals') == 'a'
+    assert IntersectKeys({a: 1, b: 2, c: 3}, {a: 1, b: string}, 'default') == 'a' | 'b'
+end

@@ -1,0 +1,27 @@
+import { ComputeRaw } from "../Any/Compute"
+import { Keys } from "../Any/Keys"
+import { OptionalFlat } from "../Object/Optional"
+import { Record } from "../Object/Record"
+import { Exclude } from "./Exclude"
+
+type _Strict(U, _U)
+    defaults _U = U
+    as
+        if U <: unknown then
+            U & OptionalFlat(Record(Exclude(Keys(_U), keyof U), never))
+        end
+
+// Make a [[Union]] not allow excess properties
+// (https://github.com/Microsoft/TypeScript/issues/20863)
+export type Strict(U)
+    where
+        U <: object
+    as
+        ComputeRaw(_Strict(U))
+
+unittest "Strict(U)" do
+    // TODO: evaluator cannot prove this yet (indeterminate: depends on the
+    // ../Object/Optional import resolving and on mapped-type normalization
+    // through ComputeRaw)
+    assert Strict({a: 1} | {b: 2}) <: {a?: 1, b?: 2}
+end

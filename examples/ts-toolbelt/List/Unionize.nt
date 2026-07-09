@@ -1,0 +1,25 @@
+import { Key } from "../Any/Key"
+import { List } from "./List"
+import { At } from "../Any/At"
+
+// Make the fields of `L` union the ones of `L1`
+export type Unionize(L, L1, K)
+    defaults K = Key
+    where
+        L <: List,
+        L1 <: List,
+        K <: Key
+    as
+        map P in keyof L do
+            if P <: K then
+                L[P] | At(L1, P)
+            else
+                L[P]
+            end
+        end
+
+unittest "Unionize(L, L1, K)" do
+    // TODO: evaluator cannot prove this yet (mapped type over a tuple with a
+    // conditional body evaluates as indeterminate)
+    assert Unionize([1, 2], ['a', 'b']) == [1 | 'a', 2 | 'b']
+end

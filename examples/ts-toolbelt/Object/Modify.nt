@@ -1,0 +1,20 @@
+import { At } from "../Any/At"
+import { Replace } from "../Union/Replace"
+import { x } from "../Any/x"
+import { Exclude } from "../Union/Exclude"
+
+// Modify `O` with `OMod` & the [[x]] placeholder
+export type Modify(O, OMod)
+    where
+        O <: object,
+        OMod <: object
+    as
+        (map K in keyof OMod do
+            Replace(OMod[K], x, Exclude(At(O, K), undefined))
+        end) & {}
+
+unittest "Modify(O, OMod)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Union/Replace,
+    // ../Union/Exclude and ../Any/x)
+    assert Modify({a: 1, b: 2}, {a: x, b: 3}) == {a: 1, b: 3}
+end

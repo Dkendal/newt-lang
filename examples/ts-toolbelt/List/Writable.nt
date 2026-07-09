@@ -1,0 +1,13 @@
+import { Depth } from "../Object/_Internal"
+import { WritablePart } from "../Object/Writable"
+import { List } from "./List"
+import { Cast } from "../Any/Cast"
+
+// Make `L` writable (deeply or not)
+export type Writable(L, depth)
+    defaults depth = 'flat'
+    where
+        L <: List,
+        depth <: Depth
+    as
+        Cast(WritablePart(L, depth), List)

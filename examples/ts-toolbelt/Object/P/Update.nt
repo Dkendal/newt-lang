@@ -1,0 +1,47 @@
+import { Key } from "../../Any/Key"
+import { Update as OUpdate } from "../Update"
+import { Update as LUpdate } from "../../List/Update"
+import { List } from "../../List/List"
+import { BuiltIn } from "../../Misc/BuiltIn"
+import { Tail } from "../../List/Tail"
+
+type UpdateAt(O, Path, A)
+    where
+        Path <: List(Key)
+    as cond do
+        O <: BuiltIn -> O,
+        Path <: [Key] and O <: List -> LUpdate(O, Path[0], A),
+        Path <: [Key] and O <: object -> OUpdate(O, Path[0], A),
+        Path <: [Key] -> O,
+        else ->
+            map K in keyof O do
+                if K <: Path[0] then
+                    UpdateAt(O[K], Tail(Path), A)
+                else
+                    O[K]
+                end
+            end
+    end
+
+// Update in `O` the fields at `Path` with `A`
+export type Update(O, Path, A)
+    where
+        O <: object,
+        Path <: List(Key),
+        A <: any
+    as
+        if Path <: unknown then
+            UpdateAt(O, Path, A)
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as {info: {name: string}, id: number}
+
+unittest "Update(O, Path, A)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Update and
+    // recursive UpdateAt)
+    assert Update(User, ['id'], string) == {
+        info: {name: string},
+        id: string
+    }
+end

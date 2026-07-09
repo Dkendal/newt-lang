@@ -1,0 +1,10 @@
+import { List } from "./List"
+
+export type Length(L)
+    where L <: List
+    as L['length']
+
+unittest "Length(L)" do
+    assert Length([1, 2, 3]) == 3
+    assert Length([]) == 0
+end

@@ -1,0 +1,23 @@
+import { Match } from "../Any/_Internal"
+import { Path as OPath } from "./Path"
+import { Is } from "../Any/Is"
+import { Key } from "../Any/Key"
+import { List } from "../List/List"
+
+// Check whether `O` has nested properties that match `M`
+export type HasPath(O, Path, M, match)
+    defaults M = any, match = 'default'
+    where
+        O <: object,
+        Path <: List(Key),
+        M <: any,
+        match <: Match
+    as
+        Is(OPath(O, Path), M, match)
+
+// TODO: evaluator cannot prove this yet — evaluating `./Path`'s `_Path`
+// recursion does not terminate, which hangs the compiler. The assert is
+// commented out to keep the file compiling; it holds in TypeScript.
+// unittest "HasPath(O, Path, M, match)" do
+//     assert HasPath({a: {b: {c: 1}}}, ['a', 'b', 'c'], number) == 1
+// end

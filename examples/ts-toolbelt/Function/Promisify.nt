@@ -1,0 +1,14 @@
+import { Function } from "./Function"
+import { Parameters } from "./Parameters"
+import { Return } from "./Return"
+import { Promise } from "../Any/Promise"
+
+export type Promisify(F)
+    where F <: Function
+    as (...args: Parameters(F)) => Promise(Return(F))
+
+unittest "Promisify(F)" do
+    // TODO: evaluator cannot prove this yet (infer through rest-parameter
+    // function types)
+    assert Promisify((a: number) => number) == ((a: number) => Promise(number))
+end

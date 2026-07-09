@@ -1,0 +1,63 @@
+import { Match } from "../Any/_Internal"
+import { UnionOf } from "../Object/UnionOf"
+import { Next } from "../Iteration/Next"
+import { Prev } from "../Iteration/Prev"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Is } from "../Any/Is"
+import { Boolean } from "../Boolean/_Internal"
+import { Cast } from "../Any/Cast"
+import { Pos } from "../Iteration/Pos"
+
+type _IncludesDeep(O, M, match, limit, I)
+    defaults I = IterationOf(0)
+    where
+        M <: any,
+        match <: Match,
+        limit <: number,
+        I <: Iteration
+    as
+        let nextO = if O <: object then UnionOf(O) else O end in
+        let selector =
+            if Pos(Prev(I)) <: limit then // if we go past the limit
+                2                         // end the loop here
+            else
+                Is(O, M, match)           // if 0 => continue, if 1 => end
+            end
+        in
+        // TS original indexes `{0: …, 1: 1, 2: 0}`; numeric object keys are
+        // not supported, so an equivalent tuple lookup is used instead.
+        [
+            _IncludesDeep(nextO, M, match, limit, Next(I)),
+            1,
+            0
+        ][selector]
+
+export type IncludesDeep(O, M, match, limit)
+    defaults match = 'default', limit = 10
+    where
+        O <: object,
+        M <: any,
+        match <: Match,
+        limit <: number
+    as
+        if _IncludesDeep(O, M, match, limit) <: ?X then
+            Cast(X, Boolean)
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type Nested as {
+    a: {
+        b: {
+            c: string
+        }
+    }
+}
+
+unittest "IncludesDeep(O, M, match, limit)" do
+    // TODO: evaluator cannot prove this yet (recursive iteration over
+    // imported Iteration counters)
+    assert IncludesDeep(Nested, string) == 1
+    // TODO: evaluator cannot prove this yet
+    assert IncludesDeep(Nested, boolean) == 0
+end

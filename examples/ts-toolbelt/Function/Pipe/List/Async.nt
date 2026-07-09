@@ -1,0 +1,17 @@
+import { Function } from "../../Function"
+import { Await } from "../../../Any/Await"
+import { Curry } from "../../Curry"
+
+// TODO: the original TS is an object type of ten generic call signatures
+// (one overload per pipe arity, 1-10; like Compose but with the function
+// list in application order), e.g. for arity 2:
+//   <R0, R1, P extends any[]>(fns: [
+//       Function<P,           R0> | Curry<Function<P,           R0>>,
+//       Function<[Await<R0>], R1> | Curry<Function<[Await<R0>], R1>>,
+//   ]): Function<P, Promise<Await<R1>>>
+// newtype has no call-signature object types, overloads, or generic function
+// types, so a single untyped signature is the closest expressible form.
+// Note: `Promise` is the TS lib global; newtype leaves it unresolved but
+// transpiles it as-is.
+export type PipeListAsync as
+    (fns: (Function | Curry(Function))[]) => Function(any, Promise(Await(any)))

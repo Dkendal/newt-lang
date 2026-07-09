@@ -195,6 +195,99 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 
 ---
 
+## ts-toolbelt port audit (2026-07-09): evaluator gaps found porting `examples/ts-toolbelt/`
+
+All 198 ts-toolbelt source files are ported to `examples/ts-toolbelt/` (227
+`.nt` files). Every file parses and transpiles; the issues below are all
+*evaluator* gaps — asserts that tsgo proves true but newtype reports FAILED
+(or worse). Faithful ports were kept; affected asserts carry
+`// TODO: evaluator cannot prove this yet` comments (grep for it), except the
+crash/hang cases whose asserts are commented out entirely.
+
+### Crashes / non-termination (fix first)
+
+- [ ] **T1. Unbound `infer` inside a template-literal pattern fatally
+  overflows the stack** instead of failing the assert. Evaluating
+  `String/Split.nt` / `String/At.nt` asserts crashes the compiler: the `?P`
+  holes in `` `${?BS}${D}${?AS}` `` never bind ("cannot resolve AS/BS"
+  warnings), and the recursive `__Split` loop then recurses forever. Asserts
+  in both files are commented out. Repro: uncomment and run
+  `target/debug/newtype --input examples/ts-toolbelt/String/Split.nt`.
+- [ ] **T2. Recursive `_Path` evaluation never terminates.** In
+  `Object/Path.nt` the loop guard `Pos(I) <: Length(P)` stays indeterminate,
+  so `resolve_head` keeps unrolling the recursion. Asserts in
+  `Object/Path.nt`, `Object/HasPath.nt`, and two in `List/Path.nt` are
+  commented out. Separately, the transpiled `_Path` is directly recursive and
+  tsgo reports TS2321 (excessively deep); the port should be redone with
+  ts-toolbelt's original `{0: …, 1: O}[Extends<…>]` object-index trick so the
+  TS side type-checks.
+
+### Evaluator gaps (asserts FAILED; ports faithful, tsgo-true)
+
+- [ ] **T3. Template literal over a *substituted* type parameter is not
+  reduced.** `` `${N}` `` with `N = 0` does not reduce to `'0'` (a directly
+  written `` `${0}` `` does). This is the highest-leverage gap: it blocks
+  `Iteration/IterationOf.nt` and `Iteration/Key.nt` (where `` `${I[0]}` `` —
+  indexed access inside a template literal — is also unreduced), and through
+  them **all 12 `Number/*` files** (Add, Sub, Negate, Absolute, Range, the
+  comparison operators) and downstream Iteration users (`Object/AtLeast`,
+  deep-merge `Depth` machinery, `Function/ValidPath`,
+  `Community/IncludesDeep`).
+- [ ] **T4. Mapped type with a conditional body indexed by `[keyof O]` is not
+  reduced.** The `{[K in keyof O]: cond ? K : never}[keyof O]` key-filtering
+  idiom stays unevaluated, hitting every `*Keys` type:
+  `Object/{Compulsory,NonNullable,Nullable,Optional,Readonly,Required,Select,
+  Undefinable,Writable}Keys.nt` and the `List/*Keys.nt` ports built on them.
+- [ ] **T5. `keyof O & K` intersections not reduced inside mapped-type key
+  positions.** Blocks the `_Pick`/`_Omit` implementations and everything
+  layered on them: `Object/{Pick,Omit,Readonly,Writable,Optional,Required,
+  Nullable,NonNullable,Undefinable,Compulsory,Record,Update,Merge,Modify}.nt`
+  and all of `Object/P/*.nt`.
+- [ ] **T6. `infer` through rest-parameter function types.**
+  `(...args: ?L) => any` never binds `L`, and `(...args: ?L) => ?R` likewise.
+  Affects `Function/{Length,Parameters,Return,Promisify}.nt` (the `==` claims;
+  some `<:` forms pass).
+- [ ] **T7. `infer` through a generic-alias application.** `Curry(?UF)` in
+  `Function/UnCurry.nt` never binds `UF` (the pattern would need the alias
+  expanded before matching).
+- [ ] **T8. `infer` over an intersection of function types** (the classic
+  union→intersection `Union/Last` trick). `IntersectOf` (contravariant infer
+  over a distributed union of function types) and `Last` fail; `Union/{ListOf,
+  Pop}.nt` fail downstream of `Last`.
+- [ ] **T9. Nested conditional over a distributed union parameter not
+  reduced.** `Any/Extends.nt`: with `A1 = 'a' | 'b'`, the inner `A1 <: A2`
+  conditional does not distribute, so `Extends('a'|'b','b')` should be
+  `0 | 1` but isn't. Same root cause via `Extends` in `Any/Is.nt` and the
+  tuple-lookup-indexed-by-`Is`/`Equals` idiom in
+  `Union/{Filter,Intersect,Replace,Select}.nt` and `Object/Invert.nt`.
+- [ ] **T10. Nested type applications passed as arguments are not reduced
+  before the outer application evaluates.**
+  `Or(IsStringLiteral(A), IsNumberLiteral(A))` in `Community/IsLiteral.nt`
+  stays unevaluated even though each component reduces in isolation.
+- [ ] **T11. `?U` infer inside a mapped-type pattern** is not matched
+  (`Any/KnownKeys.nt`).
+- [ ] **T12. Indexed conditional on a wrapped tuple.**
+  `[A][if A <: any then 0 end]` (the `NoInfer` trick) is not reduced
+  (`Function/NoInfer.nt`).
+- [ ] **T13. Recursive aliases generally can't be *proven*.** They parse,
+  transpile, and terminate (except T2), but claims about them stay FAILED:
+  ~29 `List/*` files (Append, Concat, Reverse, Tail, Repeat, Zip …),
+  `Union/ListOf`, `Number/Range`, `String/{Join,Length,Replace}` (also mixing
+  T3's template-literal gap).
+
+### Missing definitions (indeterminate, not wrong)
+
+- [ ] **T14. TS lib globals unresolved.** `globalThis.Promise`
+  (`Any/Promise.nt`, `Function/{Promisify,Compose,Pipe}` async variants),
+  `Record` (`Any/Compute.nt`), and `Error`/`Date`/`RegExp`/`Generator`
+  (`Misc/BuiltIn.nt`, warnings only) have no `.nt` definitions, so claims
+  touching them are indeterminate. Needs a small ambient-lib prelude.
+- [ ] **T15. Test coverage holes from the port:** `Object/{MergeAll,PatchAll,
+  Paths}.nt` and `Object/P/_Internal.nt` compile clean but their TS
+  `@example`s were not converted to unittest blocks.
+
+---
+
 ## Unimplemented language features
 
 - [x] **Optional property modifier** `{ a?: T }` — grammar/parser/printer now

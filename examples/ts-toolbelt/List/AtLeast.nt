@@ -1,0 +1,25 @@
+import { Key } from "./_Internal"
+import { AtLeast as OAtLeast } from "../Object/AtLeast"
+import { ObjectOf } from "./ObjectOf"
+import { _ListOf } from "../Object/ListOf"
+import { List } from "./List"
+import { Keys } from "../Any/Keys"
+
+export type AtLeast(L, K)
+    defaults K = Keys(L)
+    where
+        L <: List,
+        K <: Key
+    as
+        if OAtLeast(ObjectOf(L), `${K & number}` | K) <: ?U then
+            // we distribute over the union: each union member to a list
+            if U <: unknown then
+                _ListOf(U & {})
+            end
+        end
+
+unittest "AtLeast(L, K)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Object/AtLeast,
+    // ./ObjectOf and ../Object/ListOf being ported)
+    assert AtLeast([1, 2, 3], 0) == [1, 2 | undefined, 3 | undefined]
+end

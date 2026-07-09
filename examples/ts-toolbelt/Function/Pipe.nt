@@ -1,0 +1,31 @@
+import { IntersectOf } from "../Union/IntersectOf"
+import { PipeListAsync } from "./Pipe/List/Async"
+import { PipeListSync } from "./Pipe/List/Sync"
+import { PipeMultiAsync } from "./Pipe/Multi/Async"
+import { PipeMultiSync } from "./Pipe/Multi/Sync"
+import { Input, Mode } from "./_Internal"
+
+// `IntersectOf` in case of unions
+export type Pipe(mode, input)
+    defaults
+        mode = 'sync',
+        input = 'multi'
+    where
+        mode <: Mode,
+        input <: Input
+    as IntersectOf({
+        sync: {
+            multi: PipeMultiSync,
+            list: PipeListSync
+        },
+        async: {
+            multi: PipeMultiAsync,
+            list: PipeListAsync
+        }
+    }[mode][input])
+
+unittest "Pipe(mode, input)" do
+    assert Pipe <: Pipe('sync', 'multi')
+    // indeterminate until ./Pipe/List/Async and ./_Internal are ported
+    assert Pipe('async', 'list') <: PipeListAsync
+end

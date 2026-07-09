@@ -1,0 +1,53 @@
+import { _Pick } from "./Pick"
+import { Depth } from "./_Internal"
+import { Key } from "../Any/Key"
+import { PatchFlat } from "./Patch"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+export type WritableFlat(O) as
+    map -readonly K in keyof O do O[K] end & {}
+
+export type WritableDeep(O) as
+    map -readonly K in keyof O do
+        if O[K] <: BuiltIn then
+            O[K]
+        else
+            WritableDeep(O[K])
+        end
+    end
+
+export type WritablePart(O, depth)
+    where
+        O <: object,
+        depth <: Depth
+    as
+        match depth do
+            'flat' -> WritableFlat(O),
+            'deep' -> WritableDeep(O)
+        end
+
+export type _Writable(O, K, depth)
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        PatchFlat(WritablePart(_Pick(O, K), depth), O)
+
+// Make some fields of `O` writable (deeply or not)
+export type Writable(O, K, depth)
+    defaults K = Key, depth = 'flat'
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        if O <: unknown then
+            _Writable(O, K, depth)
+        end
+
+unittest "Writable(O, K, depth)" do
+    assert WritableFlat({readonly a: 1, readonly b: 2}) == {a: 1, b: 2}
+    // TODO: evaluator cannot prove this yet (depends on ./Pick and ./Patch)
+    assert Writable({readonly a: 1, readonly b: 2}, 'a') == {a: 1, readonly b: 2}
+end

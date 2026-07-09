@@ -1,0 +1,94 @@
+import { Pos } from "../Iteration/Pos"
+import { Concat } from "../List/Concat"
+import { Length } from "../List/Length"
+import { Next } from "../Iteration/Next"
+import { Cast } from "../Any/Cast"
+import { Parameters } from "./Parameters"
+import { Return } from "./Return"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { NonNullableFlat } from "../Object/NonNullable"
+import { x } from "../Any/x"
+import { List } from "../List/List"
+import { Function } from "./Function"
+import { Extends } from "../Any/Extends"
+import { Tail } from "../List/Tail"
+import { RequiredKeys } from "../List/RequiredKeys"
+
+// The original TS dispatches recursion through `{0: ..., 1: ..., 2: ...}[...]`
+// index objects (a lazy-evaluation trick); newtype object literals do not take
+// numeric keys, so they are lowered to equivalent `cond` expressions.
+type _SplitParams(P, PSplit, PRest)
+    defaults PSplit = [], PRest = Tail(P)
+    where P <: List, PSplit <: List[], PRest <: List
+    as cond do
+        number <: Length(P) -> P[number][][],
+        P <: [] -> PSplit,
+        else ->
+            if P <: [...?A, ...PRest] then
+                _SplitParams(Tail(P), [...PSplit, A], Tail(PRest))
+            end
+    end
+
+// Splits tuples to preserve their labels
+type SplitParams(P)
+    where P <: List
+    as if _SplitParams(P) <: ?X then Cast(X, List[]) end
+
+type _JoinParams(PSplit, L)
+    defaults L = []
+    where PSplit <: List[], L <: List
+    as cond do
+        number <: Length(PSplit) -> PSplit[number][],
+        PSplit <: [] -> L,
+        else -> _JoinParams(Tail(PSplit), [...L, ...PSplit[0]])
+    end
+
+// Undoes the job of SplitParams
+type JoinParams(P)
+    where P <: List[]
+    as if _JoinParams(P) <: ?X then Cast(X, List) end
+
+type GapOf(L1, L2, LN, I)
+    where L1 <: List, L2 <: List[], LN <: List, I <: Iteration
+    as if L1[Pos(I)] <: x then
+        Concat(LN, L2[Pos(I)])
+    else
+        LN
+    end
+
+// The original indexes `{0: recurse, 1: finish}[Extends<Pos<I>, Length<L1>>]`;
+// this is the same dispatch written as a conditional.
+type _GapsOf(L1, L2, LN, L2D, I)
+    defaults LN = [], L2D = L2, I = IterationOf(0)
+    where L1 <: List, L2 <: List[], LN <: List, L2D <: List[], I <: Iteration
+    as if Pos(I) <: Length(L1) then
+        Concat(LN, JoinParams(L2D))
+    else
+        _GapsOf(L1, L2, GapOf(L1, L2, LN, I), Tail(L2D), Next(I))
+    end
+
+type GapsOf(L1, L2)
+    where L1 <: List, L2 <: List
+    as if _GapsOf(L1, SplitParams(L2)) <: ?X then Cast(X, List) end
+
+type Gaps(L)
+    where L <: List
+    as Cast(NonNullableFlat(map ? K in keyof L do L[K] | x end), List)
+
+// TODO: the original `Curry` is a generic function type with inference-driven
+// defaults, which newtype cannot express (no generic call signatures):
+//   export type Curry<F extends Function> =
+//       <
+//           P extends Gaps<Parameters<F>>,
+//           G extends List = GapsOf<P, Parameters<F>>,
+//           R extends any = Return<F>
+//       >(...p: Gaps<Parameters<F>> | P) =>
+//           RequiredKeys<G> extends never
+//           ? R
+//           : Curry<(...p: G) => R>
+// The closest expressible form takes the gapped parameters and returns either
+// the final result or a further curried function.
+export type Curry(F)
+    where F <: Function
+    as (...p: Gaps(Parameters(F))) => Return(F) | Function

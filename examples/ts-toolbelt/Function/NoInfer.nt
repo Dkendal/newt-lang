@@ -1,0 +1,10 @@
+// Explain to TS which function parameter has priority for generic inference
+// See https://stackoverflow.com/questions/56687668
+export type NoInfer(A)
+    where A <: any
+    as [A][if A <: any then 0 end]
+
+unittest "NoInfer(A)" do
+    // TODO: evaluator cannot prove this yet
+    assert NoInfer(string) == string
+end

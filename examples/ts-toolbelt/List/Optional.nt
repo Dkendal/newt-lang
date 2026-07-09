@@ -1,0 +1,17 @@
+import { Cast } from "../Any/Cast"
+import { OptionalPart } from "../Object/Optional"
+import { Depth } from "../Object/_Internal"
+import { List } from "./List"
+
+export type Optional(L, depth)
+    defaults depth = 'flat'
+    where
+        L <: List,
+        depth <: Depth
+    as
+        Cast(OptionalPart(L, depth), List)
+
+unittest "Optional(L, depth)" do
+    // TODO: evaluator cannot prove this yet
+    assert Optional([1, 2]) == [1?, 2?]
+end

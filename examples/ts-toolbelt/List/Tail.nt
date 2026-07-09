@@ -1,0 +1,20 @@
+import { List } from "./List"
+
+// Remove the first item out of a List
+export type Tail(L)
+    where L <: List
+    as
+        match L do
+            readonly [] -> L,
+            readonly [any?, ...?LTail] -> LTail,
+            else -> L
+        end
+
+unittest "Tail(L)" do
+    // TODO: evaluator cannot prove this yet (the `[any?, ...?LTail]` pattern
+    // involves `any`, which makes the claim indeterminate)
+    assert Tail([1, 2, 3]) == [2, 3]
+    assert Tail([]) == []
+    // TODO: evaluator cannot prove this yet (see above)
+    assert Tail(['a']) == []
+end

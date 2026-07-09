@@ -1,0 +1,18 @@
+import { Match } from "../Any/_Internal"
+import { SelectKeys as OSelectKeys } from "../Object/SelectKeys"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+// Get the keys of `L` which entries match `M`
+export type SelectKeys(L, M, match)
+    defaults match = 'default'
+    where
+        L <: List,
+        M <: any,
+        match <: Match
+    as OSelectKeys(ObjectOf(L), M, match)
+
+unittest "SelectKeys(L, M)" do
+    // TODO: evaluator cannot prove this yet
+    assert SelectKeys([1, 'a', 2], number) == '0' | '2'
+end

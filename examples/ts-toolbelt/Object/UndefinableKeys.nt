@@ -1,0 +1,31 @@
+export type _UndefinableKeys(O)
+    where
+        O <: object
+    as
+        let picks =
+            map -? K in keyof O do
+                if [O[K] & (undefined)] <: [never] then
+                    never
+                else
+                    K
+                end
+            end
+        in
+        picks[keyof O]
+
+// Get the keys of `O` that are `undefined`
+// (warning: needs `--strictNullChecks` enabled)
+export type UndefinableKeys(O)
+    where
+        O <: object
+    as
+        if O <: unknown then
+            _UndefinableKeys(O)
+        end
+
+unittest "UndefinableKeys(O)" do
+    // TODO: evaluator cannot prove these yet (mapped type with conditional
+    // body indexed by `[keyof O]`)
+    assert UndefinableKeys({a: 1 | undefined, b: 2}) == 'a'
+    assert UndefinableKeys({a: 1, b: 2}) == never
+end

@@ -1,0 +1,34 @@
+import { Equals } from "./Any/Equals"
+import { Boolean } from "./Boolean/_Internal"
+
+// Test should pass
+export type Pass as 1
+
+// Test should fail
+export type Fail as 0
+
+// TODO: no `.nt` equivalent for value-level `declare function` exports.
+// Original TS:
+//   export declare function check<Type, Expect, Outcome extends Boolean>(
+//       debug?: Type
+//   ): Equals<Equals<Type, Expect>, Outcome>
+//
+//   export declare function checks(checks: 1[]): void;
+//
+// The type-level core of `check` is expressible as a type alias:
+export type Check(Type, Expect, Outcome)
+    where
+        Outcome <: Boolean
+    as Equals(Equals(Type, Expect), Outcome)
+
+unittest "Pass / Fail" do
+    assert Pass == 1
+    assert Fail == 0
+    assert not(Pass == Fail)
+end
+
+unittest "Check(Type, Expect, Outcome)" do
+    assert Check(string, string, 1) == Pass
+    assert Check(string, number, 0) == Pass
+    assert Check(string, number, 1) == Fail
+end

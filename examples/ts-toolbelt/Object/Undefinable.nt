@@ -1,0 +1,53 @@
+import { Depth } from "./_Internal"
+import { _Pick } from "./Pick"
+import { Key } from "../Any/Key"
+import { PatchFlat } from "./Patch"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+export type UndefinableFlat(O) as
+    map K in keyof O do O[K] | undefined end & {}
+
+export type UndefinableDeep(O) as
+    map K in keyof O do
+        if O[K] <: BuiltIn then
+            O[K]
+        else
+            UndefinableDeep(O[K] | undefined)
+        end
+    end
+
+type UndefinablePart(O, depth)
+    where
+        O <: object,
+        depth <: Depth
+    as
+        match depth do
+            'flat' -> UndefinableFlat(O),
+            'deep' -> UndefinableDeep(O)
+        end
+
+export type _Undefinable(O, K, depth)
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        PatchFlat(UndefinablePart(_Pick(O, K), depth), O)
+
+// Make some fields of `O` `undefined` (deeply or not)
+export type Undefinable(O, K, depth)
+    defaults K = Key, depth = 'flat'
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        if O <: unknown then
+            _Undefinable(O, K, depth)
+        end
+
+unittest "Undefinable(O, K, depth)" do
+    assert UndefinableFlat({a: 1, b: 2}) == {a: 1 | undefined, b: 2 | undefined}
+    // TODO: evaluator cannot prove this yet (depends on ./Pick and ./Patch)
+    assert Undefinable({a: 1, b: 2}, 'a') == {a: 1 | undefined, b: 2}
+end

@@ -1,0 +1,28 @@
+import { Has } from "../Union/Has"
+import { List } from "./List"
+
+// TS original selects from `{0: L1, 1: L}[Has<keyof L, keyof L1>]`;
+// numeric object keys are unsupported, so it is written as a conditional.
+export type Longest(L, L1)
+    where
+        L <: List,
+        L1 <: List
+    as
+        if L <: unknown then
+            if L1 <: unknown then
+                if Has(keyof L, keyof L1) <: 1 then
+                    L
+                else
+                    L1
+                end
+            end
+        end
+
+unittest "Longest(L, L1)" do
+    assert Longest([1, 2], [1, 2, 3]) == [1, 2, 3]
+    // TODO: evaluator cannot prove this yet
+    assert Longest([1, 2, 3], [1, 2]) == [1, 2, 3]
+    // L has priority when both lengths are equal
+    // TODO: evaluator cannot prove this yet
+    assert Longest([1, 2], ['a', 'b']) == [1, 2]
+end

@@ -1,0 +1,11 @@
+import { List } from "./List"
+
+// Transform a List into an Union
+export type UnionOf(L)
+    where L <: List
+    as L[number]
+
+unittest "UnionOf(L)" do
+    assert UnionOf([1, 2, 3]) == 1 | 2 | 3
+    assert UnionOf(['a', 2]) == 'a' | 2
+end

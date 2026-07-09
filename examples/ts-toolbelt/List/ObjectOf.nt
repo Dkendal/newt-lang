@@ -1,0 +1,21 @@
+import { _Omit } from "../Object/Omit"
+import { _Pick } from "../Object/Pick"
+import { Length } from "./Length"
+import { List } from "./List"
+
+export type ObjectOf(O)
+    where
+        O <: List
+    as
+        if O <: unknown then
+            if number <: Length(O) then // detect arrays
+                _Pick(O, number)        // preserves arrays
+            else
+                _Omit(O, keyof(any[]))  // transforms tuples
+            end
+        end
+
+unittest "ObjectOf(O)" do
+    // TODO: evaluator cannot prove this yet
+    assert ObjectOf([1, 2])['0'] == 1
+end

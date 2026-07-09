@@ -1,0 +1,54 @@
+import { And } from "../Boolean/And"
+import { Or } from "../Boolean/Or"
+import { Extends } from "../Any/Extends"
+
+export type IsStringLiteral(A)
+    where A <: any
+    as
+        if A <: string then
+            if string <: A then
+                0
+            else
+                1
+            end
+        else
+            0
+        end
+
+export type IsNumberLiteral(A)
+    where A <: any
+    as
+        if A <: number then
+            if number <: A then
+                0
+            else
+                1
+            end
+        else
+            0
+        end
+
+// Literal to restrict against
+export type Kind as string | number
+
+export type IsLiteral(A, kind)
+    defaults kind = Kind
+    where
+        A <: any,
+        kind <: Kind
+    as
+        And(Or(IsStringLiteral(A), IsNumberLiteral(A)), Extends(A, kind))
+
+unittest "IsLiteral(A, kind)" do
+    // TODO: evaluator cannot prove these yet — nested applications passed as
+    // arguments (e.g. Or(IsStringLiteral(A), IsNumberLiteral(A))) are not
+    // reduced before the outer lookup; each component evaluates correctly in
+    // isolation.
+    assert IsLiteral(1 | 2) == 1
+    // TODO: evaluator cannot prove this yet
+    assert IsLiteral(1 | 2, string) == 0
+    // TODO: evaluator cannot prove this yet
+    assert IsLiteral(1 | '2', string) == 0 | 1
+    // TODO: evaluator cannot prove this yet
+    assert IsLiteral(number) == 0
+end

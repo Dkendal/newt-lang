@@ -1,0 +1,16 @@
+import { KeySet } from "./KeySet"
+import { Omit } from "./Omit"
+import { List } from "./List"
+
+// Remove out of `L` a range of entries
+export type Remove(L, From, To)
+    where
+        L <: List,
+        From <: number,
+        To <: number
+    as Omit(L, KeySet(From, To))
+
+unittest "Remove(L, From, To)" do
+    // TODO: evaluator cannot prove this yet
+    assert Remove([1, 2, 3, 4], 1, 2) == [1, 4]
+end

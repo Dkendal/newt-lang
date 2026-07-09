@@ -1,0 +1,18 @@
+import { Key } from "./_Internal"
+import { List } from "./List"
+import { Update } from "../Object/Update"
+import { x } from "../Any/x"
+import { Cast } from "../Any/Cast"
+
+export type Nullable(L, K)
+    defaults K = Key
+    where
+        L <: List,
+        K <: Key
+    as
+        Cast(Update(L, `${K & number}` | K, x | null | undefined), List)
+
+unittest "Nullable(L, K)" do
+    // TODO: evaluator cannot prove this yet
+    assert Nullable([1]) == [1 | null | undefined]
+end

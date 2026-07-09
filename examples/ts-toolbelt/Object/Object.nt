@@ -1,0 +1,13 @@
+import { Key } from "../Any/Key"
+import { Record } from "./Record"
+
+// An [[Object]]
+export type Object as Record(Key, any)
+
+unittest "Object" do
+    // TODO: evaluator cannot prove this yet (Record(Key, any) involves `any`,
+    // which the assert algebra treats as indeterminate)
+    assert {a: 'hello'} <: Object
+    // TODO: evaluator cannot prove this yet (same `any` indeterminacy)
+    assert {b: 'world'} <: Object
+end

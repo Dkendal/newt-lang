@@ -1,0 +1,49 @@
+import { List } from "./List"
+import { _UnNest } from "./UnNest"
+import { Cast } from "../Any/Cast"
+import { Equals } from "../Any/Equals"
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Extends } from "../Any/Extends"
+import { Next } from "../Iteration/Next"
+import { Or } from "../Boolean/Or"
+import { Boolean } from "../Boolean/_Internal"
+
+type __Flatten(L, LO, strict, limit, I)
+    defaults I = IterationOf(0)
+    where
+        L <: List,
+        LO <: List,
+        strict <: Boolean,
+        limit <: Iteration,
+        I <: Iteration
+    as
+        // TS uses a `{0: ..., 1: ...}[...]` lookup here; numeric property
+        // names are not supported, so an equivalent tuple lookup is used.
+        [
+            __Flatten(_UnNest(L, strict), L, strict, limit, Next(I)),
+            L
+        ][Or(Equals(L, LO), Extends(limit, I))]
+
+export type _Flatten(L, strict, limit)
+    defaults limit = number
+    where
+        L <: List,
+        strict <: Boolean,
+        limit <: number
+    as
+        if __Flatten(L, [], strict, IterationOf(limit)) <: ?X then
+            Cast(X, List)
+        end
+
+// Remove all dimensions of `L` (10 max)
+export type Flatten(L, strict, limit)
+    defaults strict = 1, limit = number
+    where
+        L <: List,
+        strict <: Boolean,
+        limit <: number
+    as
+        if L <: unknown then
+            _Flatten(L, strict, limit)
+        end

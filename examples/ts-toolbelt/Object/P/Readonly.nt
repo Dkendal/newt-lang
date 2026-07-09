@@ -1,0 +1,49 @@
+import { Key } from "../../Any/Key"
+import { Readonly as OReadonly } from "../Readonly"
+import { List } from "../../List/List"
+import { BuiltIn } from "../../Misc/BuiltIn"
+import { Tail } from "../../List/Tail"
+import { Depth } from "../_Internal"
+
+type ReadonlyAt(O, Path, depth)
+    where
+        Path <: List(Key),
+        depth <: Depth
+    as cond do
+        O <: BuiltIn -> O,
+        Path <: [Key] and O <: List -> OReadonly(O, Path[0], depth),
+        Path <: [Key] and O <: object -> OReadonly(O, Path[0], depth),
+        Path <: [Key] -> O,
+        else ->
+            map K in keyof O do
+                if K <: Path[0] then
+                    ReadonlyAt(O[K], Tail(Path), depth)
+                else
+                    O[K]
+                end
+            end
+    end
+
+// Make some fields of `O` readonly at `Path` (deeply or not)
+export type Readonly(O, Path, depth)
+    defaults depth = 'flat'
+    where
+        O <: object,
+        Path <: List(Key),
+        depth <: Depth
+    as
+        if Path <: unknown then
+            ReadonlyAt(O, Path, depth)
+        end
+
+// TODO allow for types in unittest blocks that aren't emitted
+type User as {info: {name: string}, id: number}
+
+unittest "Readonly(O, Path, depth)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Readonly and
+    // recursive ReadonlyAt)
+    assert Readonly(User, ['info', 'name']) == {
+        info: {readonly name: string},
+        id: number
+    }
+end

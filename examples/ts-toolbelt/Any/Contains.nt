@@ -1,0 +1,17 @@
+import { Extends } from "./Extends"
+
+export type Contains(A1, A2)
+    where
+        A1 <: any,
+        A2 <: any
+    as
+        if Extends(A1, A2) <: 1 then 1 else 0 end
+
+unittest "Contains(A1, A2)" do
+    assert Contains('a' | 'b', 'b') == 0
+    assert Contains('a', 'a' | 'b') == 1
+    assert Contains({a: string}, {a: string, b: number}) == 0
+    assert Contains({a: string, b: number}, {a: string}) == 1
+    // Nothing cannot contain nothing, use `A.Equals`
+    assert Contains(never, never) == 0
+end

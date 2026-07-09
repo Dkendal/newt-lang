@@ -1,0 +1,19 @@
+import { Patch as OPatch } from "../Object/Patch"
+import { List } from "./List"
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Cast } from "../Any/Cast"
+
+export type Patch(L, L1, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = never
+    where
+        L <: List,
+        L1 <: List,
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        Cast(OPatch(L, L1, depth, ignore, fill), List)

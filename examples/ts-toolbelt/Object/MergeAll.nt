@@ -1,0 +1,67 @@
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Merge } from "./Merge"
+import { Pos } from "../Iteration/Pos"
+import { Next } from "../Iteration/Next"
+import { Length } from "../List/Length"
+import { Cast } from "../Any/Cast"
+import { List } from "../List/List"
+import { Extends } from "../Any/Extends"
+import { Depth } from "./_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+// NOTE: the TS original recurses via `{0: ..., 1: ...}[Extends<...>]`;
+// numeric-literal object keys are unsupported, so we branch on the result.
+type __MergeAll(O, Os, depth, ignore, fill, I)
+    defaults I = IterationOf(0)
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any,
+        I <: Iteration
+    as
+        if Extends(Pos(I), Length(Os)) <: 1 then
+            O
+        else
+            __MergeAll(Merge(O, Os[Pos(I)], depth, ignore, fill), Os, depth, ignore, fill, Next(I))
+        end
+
+export type _MergeAll(O, Os, depth, ignore, fill)
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        if __MergeAll(O, Os, depth, ignore, fill) <: ?X then
+            Cast(X, object)
+        end
+
+// [[Merge]] a list of [[Object]]s into `O`. Merges from left to right, first
+// items get completed by the next ones (last-in completes).
+export type MergeAll(O, Os, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = undefined
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        if O <: unknown then
+            if Os <: unknown then
+                _MergeAll(O, Os, depth, ignore, fill)
+            end
+        end
+
+// TODO: evaluator cannot prove asserts about this yet — it diverges
+// (non-termination) expanding the recursive `__MergeAll` iteration, even for
+// the empty-list base case, so no unittest is included (the TS @example is
+// empty too). Intended behavior:
+//   MergeAll({a: 1}, [{b: 2}, {c: 3}]) == {a: 1, b: 2, c: 3}

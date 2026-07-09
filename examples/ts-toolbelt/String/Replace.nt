@@ -1,0 +1,32 @@
+import { Cast } from "../Any/Cast"
+import { Literal } from "./_Internal"
+
+type _Replace(S, R, W)
+    where
+        S <: string,
+        R <: Literal,
+        W <: Literal
+    as
+        if S <: `${?BS}${R}${?AS}` then
+            Replace(`${BS}${W}${AS}`, R, W)
+        else
+            S
+        end
+
+// Replace `R` with `W` in `S`
+export type Replace(S, R, W)
+    where
+        S <: string,
+        R <: Literal,
+        W <: Literal
+    as
+        if _Replace(S, R, W) <: ?X then
+            Cast(X, string)
+        end
+
+unittest "Replace(S, R, W)" do
+    // TODO: evaluator cannot prove this yet
+    assert Replace('hello world', 'o', '0') == 'hell0 w0rld'
+    // TODO: evaluator cannot prove this yet
+    assert Replace('abc', 'z', 'y') == 'abc'
+end

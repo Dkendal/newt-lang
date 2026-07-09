@@ -1,0 +1,23 @@
+import { Match } from "../Any/_Internal"
+import { Is } from "../Any/Is"
+
+// Remove `M` out of `U`
+export type Filter(U, M, match)
+    defaults match = 'default'
+    where
+        U <: any,
+        M <: any,
+        match <: Match
+    as
+        // TS uses a `{1: never, 0: U & M}[Is<U, M, match>]` lookup here;
+        // numeric property names are not supported, so an equivalent tuple
+        // lookup is used.
+        if U <: unknown then
+            [U & M, never][Is(U, M, match)]
+        end
+
+unittest "Filter(U, M, match)" do
+    // TODO: evaluator cannot prove this yet (distribution over the union and
+    // tuple lookup indexed by the result of Is)
+    assert Filter(string | 1, 'a') == 'a'
+end

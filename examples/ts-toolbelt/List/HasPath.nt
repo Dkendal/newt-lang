@@ -1,0 +1,16 @@
+import { HasPath as OHasPath } from "../Object/HasPath"
+import { Match } from "../Any/_Internal"
+import { Key } from "../Any/Key"
+import { ObjectOf } from "./ObjectOf"
+import { List } from "./List"
+
+export type HasPath(L, Path, M, match)
+    defaults
+        M = any,
+        match = 'default'
+    where
+        L <: List,
+        Path <: List(Key),
+        M <: any,
+        match <: Match
+    as OHasPath(ObjectOf(L), Path, M, match)

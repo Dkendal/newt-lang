@@ -1,0 +1,10 @@
+export type Await(P)
+    where
+        P <: any
+    as
+        if P <: Promise(?A) then A else P end
+
+unittest "Await(P)" do
+    assert Await(Promise(string)) == string
+    assert Await(Promise(number)) == number
+end

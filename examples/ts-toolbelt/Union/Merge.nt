@@ -1,0 +1,24 @@
+import { At } from "../Any/At"
+import { Overwrite } from "../Object/Overwrite"
+import { ComputeRaw } from "../Any/Compute"
+import { IntersectOf } from "./IntersectOf"
+import { Strict } from "./Strict"
+
+type _Merge(U)
+    where
+        U <: object
+    as
+        IntersectOf(Overwrite(U, map -? K in keyof U do At(U, K) end))
+
+// Merge a [[Union]] of [[Object]]s into a single one
+export type Merge(U)
+    where
+        U <: object
+    as
+        ComputeRaw(_Merge(Strict(U)))
+
+unittest "Merge(U)" do
+    // TODO: evaluator cannot prove this yet (depends on ../Object/Overwrite
+    // and IntersectOf's infer over intersected function types)
+    assert Merge({a: 1} | {b: 2}) <: {a?: 1, b?: 2}
+end

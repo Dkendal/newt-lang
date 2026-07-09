@@ -1,0 +1,54 @@
+import { Next } from "../Iteration/Next"
+import { Prepend } from "./Prepend"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Iteration } from "../Iteration/Iteration"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+import { Extends } from "../Any/Extends"
+import { Pos } from "../Iteration/Pos"
+
+type __Repeat(N, A, L, I)
+    defaults L = [], I = IterationOf(0)
+    where
+        N <: number,
+        L <: List,
+        I <: Iteration
+    as
+        // TS uses a `{0: ..., 1: ...}[...]` lookup here; numeric property
+        // names are not supported, so an equivalent tuple lookup is used.
+        [
+            __Repeat(N, A, Prepend(L, A), Next(I)),
+            L
+        ][Extends(Pos(I), N)]
+
+export type _Repeat(A, N, L)
+    defaults L = []
+    where
+        A <: any,
+        N <: number,
+        L <: List
+    as
+        if __Repeat(N, A, L) <: ?X then
+            Cast(X, List)
+        end
+
+// Fill a List with `N` times `A`
+export type Repeat(A, N, L)
+    defaults L = []
+    where
+        A <: any,
+        N <: number,
+        L <: List
+    as
+        if N <: unknown then
+            if L <: unknown then
+                _Repeat(A, N, L)
+            end
+        end
+
+unittest "Repeat(A, N, L)" do
+    // TODO: evaluator cannot prove this yet
+    assert Repeat('x', 2) == ['x', 'x']
+    // TODO: evaluator cannot prove this yet
+    assert Repeat(1, 0) == []
+end

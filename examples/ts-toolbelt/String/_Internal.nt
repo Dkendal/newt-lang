@@ -1,0 +1,1 @@
+export type Literal as string | number | bigint | boolean

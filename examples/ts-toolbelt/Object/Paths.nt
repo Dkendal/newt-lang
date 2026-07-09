@@ -1,0 +1,39 @@
+import { Key } from "../Any/Key"
+import { NonNullableFlat } from "../Object/NonNullable"
+import { Cast } from "../Any/Cast"
+import { List } from "../List/List"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Primitive } from "../Misc/Primitive"
+import { Length } from "../List/Length"
+import { Keys } from "../Any/Keys"
+
+type UnionOf(A) as
+    if A <: List then
+        A[number]
+    else
+        A[keyof A]
+    end
+
+type _Paths(O, P)
+    defaults P = []
+    where P <: List
+    as UnionOf(
+        map K in keyof O do
+            cond do
+                O[K] <: BuiltIn | Primitive -> NonNullableFlat([...P, K?]),
+                [Keys(O[K])] <: [never] -> NonNullableFlat([...P, K?]),
+                12 <: Length(P) -> NonNullableFlat([...P, K?]),
+                else -> _Paths(O[K], [...P, K?])
+            end
+        end
+    )
+
+// Get all the possible paths of `O`
+// (this won't work with circular-refs)
+export type Paths(O, P)
+    defaults P = []
+    where P <: List
+    as
+        if _Paths(O, P) <: ?X then
+            Cast(X, List(Key))
+        end

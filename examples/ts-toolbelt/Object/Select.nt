@@ -1,0 +1,18 @@
+import { SelectKeys } from "./SelectKeys"
+import { Match } from "../Any/_Internal"
+import { Pick } from "./Pick"
+
+// Extract the fields of `O` that match `M`
+export type Select(O, M, match)
+    defaults match = 'default'
+    where
+        O <: object,
+        M <: any,
+        match <: Match
+    as
+        Pick(O, SelectKeys(O, M, match))
+
+unittest "Select(O, M, match)" do
+    // TODO: evaluator cannot prove this yet (depends on ./Pick)
+    assert Select({a: 1, b: string}, string) == {b: string}
+end

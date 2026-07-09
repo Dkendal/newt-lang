@@ -1,0 +1,11 @@
+import { Overwrite } from "../Object/Overwrite"
+import { List } from "./List"
+
+// Remove `?` & `readonly` from a List.
+// TS original: Overwrite<Required<L>, L>; `Required` is not a builtin here,
+// so it is inlined as the equivalent mapped type.
+export type Naked(L)
+    where L <: List
+    as Overwrite(map -? K in keyof L do L[K] end, L)
+
+export type Key as string | number | symbol

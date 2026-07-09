@@ -1,0 +1,14 @@
+import { Key } from "./_Internal"
+import { List } from "./List"
+import { Update as OUpdate } from "../Object/Update"
+import { Cast } from "../Any/Cast"
+
+// Update in `L` the entries of key `K` with `A`.
+// Use the `x` placeholder to get the current field type.
+export type Update(L, K, A)
+    where
+        L <: List,
+        K <: Key,
+        A <: any
+    as
+        Cast(OUpdate(L, `${K & number}` | K, A), List)

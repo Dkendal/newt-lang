@@ -1,0 +1,57 @@
+import { Iteration } from "../Iteration/Iteration"
+import { IterationOf } from "../Iteration/IterationOf"
+import { Pos } from "../Iteration/Pos"
+import { Next } from "../Iteration/Next"
+import { Length } from "../List/Length"
+import { Cast } from "../Any/Cast"
+import { List } from "../List/List"
+import { Depth } from "./_Internal"
+import { Patch } from "./Patch"
+import { BuiltIn } from "../Misc/BuiltIn"
+
+type __PatchAll(O, Os, depth, ignore, fill, I)
+    defaults I = IterationOf(0)
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any,
+        I <: Iteration
+    as
+        if Pos(I) <: Length(Os) then
+            O
+        else
+            __PatchAll(Patch(O, Os[Pos(I)], depth, ignore, fill), Os, depth, ignore, fill, Next(I))
+        end
+
+export type _PatchAll(O, Os, depth, ignore, fill)
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        if __PatchAll(O, Os, depth, ignore, fill) <: ?X then
+            Cast(X, object)
+        end
+
+// [[Patch]] a list of [[Object]]s into `O`. Patches from left to right.
+export type PatchAll(O, Os, depth, ignore, fill)
+    defaults
+        depth = 'flat',
+        ignore = BuiltIn,
+        fill = never
+    where
+        O <: object,
+        Os <: List(object),
+        depth <: Depth,
+        ignore <: object,
+        fill <: any
+    as
+        if O <: unknown then
+            if Os <: unknown then
+                _PatchAll(O, Os, depth, ignore, fill)
+            end
+        end

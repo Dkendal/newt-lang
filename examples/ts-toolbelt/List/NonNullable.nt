@@ -1,0 +1,56 @@
+import { _Pick } from "../Object/Pick"
+import { Key } from "./_Internal"
+import { NonNullable as UNonNullable } from "../Union/NonNullable"
+import { Depth } from "../Object/_Internal"
+import { BuiltIn } from "../Misc/BuiltIn"
+import { Cast } from "../Any/Cast"
+import { List } from "./List"
+
+export type NonNullableFlat(O, K)
+    defaults K = Key
+    as
+        (map P in keyof O do
+            if P <: K then
+                UNonNullable(O[P])
+            else
+                O[P]
+            end
+        end) & {}
+
+type _NonNullableDeep(O) as
+    map K in keyof O do
+        if O[K] <: BuiltIn then
+            O[K]
+        else
+            NonNullableDeep(O[K], Key)
+        end
+    end
+
+export type NonNullableDeep(O, K)
+    defaults K = Key
+    as
+        _NonNullableDeep(NonNullableFlat(O, K))
+
+export type NonNullablePart(O, K, depth)
+    where
+        O <: object,
+        K <: Key,
+        depth <: Depth
+    as
+        // NOTE: quoted property names are unsupported; identifier keys
+        // `flat`/`deep` denote the same string keys as TS `'flat'`/`'deep'`.
+        {
+            flat: NonNullableFlat(O, K),
+            deep: NonNullableDeep(O, K)
+        }[depth]
+
+export type NonNullable(L, K, depth)
+    defaults
+        K = Key,
+        depth = 'flat'
+    where
+        L <: List,
+        K <: Key,
+        depth <: Depth
+    as
+        Cast(NonNullablePart(L, `${K & number}` | K, depth), List)
