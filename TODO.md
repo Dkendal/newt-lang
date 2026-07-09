@@ -282,6 +282,12 @@ crash/hang cases whose asserts are commented out entirely.
   `Record` (`Any/Compute.nt`), and `Error`/`Date`/`RegExp`/`Generator`
   (`Misc/BuiltIn.nt`, warnings only) have no `.nt` definitions, so claims
   touching them are indeterminate. Needs a small ambient-lib prelude.
+- [ ] **T16. Function types don't expose `Function`'s apparent members.**
+  With `Function` defined structurally (`examples/lib.nt`),
+  `(() => any) <: Function` is a definite `false` — the engine gives function
+  types no apparent `apply`/`call`/`bind`/`length` members (tsgo proves it;
+  conformance DISAGREE on `examples/lib.nt`). Counterpart of G7 for
+  functions.
 - [ ] **T15. Test coverage holes from the port:** `Object/{MergeAll,PatchAll,
   Paths}.nt` and `Object/P/_Internal.nt` compile clean but their TS
   `@example`s were not converted to unittest blocks.

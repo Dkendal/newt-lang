@@ -1,0 +1,150 @@
+// TypeScript lib.d.ts built-ins referenced by the ts-toolbelt examples.
+// Ported from lib.es5.d.ts (tsgo / @typescript/native-preview). Utility type
+// aliases are ported faithfully; the interfaces (Function, Error, Date,
+// RegExp, Generator, Promise) are curated structural stubs carrying only the
+// members that matter to type-level code — the full lib surface is
+// irrelevant here.
+//
+// Not portable: Uppercase / Lowercase / Capitalize / Uncapitalize / NoInfer
+// are `intrinsic` in lib.es5.d.ts and have no .nt equivalent.
+
+export type PropertyKey as string | number | symbol
+
+// ---------------------------------------------------------------------------
+// Utility type aliases (lib.es5.d.ts "Type Operators" block)
+// ---------------------------------------------------------------------------
+
+export type Partial(T) as map ? k in keyof(T) do T[k] end
+
+export type Required(T) as map -? k in keyof(T) do T[k] end
+
+export type Readonly(T) as map readonly k in keyof(T) do T[k] end
+
+export type Pick(T, K)
+    where K <: keyof T
+    as map k in K do T[k] end
+
+export type Record(K, T)
+    where K <: PropertyKey
+    as map k in K do T end
+
+export type Exclude(T, U) as if T <: U then never else T end
+
+export type Extract(T, U) as if T <: U then T end
+
+export type Omit(T, K)
+    where K <: PropertyKey
+    as Pick(T, Exclude(keyof T, K))
+
+export type NonNullable(T) as T & {}
+
+export type Parameters(T)
+    where T <: (...args: any[]) => any
+    as if T <: (...args: ?P) => any then P end
+
+export type ConstructorParameters(T)
+    where T <: new (...args: any[]) => any
+    as if T <: new (...args: ?P) => any then P end
+
+export type ReturnType(T)
+    where T <: (...args: any[]) => any
+    as if T <: (...args: any[]) => ?R then R else any end
+
+export type InstanceType(T)
+    where T <: new (...args: any[]) => any
+    as if T <: new (...args: any[]) => ?R then R else any end
+
+export type Awaited(T) as
+    if T <: null | undefined then
+        T
+    else
+        if T <: object & { then: (onfulfilled: ?F, ...args: any[]) => any } then
+            if F <: (value: ?V, ...args: any[]) => any then
+                Awaited(V)
+            end
+        else
+            T
+        end
+    end
+
+// ---------------------------------------------------------------------------
+// Global interfaces (curated structural stubs)
+// ---------------------------------------------------------------------------
+
+export interface Function {
+  apply: (thisArg: any, argArray?: any) => any,
+  call: (thisArg: any, ...argArray: any[]) => any,
+  bind: (thisArg: any, ...argArray: any[]) => any,
+  prototype: any,
+  length: number,
+}
+
+export interface Error {
+  name: string,
+  message: string,
+  stack?: string,
+}
+
+export interface Date {
+  getTime: () => number,
+  toISOString: () => string,
+  valueOf: () => number,
+}
+
+export interface RegExp {
+  exec: (s: string) => any,
+  test: (s: string) => boolean,
+  source: string,
+  lastIndex: number,
+}
+
+export interface Generator(T, TReturn, TNext)
+    defaults T = unknown, TReturn = any, TNext = any {
+  next: (...args: TNext[]) => { done: boolean, value: T | TReturn },
+  return: (value: TReturn) => { done: boolean, value: T | TReturn },
+  throw: (e: any) => { done: boolean, value: T | TReturn },
+}
+
+export interface PromiseLike(T) {
+  then: (onfulfilled?: (value: T) => any, onrejected?: (reason: any) => any) => PromiseLike(T),
+}
+
+export interface Promise(T) {
+  then: (onfulfilled?: (value: T) => any, onrejected?: (reason: any) => any) => Promise(T),
+  catch: (onrejected?: (reason: any) => any) => Promise(T),
+}
+
+// ---------------------------------------------------------------------------
+
+type Point as { x: number, y?: string }
+
+unittest "mapped utility types" do
+    assert Partial(Point) == { x?: number, y?: string }
+    assert Required(Point) == { x: number, y: string }
+    assert Readonly(Point) == { readonly x: number, readonly y?: string }
+    assert Pick(Point, 'x') == { x: number }
+    assert Record('a' | 'b', number) == { a: number, b: number }
+end
+
+unittest "union utility types" do
+    assert Exclude(1 | 2 | 3, 2) == 1 | 3
+    assert Extract(1 | 2 | 3, 2 | 4) == 2
+    // TODO: evaluator cannot prove this yet (nested type applications passed
+    // as arguments are not reduced, see TODO.md T10)
+    assert Omit(Point, 'y') == { x: number }
+    assert NonNullable(string | null | undefined) == string
+end
+
+unittest "function utility types" do
+    // TODO: evaluator cannot prove these yet (infer through rest-parameter
+    // function types, see TODO.md T6)
+    assert Parameters((a: number, b: string) => void) == [a: number, b: string]
+    assert ReturnType(() => string) == string
+end
+
+unittest "interfaces are structural" do
+    // TODO: evaluator cannot prove this yet (function types do not expose
+    // the Function interface's apparent members)
+    assert (() => any) <: Function
+    assert { name: 'x', message: 'y' } <: Error
+end
