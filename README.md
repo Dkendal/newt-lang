@@ -27,7 +27,7 @@ type IdOrNameLabel<T extends string | number> =
 
 ```
 
-The same thing can be expressed in Newt using few different control structures:
+The same thing can be expressed in Newt using different control structures:
 
 ```haskell
 interface IdLabel {
