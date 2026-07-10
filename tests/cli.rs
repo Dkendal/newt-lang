@@ -32,7 +32,7 @@ fn run(source: &str, args: &[&str]) -> (bool, String) {
 
 #[test]
 fn unresolved_reference_warns_but_exits_zero() {
-    let (ok, stderr) = run("type A as Foo", &[]);
+    let (ok, stderr) = run("type A do Foo end", &[]);
     assert!(ok, "warnings alone must not fail the run:\n{stderr}");
     assert!(stderr.contains("cannot resolve type `Foo`"), "{stderr}");
     assert!(
@@ -43,7 +43,7 @@ fn unresolved_reference_warns_but_exits_zero() {
 
 #[test]
 fn deny_unresolved_exits_nonzero() {
-    let (ok, stderr) = run("type A as Foo", &["--deny-unresolved"]);
+    let (ok, stderr) = run("type A do Foo end", &["--deny-unresolved"]);
     assert!(!ok, "--deny-unresolved must fail the run:\n{stderr}");
     assert!(stderr.contains("cannot resolve type `Foo`"), "{stderr}");
 }
@@ -51,7 +51,7 @@ fn deny_unresolved_exits_nonzero() {
 #[test]
 fn resolved_program_emits_no_warning() {
     let (ok, stderr) = run(
-        "type Foo as 1\nunittest \"t\" do\n  assert Foo <: number\nend",
+        "type Foo do 1 end\nunittest \"t\" do\n  assert Foo <: number\nend",
         &[],
     );
     assert!(ok, "{stderr}");
@@ -60,7 +60,10 @@ fn resolved_program_emits_no_warning() {
 
 #[test]
 fn deny_unresolved_with_clean_program_exits_zero() {
-    let (ok, stderr) = run("type Foo as 1\ntype A as Foo", &["--deny-unresolved"]);
+    let (ok, stderr) = run(
+        "type Foo do 1 end\ntype A do Foo end",
+        &["--deny-unresolved"],
+    );
     assert!(ok, "{stderr}");
 }
 

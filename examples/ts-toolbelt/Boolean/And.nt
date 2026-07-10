@@ -7,11 +7,12 @@ export type And(B1, B2)
     where
         B1 <: Boolean,
         B2 <: Boolean
-    as
+    do
         [
             [0, 0],
             [0, 1]
         ][B1][B2]
+end
 
 unittest "And(B1, B2)" do
     assert And(1, 0) == 0

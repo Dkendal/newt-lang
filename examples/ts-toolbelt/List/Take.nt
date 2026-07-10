@@ -19,35 +19,38 @@ type TakeForth(L, N, I, LN)
         N <: Iteration,
         I <: Iteration,
         LN <: List
-    as
+    do
         if Extends(-1, Pos(I)) <: 1 then
             LN
         else
             TakeForth(L, N, Prev(I), Prepend(LN, L[Pos(I)]))
         end
+end
 
 // starts in reverse from the end till `N` = 0
 type TakeBack(L, N)
     where
         L <: List,
         N <: Iteration
-    as
+    do
         if Extends(0, Pos(N)) <: 1 then
             L
         else
             TakeBack(Tail(L), Prev(N))
         end
+end
 
 type __Take(L, N, way)
     where
         L <: List,
         N <: Iteration,
         way <: Way
-    as
+    do
         match way do
             '->' -> TakeForth(L, N),
             '<-' -> TakeBack(L, N)
         end
+end
 
 export type _Take(L, N, way)
     defaults way = '->'
@@ -55,10 +58,11 @@ export type _Take(L, N, way)
         L <: List,
         N <: number,
         way <: Way
-    as
+    do
         if __Take(L, IterationOf(N), way) <: ?X then
             Cast(X, List)
         end
+end
 
 // Extract `N` entries out of `L`
 export type Take(L, N, way)
@@ -67,12 +71,13 @@ export type Take(L, N, way)
         L <: List,
         N <: number,
         way <: Way
-    as
+    do
         if L <: unknown then
             if N <: unknown then
                 _Take(L, N, way)
             end
         end
+end
 
 // TODO: evaluator cannot prove these yet — evaluating the recursive
 // iteration loop does not terminate, so the asserts are commented out:

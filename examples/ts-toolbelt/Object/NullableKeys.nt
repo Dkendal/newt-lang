@@ -1,24 +1,26 @@
 export type _NullableKeys(O)
     where
         O <: object
-    as
-        (map -? K in keyof O do
+    do
+        (map -optional K in keyof O do
             if [O[K] & (undefined | null)] <: [never] then
                 never
             else
                 K
             end
         end)[keyof O]
+end
 
 // Get the keys of `O` that are nullable
 // (needs `--strictNullChecks` enabled)
 export type NullableKeys(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _NullableKeys(O)
         end
+end
 
 unittest "NullableKeys(O)" do
     // TODO: evaluator cannot prove this yet (mapped type with conditional

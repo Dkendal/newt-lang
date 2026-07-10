@@ -18,33 +18,36 @@ type __Zip(L, L1, LN, I)
         L1 <: List,
         LN <: List,
         I <: Iteration
-    as
+    do
         if Extends(Pos(I), Length(L)) <: 1 then
             LN
         else
             __Zip(L, L1, Append(LN, [L[Pos(I)], L1[Pos(I)]]), Next(I))
         end
+end
 
 export type _Zip(L, L1)
     where
         L <: List,
         L1 <: List
-    as
+    do
         if __Zip(Naked(L), L1) <: ?X then
             Cast(X, List)
         end
+end
 
 // Pair up the entries of `L` with `L1`
 export type Zip(L, L1)
     where
         L <: List,
         L1 <: List
-    as
+    do
         if L <: unknown then
             if L1 <: unknown then
                 _Zip(L, L1)
             end
         end
+end
 
 // TODO: evaluator cannot prove this yet — evaluating the recursive
 // iteration loop does not terminate, so the assert is commented out:

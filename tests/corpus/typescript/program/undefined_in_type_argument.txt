@@ -1,6 +1,6 @@
 Primitive undefined as a type argument
 =======
-type A as Foo(undefined)
+type A do Foo(undefined) end
 =======
 type A = Foo<undefined>;
 

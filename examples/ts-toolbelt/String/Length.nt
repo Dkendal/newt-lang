@@ -4,7 +4,8 @@ import { Length as LLength } from "../List/Length"
 // Get the length of a `string`
 export type Length(S)
     where S <: string
-    as LLength(Split(S, ''))
+    do LLength(Split(S, ''))
+end
 
 unittest "Length(S)" do
     // TODO: evaluator cannot prove this yet

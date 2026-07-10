@@ -3,12 +3,13 @@ export type Exclude(U, M)
     where
         U <: any,
         M <: any
-    as
+    do
         if U <: M then
             never
         else
             U
         end
+end
 
 unittest "Exclude(U, M)" do
     assert Exclude('a' | 'b' | 'c', 'a') == 'b' | 'c'

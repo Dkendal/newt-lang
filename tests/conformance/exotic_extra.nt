@@ -47,8 +47,8 @@ unittest "empty constructs self and top relations" do
   assert [] <: readonly []
 end
 
-type Tree as {value: number, children: Tree[]}
-type LL as {head: number, tail: LL | null}
+type Tree do {value: number, children: Tree[]} end
+type LL do {head: number, tail: LL | null} end
 
 unittest "recursive alias self and width relations" do
   assert Tree <: Tree
@@ -58,7 +58,7 @@ unittest "recursive alias self and width relations" do
   assert null <: LL | null
 end
 
-type Json as null | boolean | number | string | Json[] | {[k in string]: Json}
+type Json do null | boolean | number | string | Json[] | {[k in string]: Json} end
 
 unittest "recursive json union membership" do
   assert 1 <: Json

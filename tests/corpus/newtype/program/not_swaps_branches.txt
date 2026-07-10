@@ -2,20 +2,22 @@ A `not` condition in a type alias swaps the if branches
 
 =======
 
-type A as
+type A do
     if not (a <: b) then
         c
     else
         d
     end
+end
 
 =======
 
-type A as
+type A do
     if a <: b then
         d
     else
         c
     end
+end
 
 =======

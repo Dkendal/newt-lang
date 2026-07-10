@@ -17,13 +17,14 @@ type __Flatten(L, LO, strict, limit, I)
         strict <: Boolean,
         limit <: Iteration,
         I <: Iteration
-    as
+    do
         // TS uses a `{0: ..., 1: ...}[...]` lookup here; numeric property
         // names are not supported, so an equivalent tuple lookup is used.
         [
             __Flatten(_UnNest(L, strict), L, strict, limit, Next(I)),
             L
         ][Or(Equals(L, LO), Extends(limit, I))]
+end
 
 export type _Flatten(L, strict, limit)
     defaults limit = number
@@ -31,10 +32,11 @@ export type _Flatten(L, strict, limit)
         L <: List,
         strict <: Boolean,
         limit <: number
-    as
+    do
         if __Flatten(L, [], strict, IterationOf(limit)) <: ?X then
             Cast(X, List)
         end
+end
 
 // Remove all dimensions of `L` (10 max)
 export type Flatten(L, strict, limit)
@@ -43,7 +45,8 @@ export type Flatten(L, strict, limit)
         L <: List,
         strict <: Boolean,
         limit <: number
-    as
+    do
         if L <: unknown then
             _Flatten(L, strict, limit)
         end
+end

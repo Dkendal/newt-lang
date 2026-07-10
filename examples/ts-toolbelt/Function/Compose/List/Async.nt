@@ -12,5 +12,6 @@ import { Curry } from "../../Curry"
 // types, so a single untyped signature is the closest expressible form.
 // Note: `Promise` is the TS lib global; newtype leaves it unresolved but
 // transpiles it as-is.
-export type ComposeListAsync as
+export type ComposeListAsync do
     (fns: (Function | Curry(Function))[]) => Function(any, Promise(Await(any)))
+end

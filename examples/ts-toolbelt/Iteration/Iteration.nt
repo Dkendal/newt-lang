@@ -8,7 +8,7 @@
 // plus a generic lookup type (`IterationMap(K)`, standing in for
 // `IterationMap[K]`).
 
-export type IterationKey as
+export type IterationKey do
     '__'
     | '-100'
     | '-99'
@@ -211,16 +211,18 @@ export type IterationKey as
     | '98'
     | '99'
     | '100'
+end
 
-export type Iteration as [
+export type Iteration do [
     value: number,
     sign: '-' | '0' | '+',
     prev: IterationKey,
     next: IterationKey,
     oppo: IterationKey
 ]
+end
 
-export type IterationMap(K) as match K do
+export type IterationMap(K) do match K do
     '__' -> [number, '-' | '0' | '+', '__', '__', '__'],
     '-100' -> [-100, '-', '__', '-99', '100'],
     '-99' -> [-99, '-', '-100', '-98', '99'],
@@ -424,6 +426,7 @@ export type IterationMap(K) as match K do
     '99' -> [99, '+', '98', '100', '-99'],
     '100' -> [100, '+', '99', '__', '-100'],
     else -> [number, '-' | '0' | '+', '__', '__', '__']
+end
 end
 
 unittest "Iteration" do

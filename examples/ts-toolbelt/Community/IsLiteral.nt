@@ -4,7 +4,7 @@ import { Extends } from "../Any/Extends"
 
 export type IsStringLiteral(A)
     where A <: any
-    as
+    do
         if A <: string then
             if string <: A then
                 0
@@ -14,10 +14,11 @@ export type IsStringLiteral(A)
         else
             0
         end
+end
 
 export type IsNumberLiteral(A)
     where A <: any
-    as
+    do
         if A <: number then
             if number <: A then
                 0
@@ -27,17 +28,19 @@ export type IsNumberLiteral(A)
         else
             0
         end
+end
 
 // Literal to restrict against
-export type Kind as string | number
+export type Kind do string | number end
 
 export type IsLiteral(A, kind)
     defaults kind = Kind
     where
         A <: any,
         kind <: Kind
-    as
+    do
         And(Or(IsStringLiteral(A), IsNumberLiteral(A)), Extends(A, kind))
+end
 
 unittest "IsLiteral(A, kind)" do
     // TODO: evaluator cannot prove these yet — nested applications passed as

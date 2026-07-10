@@ -1,1 +1,1 @@
-export type List(A) defaults A = any as ReadonlyArray(A)
+export type List(A) defaults A = any do ReadonlyArray(A) end

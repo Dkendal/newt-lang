@@ -8,17 +8,19 @@ export type _Omit(L, K)
     where
         L <: List,
         K <: Key
-    as
+    do
         _ListOf(_OOmit(ObjectOf(L), `${K & number}` | K))
+end
 
 export type Omit(L, K)
     where
         L <: List,
         K <: Key
-    as
+    do
         if L <: unknown then
             _Omit(L, K)
         end
+end
 
 unittest "Omit(L, K)" do
     // TODO: evaluator cannot prove this yet

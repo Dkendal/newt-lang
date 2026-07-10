@@ -8,7 +8,8 @@ export type Remove(L, From, To)
         L <: List,
         From <: number,
         To <: number
-    as Omit(L, KeySet(From, To))
+    do Omit(L, KeySet(From, To))
+end
 
 unittest "Remove(L, From, To)" do
     // TODO: evaluator cannot prove this yet

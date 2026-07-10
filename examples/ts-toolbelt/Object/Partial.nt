@@ -7,10 +7,11 @@ export type Partial(O, depth)
     where
         O <: object,
         depth <: Depth
-    as OptionalPart(O, depth)
+    do OptionalPart(O, depth)
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type L as {a: {b: {c: 2}}, b: 1}
+type L do {a: {b: {c: 2}}, b: 1} end
 
 unittest "Partial(O, depth)" do
     assert Partial(L) == {a?: {b: {c: 2}}, b?: 1}

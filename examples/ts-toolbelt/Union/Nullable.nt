@@ -2,8 +2,9 @@
 export type Nullable(U)
     where
         U <: any
-    as
+    do
         U | undefined | null
+end
 
 unittest "Nullable(U)" do
     assert Nullable(string) == string | undefined | null

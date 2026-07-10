@@ -1,6 +1,6 @@
 import { Key as Local } from "./Key"
 
-type Local as 1
+type Local do 1 end
 
 unittest "aliased collision" do
     assert Local == 1

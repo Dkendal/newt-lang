@@ -1,6 +1,6 @@
 Decimal literal with a fraction
 =======
-type A as 100.0
+type A do 100.0 end
 =======
 type A = 100.0;
 

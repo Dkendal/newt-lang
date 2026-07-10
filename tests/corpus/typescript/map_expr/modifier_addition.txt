@@ -1,0 +1,11 @@
+Mapped-type modifier addition renders readonly and ?
+
+=======
+
+map readonly optional k in t do 1 end
+
+=======
+
+{ readonly [k in t]?: 1 }
+
+=======

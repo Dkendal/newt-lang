@@ -2,7 +2,7 @@ Generic type alias with one argument
 
 =======
 
-type A(x) as x
+type A(x) do x end
 
 =======
 

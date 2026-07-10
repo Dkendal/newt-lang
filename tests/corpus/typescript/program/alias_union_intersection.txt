@@ -1,6 +1,6 @@
 A top-level alias combining union and intersection
 =======
-type A as number & string | boolean
+type A do number & string | boolean end
 =======
 type A = boolean | (number & string);
 =======

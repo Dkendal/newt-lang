@@ -3,12 +3,13 @@ import { List } from "./List"
 
 export type Head(L)
     where L <: List
-    as
+    do
         if Length(L) <: 0 then
             never
         else
             L[0]
         end
+end
 
 unittest "Head(L)" do
     assert Head([1, 2, 3]) == 1

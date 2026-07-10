@@ -8,8 +8,9 @@ export type Partial(L, depth)
     where
         L <: List,
         depth <: Depth
-    as
+    do
         Cast(OPartial(L, depth), List)
+end
 
 unittest "Partial(L, depth)" do
     // TODO: evaluator cannot prove this yet

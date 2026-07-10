@@ -7,15 +7,17 @@ import { Strict } from "./Strict"
 type _Merge(U)
     where
         U <: object
-    as
-        IntersectOf(Overwrite(U, map -? K in keyof U do At(U, K) end))
+    do
+        IntersectOf(Overwrite(U, map -optional K in keyof U do At(U, K) end))
+end
 
 // Merge a [[Union]] of [[Object]]s into a single one
 export type Merge(U)
     where
         U <: object
-    as
+    do
         ComputeRaw(_Merge(Strict(U)))
+end
 
 unittest "Merge(U)" do
     // TODO: evaluator cannot prove this yet (depends on ../Object/Overwrite

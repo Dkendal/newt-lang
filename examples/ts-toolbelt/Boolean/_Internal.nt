@@ -1,1 +1,1 @@
-export type Boolean as 0 | 1
+export type Boolean do 0 | 1 end

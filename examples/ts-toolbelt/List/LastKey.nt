@@ -4,7 +4,8 @@ import { List } from "./List"
 
 export type LastKey(L)
     where L <: List
-    as Length(Tail(L))
+    do Length(Tail(L))
+end
 
 unittest "LastKey(L)" do
     // TODO: evaluator cannot prove this yet

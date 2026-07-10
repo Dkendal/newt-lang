@@ -1,6 +1,6 @@
 Negative integer literal type alias
 =======
-type A as -1
+type A do -1 end
 =======
 type A = -1;
 

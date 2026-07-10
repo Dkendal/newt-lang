@@ -13,25 +13,27 @@ type _Path(O, P, I)
     where
         P <: List(Key),
         I <: Iteration
-    as
+    do
         if Pos(I) <: Length(P) then
             O
         else
             _Path(At(O, P[Pos(I)]), P, Next(I))
         end
+end
 
 // Get in `O` the type of nested properties
 export type Path(O, P)
     where
         O <: any,
         P <: List(Key)
-    as
+    do
         if _Path(O & {}, P) <: ?X then
             Cast(X, any)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as { name: string, friends: [{ name: string }] }
+type User do { name: string, friends: [{ name: string }] } end
 
 // TODO: evaluator cannot prove these yet — evaluating `_Path` does not
 // terminate (the `Pos(I) <: Length(P)` guard stays indeterminate, so the

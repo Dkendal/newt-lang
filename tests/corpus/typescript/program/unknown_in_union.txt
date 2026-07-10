@@ -1,6 +1,6 @@
 Primitive unknown in a union
 =======
-type A as unknown | number
+type A do unknown | number end
 =======
 type A = unknown | number;
 

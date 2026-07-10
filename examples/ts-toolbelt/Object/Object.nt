@@ -2,7 +2,7 @@ import { Key } from "../Any/Key"
 import { Record } from "./Record"
 
 // An [[Object]]
-export type Object as Record(Key, any)
+export type Object do Record(Key, any) end
 
 unittest "Object" do
     // TODO: evaluator cannot prove this yet (Record(Key, any) involves `any`,

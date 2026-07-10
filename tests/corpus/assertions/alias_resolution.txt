@@ -2,7 +2,7 @@ a unittest can reference a top-level type alias by name
 
 =======
 
-type Foo as 1
+type Foo do 1 end
 
 unittest "alias" do
   assert Foo <: number

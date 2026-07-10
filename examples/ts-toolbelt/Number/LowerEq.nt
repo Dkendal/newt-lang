@@ -7,7 +7,8 @@ export type LowerEq(N1, N2)
     where
         N1 <: number,
         N2 <: number
-    as GreaterEq(N2, N1)
+    do GreaterEq(N2, N1)
+end
 
 unittest "LowerEq(N1, N2)" do
     // TODO: evaluator cannot prove this yet (recursive alias evaluation and

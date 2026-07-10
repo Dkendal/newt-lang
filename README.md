@@ -40,12 +40,13 @@ interface NameLabel {
 
 type IdOrNameLabel(T)
 where T <: string | number
-as
+do
   if T <: string then
     NameLabel
   else
     IdLabel
   end
+end
 ```
 
 Or
@@ -53,11 +54,12 @@ Or
 ```haskell
 type IdOrNameLabel(T)
 where T <: string | number
-as
+do
   cond do
     T <: string -> NameLabel
     else -> IdLabel
   end
+end
 ```
 
 Or finally:
@@ -65,11 +67,12 @@ Or finally:
 ```haskell
 type IdOrNameLabel(T)
 where T <: string | number
-as
+do
   match T do
     string -> NameLabel
     _ -> IdLabel
   end
+end
 ```
 
 While these simple examples probably aren't too compelling given all the extra

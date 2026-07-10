@@ -4,13 +4,14 @@
 export type IntersectOf(U)
     where
         U <: any
-    as
+    do
         // Distribute U into a union of function types, then infer the single
         // (intersected) parameter back out.
         let fns = if U <: unknown then (k: U) => void end in
         if fns <: (k: ?I) => void then
             I
         end
+end
 
 unittest "IntersectOf(U)" do
     // TODO: evaluator cannot prove this yet (contravariant infer over a

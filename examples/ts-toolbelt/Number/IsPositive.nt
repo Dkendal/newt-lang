@@ -8,16 +8,18 @@ import { IterationOf } from "../Iteration/IterationOf"
 // so a `match` on the sign is used instead.
 export type _IsPositive(N)
     where N <: Iteration
-    as
+    do
         match N[1] do
             '+' -> 1,
             else -> 0
         end
+end
 
 // Check whether a number is positive or not
 export type IsPositive(N)
     where N <: number
-    as _IsPositive(IterationOf(N))
+    do _IsPositive(IterationOf(N))
+end
 
 unittest "IsPositive(N)" do
     // TODO: evaluator cannot prove this yet (template-literal interpolation

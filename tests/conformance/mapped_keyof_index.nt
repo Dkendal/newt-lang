@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 // Shared object type used across the unittests below.
 // ---------------------------------------------------------------------------
-type Obj as {a: number, b: string, c: boolean}
+type Obj do {a: number, b: string, c: boolean} end
 
 // ---------------------------------------------------------------------------
 // keyof of an object literal collapses to the union of its keys.
@@ -100,8 +100,8 @@ end
 // to required (so the reverse direction fails).
 // ---------------------------------------------------------------------------
 unittest "mapped optional modifier" do
-  assert Obj <: map ?k in keyof(Obj) do Obj[k] end
-  assert not(map ?k in keyof(Obj) do Obj[k] end <: Obj)
-  assert map ?k in keyof(Obj) do Obj[k] end == {a?: number, b?: string, c?: boolean}
-  assert map ?k in keyof(Obj) do Obj[k] end <: {a?: number}
+  assert Obj <: map optional k in keyof(Obj) do Obj[k] end
+  assert not(map optional k in keyof(Obj) do Obj[k] end <: Obj)
+  assert map optional k in keyof(Obj) do Obj[k] end == {a?: number, b?: string, c?: boolean}
+  assert map optional k in keyof(Obj) do Obj[k] end <: {a?: number}
 end

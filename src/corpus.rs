@@ -372,10 +372,11 @@ mod tests {
 
     #[test]
     fn splits_four_sections() {
-        let case =
-            parse_fixture("Name\n\n=======\n\ntype A as 1\n\n=======\n\ntype A = 1;\n\n=======\n");
+        let case = parse_fixture(
+            "Name\n\n=======\n\ntype A do 1 end\n\n=======\n\ntype A = 1;\n\n=======\n",
+        );
         assert_eq!(case.name, "Name");
-        assert_eq!(case.source, "type A as 1");
+        assert_eq!(case.source, "type A do 1 end");
         assert_eq!(case.expected, "type A = 1;");
         assert_eq!(case.stderr, "");
     }
@@ -398,7 +399,7 @@ mod tests {
     #[should_panic(expected = "at least 3 `===` separator")]
     fn rejects_missing_stderr_section() {
         // Three sections (name, source, expected) but no stderr section.
-        parse_fixture("Name\n\n=======\n\ntype A as 1\n\n=======\n\ntype A = 1;\n");
+        parse_fixture("Name\n\n=======\n\ntype A do 1 end\n\n=======\n\ntype A = 1;\n");
     }
 
     #[test]

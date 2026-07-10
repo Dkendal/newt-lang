@@ -21,12 +21,13 @@ type __MergeAll(O, Os, depth, ignore, fill, I)
         ignore <: object,
         fill <: any,
         I <: Iteration
-    as
+    do
         if Extends(Pos(I), Length(Os)) <: 1 then
             O
         else
             __MergeAll(Merge(O, Os[Pos(I)], depth, ignore, fill), Os, depth, ignore, fill, Next(I))
         end
+end
 
 export type _MergeAll(O, Os, depth, ignore, fill)
     where
@@ -35,10 +36,11 @@ export type _MergeAll(O, Os, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         if __MergeAll(O, Os, depth, ignore, fill) <: ?X then
             Cast(X, object)
         end
+end
 
 // [[Merge]] a list of [[Object]]s into `O`. Merges from left to right, first
 // items get completed by the next ones (last-in completes).
@@ -53,12 +55,13 @@ export type MergeAll(O, Os, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         if O <: unknown then
             if Os <: unknown then
                 _MergeAll(O, Os, depth, ignore, fill)
             end
         end
+end
 
 // TODO: evaluator cannot prove asserts about this yet — it diverges
 // (non-termination) expanding the recursive `__MergeAll` iteration, even for

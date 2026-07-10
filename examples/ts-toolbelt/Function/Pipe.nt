@@ -13,7 +13,7 @@ export type Pipe(mode, input)
     where
         mode <: Mode,
         input <: Input
-    as IntersectOf({
+    do IntersectOf({
         sync: {
             multi: PipeMultiSync,
             list: PipeListSync
@@ -23,6 +23,7 @@ export type Pipe(mode, input)
             list: PipeListAsync
         }
     }[mode][input])
+end
 
 unittest "Pipe(mode, input)" do
     assert Pipe <: Pipe('sync', 'multi')

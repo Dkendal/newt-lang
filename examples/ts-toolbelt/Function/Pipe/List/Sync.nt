@@ -18,9 +18,10 @@ import { Function } from "../../Function"
 //
 // Closest expressible form: a single non-generic signature taking a
 // non-empty list of (possibly curried) functions.
-export type PipeListSync as (
+export type PipeListSync do (
     fns: [
         Function(any[], any) | Curry(Function(any[], any)),
         ...(Function(any[], any) | Curry(Function(any[], any)))[]
     ]
 ) => Function(any[], any)
+end

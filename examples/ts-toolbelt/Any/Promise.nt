@@ -3,10 +3,11 @@
 export type Promise(A)
     where
         A <: any
-    as
+    do
         globalThis.Promise(
             if A <: globalThis.Promise(?X) then X else A end
         )
+end
 
 unittest "Promise(A)" do
     // TODO: evaluator cannot prove this yet (`globalThis.Promise` is an

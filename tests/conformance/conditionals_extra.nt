@@ -1,15 +1,15 @@
 // Conformance edge cases added by the 2026-06-30 audit (conditionals).
 // Every assertion below agrees with tsgo --strict.
 
-type BoolDist(T) as if T <: true then 1 else 2 end
+type BoolDist(T) do if T <: true then 1 else 2 end end
 
 unittest "boolean distributes into true and false branches" do
   assert BoolDist(true) == 1
   assert BoolDist(false) == 2
 end
 
-type IsNeverD(T) as if T <: never then true else false end
-type ToArr(T) as if T <: any then T[] else never end
+type IsNeverD(T) do if T <: never then true else false end end
+type ToArr(T) do if T <: any then T[] else never end end
 
 unittest "never as naked input short-circuits to never" do
   assert IsNeverD(never) == never
@@ -18,16 +18,16 @@ unittest "never as naked input short-circuits to never" do
   assert ToArr(any) == any[]
 end
 
-type IsStr(T) as if T <: string then 1 else 2 end
+type IsStr(T) do if T <: string then 1 else 2 end end
 
 unittest "unknown does not distribute" do
   assert IsStr(unknown) == 2
 end
 
-type ElemElem(T) as if T <: Array(Array(?U)) then U else never end
-type RetArr(T) as if T <: () => Array(?U) then U else never end
-type RetOf(T) as if T <: (any) => ?R then R else never end
-type UnwrapArr(T) as if T <: Promise(Array(?U)) then U else never end
+type ElemElem(T) do if T <: Array(Array(?U)) then U else never end end
+type RetArr(T) do if T <: () => Array(?U) then U else never end end
+type RetOf(T) do if T <: (any) => ?R then R else never end end
+type UnwrapArr(T) do if T <: Promise(Array(?U)) then U else never end end
 
 unittest "nested array and function-return infer" do
   assert ElemElem(number[][]) == number
@@ -38,8 +38,8 @@ unittest "nested array and function-return infer" do
   assert UnwrapArr(Promise(string)) == never
 end
 
-type Kind(T) as if T <: string then 's' else if T <: number then 'n' else 'o' end end
-type Label(T) as if T <: 1 then 'one' else if T <: 2 then 'two' else 'x' end end
+type Kind(T) do if T <: string then 's' else if T <: number then 'n' else 'o' end end end
+type Label(T) do if T <: 1 then 'one' else if T <: 2 then 'two' else 'x' end end end
 
 unittest "chained conditional classification distributes per member" do
   assert Kind(string) == 's'
@@ -49,7 +49,7 @@ unittest "chained conditional classification distributes per member" do
   assert Label(1 | 2 | 3) == 'one' | 'two' | 'x'
 end
 
-type OnlyStr(T) as if T <: string then T else never end
+type OnlyStr(T) do if T <: string then T else never end end
 
 unittest "distributive filter keeps matching union members" do
   assert OnlyStr(string | number) == string
@@ -57,8 +57,8 @@ unittest "distributive filter keeps matching union members" do
   assert OnlyStr(number) == never
 end
 
-type NN(T) as if T <: null then never else T end
-type Always(T) as if T <: string then never else never end
+type NN(T) do if T <: null then never else T end end
+type Always(T) do if T <: string then never else never end end
 
 unittest "distribute null member and both-never branches" do
   assert NN(string | null) == string
@@ -67,14 +67,14 @@ unittest "distribute null member and both-never branches" do
   assert Always(number) == never
 end
 
-type Both(T) as if T <: (?U) => ?U then U else never end
+type Both(T) do if T <: (?U) => ?U then U else never end end
 
 unittest "infer same var in contravariant and covariant positions" do
   assert Both((string) => string) == string
 end
 
-type HasA(T) as if 'a' <: keyof T then 1 else 2 end
-type Get(T) as if T <: {x: ?V} then V else never end
+type HasA(T) do if 'a' <: keyof T then 1 else 2 end end
+type Get(T) do if T <: {x: ?V} then V else never end end
 
 unittest "keyof in condition and object property infer" do
   assert HasA({a: number, b: string}) == 1
@@ -83,20 +83,20 @@ unittest "keyof in condition and object property infer" do
   assert Get({y: number}) == never
 end
 
-type Boxed(T) as if T <: any then {v: T} else never end
+type Boxed(T) do if T <: any then {v: T} else never end end
 
 unittest "distribute conditional result into object wrapper" do
   assert Boxed(string | number) == {v: string} | {v: number}
 end
 
-type Only(T) as if T <: [?A] then A else never end
+type Only(T) do if T <: [?A] then A else never end end
 
 unittest "single element tuple infer requires exact arity" do
   assert Only([number]) == number
   assert Only([number, string]) == never
 end
 
-type InferBothParams(T) as if T <: (a: ?A, b: ?A) => any then A else never end
+type InferBothParams(T) do if T <: (a: ?A, b: ?A) => any then A else never end end
 
 unittest "contravariant infer candidates intersect" do
   assert InferBothParams((a: string, b: number) => any) == (string & number)
@@ -104,7 +104,7 @@ unittest "contravariant infer candidates intersect" do
   assert InferBothParams((a: {x: 1}, b: {y: 2}) => any) == ({x: 1} & {y: 2})
 end
 
-type ElemOf(T) as if T <: Array(?U) then U else never end
+type ElemOf(T) do if T <: Array(?U) then U else never end end
 
 unittest "Array infer pattern matches tuples" do
   assert ElemOf([1, 2]) == 1 | 2

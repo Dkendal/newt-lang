@@ -2,7 +2,7 @@ Generic type alias with multiple where constraints
 
 =======
 
-type A(x, y) where x <: number, y <: string as x
+type A(x, y) where x <: number, y <: string do x end
 
 =======
 

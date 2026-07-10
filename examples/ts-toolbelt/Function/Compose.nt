@@ -10,7 +10,7 @@ import { Input, Mode } from "./_Internal"
 export type Compose(mode, input)
     defaults mode = 'sync', input = 'multi'
     where mode <: Mode, input <: Input
-    as IntersectOf({
+    do IntersectOf({
         sync: {
             multi: ComposeMultiSync,
             list: ComposeListSync
@@ -20,6 +20,7 @@ export type Compose(mode, input)
             list: ComposeListAsync
         }
     }[mode][input])
+end
 
 unittest "Compose(mode, input)" do
     // TODO: evaluator cannot prove this yet (Union/IntersectOf is unresolved)

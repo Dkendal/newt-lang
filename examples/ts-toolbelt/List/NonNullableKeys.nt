@@ -5,8 +5,9 @@ import { List } from "./List"
 export type NonNullableKeys(L)
     where
         L <: List
-    as
+    do
         ONonNullableKeys(ObjectOf(L))
+end
 
 unittest "NonNullableKeys(L)" do
     // TODO: evaluator cannot prove this yet

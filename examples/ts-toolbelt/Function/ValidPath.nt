@@ -16,7 +16,7 @@ type ValidatePath(O, Path, I)
     where
         Path <: List(AKey),
         I <: Iteration
-    as Update(
+    do Update(
         Path,
         Key(I),
         if [At(O & {}, Path[Pos(I)])] <: [never] then
@@ -25,6 +25,7 @@ type ValidatePath(O, Path, I)
             Path[Pos(I)]
         end
     )
+end
 
 // TODO: the original TS recurses through an object literal indexed by 0 | 1:
 //   { 0: __ValidPath<...>, 1: Path }[Extends<Pos<I>, Length<Path>>]
@@ -35,39 +36,43 @@ type __ValidPath(O, Path, I)
     where
         Path <: List(AKey),
         I <: Iteration
-    as [
+    do [
         __ValidPath(NonNullable(At(O & {}, Path[Pos(I)])), ValidatePath(O, Path, I), Next(I)),
         Path
     ][Extends(Pos(I), Length(Path))]
+end
 
 export type _ValidPath(O, Path)
     where
         O <: object,
         Path <: List(AKey)
-    as
+    do
         if __ValidPath(O, Path) <: ?X then
             Cast(X, List(AKey))
         end
+end
 
 export type ValidPath(O, Path)
     where
         O <: object,
         Path <: List(AKey)
-    as
+    do
         if O <: unknown then
             if Path <: unknown then
                 _ValidPath(O, Path)
             end
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type Nested as {
+type Nested do {
     a: {
         b: {
             c: 1
         }
     }
 }
+end
 
 unittest "ValidPath(O, Path)" do
     // TODO: evaluator cannot prove this yet (recursive alias over iteration

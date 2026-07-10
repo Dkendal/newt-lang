@@ -3,7 +3,7 @@ import { Keys } from "./Keys"
 export type KnownKeys(O)
     where
         O <: object
-    as
+    do
         let filtered = map K in keyof O do
             cond do
                 string <: K -> never,
@@ -14,6 +14,7 @@ export type KnownKeys(O)
         if filtered <: (map K in keyof O do ?U end) then
             U & Keys(O)
         end
+end
 
 unittest "KnownKeys(O)" do
     // TODO: evaluator cannot prove this yet (infer `?U` inside a mapped

@@ -1,6 +1,6 @@
 Negative large integer literal
 =======
-type A as -1000000
+type A do -1000000 end
 =======
 type A = -1000000;
 

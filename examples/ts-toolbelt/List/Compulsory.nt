@@ -9,8 +9,9 @@ export type Compulsory(L, depth)
     where
         L <: List,
         depth <: Depth
-    as
+    do
         Cast(CompulsoryPart(L, depth), List)
+end
 
 unittest "Compulsory(L, depth)" do
     // TODO: evaluator cannot prove this yet (depends on ../Object/Compulsory

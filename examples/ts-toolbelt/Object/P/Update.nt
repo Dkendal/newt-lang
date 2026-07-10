@@ -8,7 +8,7 @@ import { Tail } from "../../List/Tail"
 type UpdateAt(O, Path, A)
     where
         Path <: List(Key)
-    as cond do
+    do cond do
         O <: BuiltIn -> O,
         Path <: [Key] and O <: List -> LUpdate(O, Path[0], A),
         Path <: [Key] and O <: object -> OUpdate(O, Path[0], A),
@@ -22,6 +22,7 @@ type UpdateAt(O, Path, A)
                 end
             end
     end
+end
 
 // Update in `O` the fields at `Path` with `A`
 export type Update(O, Path, A)
@@ -29,13 +30,14 @@ export type Update(O, Path, A)
         O <: object,
         Path <: List(Key),
         A <: any
-    as
+    do
         if Path <: unknown then
             UpdateAt(O, Path, A)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as {info: {name: string}, id: number}
+type User do {info: {name: string}, id: number} end
 
 unittest "Update(O, Path, A)" do
     // TODO: evaluator cannot prove this yet (depends on ../Update and

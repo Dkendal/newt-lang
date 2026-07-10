@@ -1,6 +1,6 @@
 Primitive undefined as a tuple element
 =======
-type A as [undefined, number]
+type A do [undefined, number] end
 =======
 type A = [undefined, number];
 

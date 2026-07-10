@@ -8,12 +8,13 @@ export type Includes(O, M, match)
         O <: object,
         M <: any,
         match <: Match
-    as
+    do
         if [SelectKeys(O, M, match)] <: [never] then
             0
         else
             1
         end
+end
 
 unittest "Includes(O, M, match)" do
     // TODO: evaluator cannot prove these yet (depends on ./SelectKeys which

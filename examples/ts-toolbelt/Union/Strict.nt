@@ -6,18 +6,20 @@ import { Exclude } from "./Exclude"
 
 type _Strict(U, _U)
     defaults _U = U
-    as
+    do
         if U <: unknown then
             U & OptionalFlat(Record(Exclude(Keys(_U), keyof U), never))
         end
+end
 
 // Make a [[Union]] not allow excess properties
 // (https://github.com/Microsoft/TypeScript/issues/20863)
 export type Strict(U)
     where
         U <: object
-    as
+    do
         ComputeRaw(_Strict(U))
+end
 
 unittest "Strict(U)" do
     // TODO: evaluator cannot prove this yet (indeterminate: depends on the

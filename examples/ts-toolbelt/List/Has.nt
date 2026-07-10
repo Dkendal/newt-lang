@@ -13,4 +13,5 @@ export type Has(L, K, M, match)
         K <: Key,
         M <: any,
         match <: Match
-    as OHas(ObjectOf(L), `${K & number}` | K, M, match)
+    do OHas(ObjectOf(L), `${K & number}` | K, M, match)
+end

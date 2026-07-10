@@ -3,12 +3,13 @@ import { List } from "../List/List"
 export type Keys(A)
     where
         A <: any
-    as
+    do
         if A <: List then
             Exclude(keyof A, keyof any[]) | number
         else
             keyof A
         end
+end
 
 unittest "Keys(A)" do
     assert Keys({a: string, b: number}) == 'a' | 'b'

@@ -3,12 +3,13 @@ export type Has(U, U1)
     where
         U <: any,
         U1 <: any
-    as
+    do
         if [U1] <: [U] then
             1
         else
             0
         end
+end
 
 unittest "Has(U, U1)" do
     assert Has('a' | 'b', 'a') == 1

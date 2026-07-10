@@ -6,8 +6,9 @@ import { Last } from "./Last"
 export type Pop(U)
     where
         U <: any
-    as
+    do
         Exclude(U, Last(U))
+end
 
 unittest "Pop(U)" do
     // TODO: evaluator cannot prove this yet (depends on Last, which infers

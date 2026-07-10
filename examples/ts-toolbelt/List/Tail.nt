@@ -3,12 +3,13 @@ import { List } from "./List"
 // Remove the first item out of a List
 export type Tail(L)
     where L <: List
-    as
+    do
         match L do
             readonly [] -> L,
             readonly [any?, ...?LTail] -> LTail,
             else -> L
         end
+end
 
 unittest "Tail(L)" do
     // TODO: evaluator cannot prove this yet (the `[any?, ...?LTail]` pattern

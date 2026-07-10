@@ -10,5 +10,6 @@ export type Update(L, K, A)
         L <: List,
         K <: Key,
         A <: any
-    as
+    do
         Cast(OUpdate(L, `${K & number}` | K, A), List)
+end

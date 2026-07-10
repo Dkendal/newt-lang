@@ -5,10 +5,11 @@ import { Iteration } from "./Iteration"
 // Get the position of `I` (**string**)
 export type Key(I)
     where I <: Iteration
-    as `${I[0]}`
+    do `${I[0]}`
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type I20 as [20, '+', '19', '21', '-20']
+type I20 do [20, '+', '19', '21', '-20'] end
 
 unittest "Key(I)" do
     // TODO: evaluator cannot prove this yet (an indexed access `${I[0]}` inside

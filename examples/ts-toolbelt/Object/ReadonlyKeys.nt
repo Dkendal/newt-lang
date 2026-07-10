@@ -4,9 +4,9 @@ import { Equals } from "../Any/Equals"
 export type _ReadonlyKeys(O)
     where
         O <: object
-    as
+    do
         let picks =
-            map -? K in keyof O do
+            map -optional K in keyof O do
                 match Equals(map -readonly Q in K do O[K] end, map Q in K do O[K] end) do
                     1 -> never,
                     0 -> K
@@ -14,15 +14,17 @@ export type _ReadonlyKeys(O)
             end
         in
         picks[keyof O]
+end
 
 // Get the keys of `O` that are readonly
 export type ReadonlyKeys(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _ReadonlyKeys(O)
         end
+end
 
 unittest "ReadonlyKeys(O)" do
     // TODO: evaluator cannot prove this yet (it does not model TS's

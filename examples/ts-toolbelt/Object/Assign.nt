@@ -19,11 +19,12 @@ type __Assign(O, Os, depth, ignore, fill, I)
         ignore <: object,
         fill <: any,
         I <: Iteration
-    as
+    do
         match Extends(Pos(I), Length(Os)) do
             0 -> __Assign(Merge(Os[Pos(I)], O, depth, ignore, fill), Os, depth, ignore, fill, Next(I)),
             1 -> O
         end
+end
 
 export type _Assign(O, Os, depth, ignore, fill)
     where
@@ -32,10 +33,11 @@ export type _Assign(O, Os, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         if __Assign(O, Os, depth, ignore, fill) <: ?X then
             Cast(X, object)
         end
+end
 
 // Assign a list of objects into `O` with `Merge`. Merges from right to
 // left, first items get overridden by the next ones (last-in overrides).
@@ -47,12 +49,13 @@ export type Assign(O, Os, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         if O <: unknown then
             if Os <: unknown then
                 _Assign(O, Os, depth, ignore, fill)
             end
         end
+end
 
 unittest "Assign(O, Os)" do
     // TODO: evaluator cannot prove this yet (depends on ./Merge, and the

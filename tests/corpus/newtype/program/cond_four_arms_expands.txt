@@ -2,16 +2,17 @@ A four-arm cond inside a type alias expands to a chain of ifs
 
 =======
 
-type A as cond do
+type A do cond do
     a <: b -> w,
     c <: d -> x,
     e <: f -> y,
     else -> z
 end
+end
 
 =======
 
-type A as
+type A do
     if a <: b then w
     else
         if c <: d then x
@@ -21,5 +22,6 @@ type A as
             end
         end
     end
+end
 
 =======

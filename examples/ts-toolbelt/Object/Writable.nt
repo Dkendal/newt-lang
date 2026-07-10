@@ -4,10 +4,11 @@ import { Key } from "../Any/Key"
 import { PatchFlat } from "./Patch"
 import { BuiltIn } from "../Misc/BuiltIn"
 
-export type WritableFlat(O) as
+export type WritableFlat(O) do
     map -readonly K in keyof O do O[K] end & {}
+end
 
-export type WritableDeep(O) as
+export type WritableDeep(O) do
     map -readonly K in keyof O do
         if O[K] <: BuiltIn then
             O[K]
@@ -15,24 +16,27 @@ export type WritableDeep(O) as
             WritableDeep(O[K])
         end
     end
+end
 
 export type WritablePart(O, depth)
     where
         O <: object,
         depth <: Depth
-    as
+    do
         match depth do
             'flat' -> WritableFlat(O),
             'deep' -> WritableDeep(O)
         end
+end
 
 export type _Writable(O, K, depth)
     where
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         PatchFlat(WritablePart(_Pick(O, K), depth), O)
+end
 
 // Make some fields of `O` writable (deeply or not)
 export type Writable(O, K, depth)
@@ -41,10 +45,11 @@ export type Writable(O, K, depth)
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         if O <: unknown then
             _Writable(O, K, depth)
         end
+end
 
 unittest "Writable(O, K, depth)" do
     assert WritableFlat({readonly a: 1, readonly b: 2}) == {a: 1, b: 2}

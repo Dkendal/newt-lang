@@ -1,9 +1,10 @@
 A match expression becomes a chain of conditional types
 =======
-type A(x) as match x do
+type A(x) do match x do
     number -> 1,
     string -> 2,
     else -> 3
+end
 end
 =======
 type A<x> = x extends number ? 1 : x extends string ? 2 : 3;

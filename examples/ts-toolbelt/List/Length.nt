@@ -2,7 +2,8 @@ import { List } from "./List"
 
 export type Length(L)
     where L <: List
-    as L['length']
+    do L['length']
+end
 
 unittest "Length(L)" do
     assert Length([1, 2, 3]) == 3

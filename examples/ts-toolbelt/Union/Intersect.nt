@@ -5,7 +5,7 @@ export type Intersect(U1, U2)
     where
         U1 <: any,
         U2 <: any
-    as
+    do
         // TS uses a `{1: U1, 0: never}[Equals<U1, U2>]` lookup here; numeric
         // property names are not supported, so an equivalent tuple lookup is
         // used.
@@ -14,6 +14,7 @@ export type Intersect(U1, U2)
                 [never, U1][Equals(U1, U2)]
             end
         end
+end
 
 unittest "Intersect(U1, U2)" do
     // TODO: evaluator cannot prove this yet (distribution over both unions

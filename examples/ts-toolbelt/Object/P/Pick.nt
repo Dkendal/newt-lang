@@ -8,7 +8,7 @@ import { _ListOf } from "../ListOf"
 type PickAt(O, Path)
     where
         Path <: List(Key)
-    as cond do
+    do cond do
         [] <: Path -> O,
         O <: BuiltIn -> O,
         O <: List ->
@@ -21,19 +21,21 @@ type PickAt(O, Path)
             end,
         else -> O
     end
+end
 
 // Extract out of `O` the fields at `Path`
 export type Pick(O, Path)
     where
         O <: object,
         Path <: List(Key)
-    as
+    do
         if Path <: unknown then
             PickAt(O, Path)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as {info: {name: string, age: number}, id: number}
+type User do {info: {name: string, age: number}, id: number} end
 
 unittest "Pick(O, Path)" do
     // TODO: evaluator cannot prove this yet (depends on ../Pick and

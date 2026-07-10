@@ -16,7 +16,7 @@ type _IncludesDeep(O, M, match, limit, I)
         match <: Match,
         limit <: number,
         I <: Iteration
-    as
+    do
         let nextO = if O <: object then UnionOf(O) else O end in
         let selector =
             if Pos(Prev(I)) <: limit then // if we go past the limit
@@ -32,6 +32,7 @@ type _IncludesDeep(O, M, match, limit, I)
             1,
             0
         ][selector]
+end
 
 export type IncludesDeep(O, M, match, limit)
     defaults match = 'default', limit = 10
@@ -40,19 +41,21 @@ export type IncludesDeep(O, M, match, limit)
         M <: any,
         match <: Match,
         limit <: number
-    as
+    do
         if _IncludesDeep(O, M, match, limit) <: ?X then
             Cast(X, Boolean)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type Nested as {
+type Nested do {
     a: {
         b: {
             c: string
         }
     }
 }
+end
 
 unittest "IncludesDeep(O, M, match, limit)" do
     // TODO: evaluator cannot prove this yet (recursive iteration over

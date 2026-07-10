@@ -8,15 +8,17 @@ import { IterationOf } from "../Iteration/IterationOf"
 
 export type _Negate(N)
     where N <: Iteration
-    as IterationMap(N[4])
+    do IterationMap(N[4])
+end
 
 // Negate a number
 export type Negate(N)
     where N <: number
-    as
+    do
         if N <: unknown then
             _Negate(IterationOf(N))[0]
         end
+end
 
 unittest "Negate(N)" do
     // TODO: evaluator cannot prove this yet (template-literal interpolation

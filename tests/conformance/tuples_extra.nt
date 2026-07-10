@@ -45,8 +45,8 @@ unittest "empty tuple identity and relations" do
   assert [] <: unknown[]
 end
 
-type RN as readonly number[]
-type MN as number[]
+type RN do readonly number[] end
+type MN do number[] end
 
 unittest "nested readonly arrays via alias" do
   assert number[][] <: readonly RN[]
@@ -234,7 +234,7 @@ unittest "indexed access on optional and rest tuples" do
   assert [number, ...string[]][number] == (number | string)
 end
 
-type G9ElemOf(T) as if T <: Array(?U) then U else never end
+type G9ElemOf(T) do if T <: Array(?U) then U else never end end
 
 unittest "infer element union over optional and rest tuples" do
   assert G9ElemOf([number, string?]) == (number | string | undefined)

@@ -9,8 +9,9 @@ export type Select(O, M, match)
         O <: object,
         M <: any,
         match <: Match
-    as
+    do
         Pick(O, SelectKeys(O, M, match))
+end
 
 unittest "Select(O, M, match)" do
     // TODO: evaluator cannot prove this yet (depends on ./Pick)

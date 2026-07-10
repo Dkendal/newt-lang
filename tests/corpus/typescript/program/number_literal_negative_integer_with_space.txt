@@ -1,6 +1,6 @@
 Negative integer literal with a space after the minus sign
 =======
-type A as - 1
+type A do - 1 end
 =======
 type A = - 1;
 

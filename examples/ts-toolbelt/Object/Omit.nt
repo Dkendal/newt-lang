@@ -6,20 +6,22 @@ export type _Omit(O, K)
     where
         O <: object,
         K <: Key
-    as _Pick(O, Exclude(keyof O, K))
+    do _Pick(O, Exclude(keyof O, K))
+end
 
 // Remove out of `O` the fields of key `K`
 export type Omit(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         if O <: unknown then
             _Omit(O, K)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as { name: string, age: number }
+type User do { name: string, age: number } end
 
 unittest "Omit(O, K)" do
     // TODO: evaluator cannot prove this yet (depends on ../Union/Exclude)

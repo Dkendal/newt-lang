@@ -1,6 +1,6 @@
 Primitive number type alias
 =======
-type A as number
+type A do number end
 =======
 type A = number;
 

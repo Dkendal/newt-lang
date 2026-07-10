@@ -1,17 +1,19 @@
 export type _UnionOf(O)
     where
         O <: object
-    as
+    do
         O[keyof O]
+end
 
 // Transform an object into a union of its field types
 export type UnionOf(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _UnionOf(O)
         end
+end
 
 unittest "UnionOf(O)" do
     assert UnionOf({a: 1, b: string}) == 1 | string

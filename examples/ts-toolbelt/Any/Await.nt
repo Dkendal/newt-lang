@@ -1,8 +1,9 @@
 export type Await(P)
     where
         P <: any
-    as
+    do
         if P <: Promise(?A) then A else P end
+end
 
 unittest "Await(P)" do
     assert Await(Promise(string)) == string

@@ -1,1 +1,1 @@
-type Hidden as 1
+type Hidden do 1 end

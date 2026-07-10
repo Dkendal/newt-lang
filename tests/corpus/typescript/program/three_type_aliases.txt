@@ -1,8 +1,8 @@
 Three type aliases in one program
 =======
-type A as number
-type B as string
-type C as boolean
+type A do number end
+type B do string end
+type C do boolean end
 =======
 type A = number;
 

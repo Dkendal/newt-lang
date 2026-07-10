@@ -10,8 +10,9 @@ export type Intersect(O, O1, match)
         O <: object,
         O1 <: object,
         match <: Match
-    as
+    do
         Pick(O, IntersectKeys(O, O1, match))
+end
 
 unittest "Intersect(O, O1, match)" do
     // TODO: evaluator cannot prove this yet (depends on ./IntersectKeys and

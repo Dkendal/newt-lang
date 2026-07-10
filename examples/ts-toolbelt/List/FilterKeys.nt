@@ -9,5 +9,6 @@ export type FilterKeys(L, M, match)
         L <: List,
         M <: any,
         match <: Match
-    as
+    do
         OFilterKeys(ObjectOf(L), M, match)
+end

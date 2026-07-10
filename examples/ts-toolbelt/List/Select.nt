@@ -11,7 +11,8 @@ export type Select(L, M, match)
         L <: List,
         M <: any,
         match <: Match
-    as ListOf(OSelect(ObjectOf(L), M, match))
+    do ListOf(OSelect(ObjectOf(L), M, match))
+end
 
 unittest "Select(L, M)" do
     // TODO: evaluator cannot prove this yet

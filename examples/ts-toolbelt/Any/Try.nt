@@ -3,8 +3,9 @@ export type Try(A1, A2, Catch)
     where
         A1 <: any,
         A2 <: any
-    as
+    do
         if A1 <: A2 then A1 else Catch end
+end
 
 unittest "Try(A1, A2, Catch)" do
     assert Try('42', string) == '42'

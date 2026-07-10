@@ -8,7 +8,7 @@ export type Record(K, A, modx)
         K <: Key,
         A <: any,
         modx <: Modx
-    as
+    do
         // Original TS indexes a two-level table with string-literal keys
         // ({'!': {'R': ..., 'W': ...}, '?': ...}[modx[0]][modx[1]]); .nt
         // object literals only accept identifier keys, so match on the
@@ -16,9 +16,10 @@ export type Record(K, A, modx)
         match modx do
             ['!', 'R'] -> map readonly P in K do A end,
             ['!', 'W'] -> map P in K do A end,
-            ['?', 'R'] -> map readonly ? P in K do A end,
-            ['?', 'W'] -> map ? P in K do A end
+            ['?', 'R'] -> map readonly optional P in K do A end,
+            ['?', 'W'] -> map optional P in K do A end
         end
+end
 
 unittest "Record(K, A, modx)" do
     assert Record('a' | 'b', number) == {a: number, b: number}

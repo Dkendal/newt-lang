@@ -2,7 +2,7 @@ Mapped-type modifier removal renders -readonly and -?
 
 =======
 
-map -readonly -? k in t do 1 end
+map -readonly -optional k in t do 1 end
 
 =======
 

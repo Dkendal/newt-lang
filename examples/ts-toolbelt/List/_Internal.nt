@@ -6,6 +6,7 @@ import { List } from "./List"
 // so it is inlined as the equivalent mapped type.
 export type Naked(L)
     where L <: List
-    as Overwrite(map -? K in keyof L do L[K] end, L)
+    do Overwrite(map -optional K in keyof L do L[K] end, L)
+end
 
-export type Key as string | number | symbol
+export type Key do string | number | symbol end

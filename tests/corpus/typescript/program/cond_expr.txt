@@ -1,8 +1,9 @@
 A cond expression with and-joined guards becomes nested conditional types
 =======
-type A(x) as cond do
+type A(x) do cond do
     x <: number -> 1,
     x <: {} and x <: {a: 1} -> 2,
+end
 end
 =======
 type A<x> =

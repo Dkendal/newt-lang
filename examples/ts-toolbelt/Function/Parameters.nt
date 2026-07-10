@@ -2,7 +2,8 @@ import { Function } from "./Function"
 
 export type Parameters(F)
     where F <: Function
-    as if F <: (...args: ?L) => any then L end
+    do if F <: (...args: ?L) => any then L end
+end
 
 unittest "Parameters(F)" do
     assert Parameters((name: string, age: number) => {}) <: [string, number]

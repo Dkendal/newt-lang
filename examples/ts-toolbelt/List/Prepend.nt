@@ -4,8 +4,9 @@ export type Prepend(L, A)
     where
         L <: List,
         A <: any
-    as
+    do
         [A, ...L]
+end
 
 unittest "Prepend(L, A)" do
     // TODO: evaluator cannot prove this yet

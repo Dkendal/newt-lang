@@ -5,4 +5,5 @@ import { List } from "./List"
 // Get the keys of `L` that are readonly
 export type ReadonlyKeys(L)
     where L <: List
-    as OReadonlyKeys(ObjectOf(L))
+    do OReadonlyKeys(ObjectOf(L))
+end

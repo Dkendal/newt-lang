@@ -1,6 +1,6 @@
 Primitive bigint as a tuple element
 =======
-type A as [bigint, number]
+type A do [bigint, number] end
 =======
 type A = [bigint, number];
 

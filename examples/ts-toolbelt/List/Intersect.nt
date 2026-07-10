@@ -10,4 +10,5 @@ export type Intersect(L, L1, match)
         L <: List,
         L1 <: List,
         match <: Match
-    as ListOf(OIntersect(ObjectOf(L), ObjectOf(L1), match))
+    do ListOf(OIntersect(ObjectOf(L), ObjectOf(L1), match))
+end

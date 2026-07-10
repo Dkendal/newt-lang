@@ -3,24 +3,26 @@ import { _Pick } from "./Pick"
 export type _RequiredKeys(O)
     where
         O <: object
-    as
+    do
         let picks =
-            map -? K in keyof O do
+            map -optional K in keyof O do
                 // The original TS uses the global `Pick`; `_Pick` is
                 // equivalent here since K comes from `keyof O`.
                 if {} <: _Pick(O, K) then never else K end
             end
         in
         picks[keyof O]
+end
 
 // Get the keys of `O` that are required
 export type RequiredKeys(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _RequiredKeys(O)
         end
+end
 
 unittest "RequiredKeys(O)" do
     // TODO: evaluator cannot prove these yet (mapped type with conditional

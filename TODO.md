@@ -27,8 +27,8 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
 
 - [x] **B1. Generic-alias substitution skips function types.** `Ast::map`
   (`src/ast/walk.rs`) had no `FunctionType` arm, so `substitute` never replaced a
-  type parameter inside a function type in an alias body. `type Fn(T) as (x: T)
-  => void` made `Fn(string) <: Fn(number)` wrongly hold (free `T` on both
+  type parameter inside a function type in an alias body. `type Fn(T) do (x: T)
+  => void end` made `Fn(string) <: Fn(number)` wrongly hold (free `T` on both
   sides). Affects param/return/nested-in-object/nested-in-tuple positions.
 - [x] **B2. Weak-type rule unmodeled.** An all-optional target with no required
   member, index, or call signature must reject a source sharing *no* property
@@ -187,8 +187,9 @@ returns *indeterminate*). Each repro below is what tsgo reports as **true**.
   is_constructor`); construct and call signatures are never inter-assignable,
   and parameters/returns relate with the usual variance. _Tests:_
   `tests/conformance/functions_extra.nt`.
-- [x] **G12.** Mapped modifier-removal (`-?`, `-readonly`) parses (dedicated
-  `MinusQuestion`/`MinusReadonly` tokens; `map -readonly -? k in … do … end`)
+- [x] **G12.** Mapped modifier-removal (`-optional`, `-readonly`) parses
+  (dedicated `MinusOptional`/`MinusReadonly` tokens;
+  `map -readonly -optional k in … do … end`)
   and `expand_mapped_type` strips the source modifiers on `Remove`. _Tests:_
   `tests/conformance/mapped_extra.nt`,
   `tests/corpus/typescript/map_expr/modifier_removal.txt`.

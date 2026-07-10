@@ -9,4 +9,5 @@ export type Readonly(L, depth)
     where
         L <: List,
         depth <: Depth
-    as Cast(ReadonlyPart(L, depth), List)
+    do Cast(ReadonlyPart(L, depth), List)
+end

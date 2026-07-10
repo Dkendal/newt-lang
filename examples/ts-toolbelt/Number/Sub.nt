@@ -16,41 +16,45 @@ type _SubPositive(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         cond do
             Pos(N2) <: 0 -> N1,                            // If successful
             number <: Pos(N2) -> number,                   // If un-success
             else -> _SubPositive(Prev(N1), Prev(N2))       // Or continue
         end
+end
 
 type SubPositive(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         if _SubPositive(N1, N2) <: ?X then
             Cast(X, Iteration)
         end
+end
 
 type _SubNegative(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         cond do
             Pos(N2) <: 0 -> N1,                            // If successful
             number <: Pos(N2) -> number,                   // If un-success
             else -> _SubNegative(Next(N1), Next(N2))       // Or continue
         end
+end
 
 type SubNegative(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         if _SubNegative(N1, N2) <: ?X then
             Cast(X, Iteration)
         end
+end
 
 // TODO: original TS selects via {0: SubPositive, 1: SubNegative}[_IsNegative<N2>];
 // numeric object keys are not supported, so a `match` is used.
@@ -58,23 +62,25 @@ export type _Sub(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         match _IsNegative(N2) do
             1 -> SubNegative(N1, N2),
             else -> SubPositive(N1, N2)
         end
+end
 
 // Subtract a number from another one
 export type Sub(N1, N2)
     where
         N1 <: number,
         N2 <: number
-    as
+    do
         if N1 <: unknown then
             if N2 <: unknown then
                 _Sub(IterationOf(N1), IterationOf(N2))[0]
             end
         end
+end
 
 unittest "Sub(N1, N2)" do
     // TODO: evaluator cannot prove this yet (recursive alias evaluation and

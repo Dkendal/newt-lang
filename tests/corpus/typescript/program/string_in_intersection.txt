@@ -1,6 +1,6 @@
 Primitive string in an intersection
 =======
-type A as string & B
+type A do string & B end
 =======
 type A = string & B;
 

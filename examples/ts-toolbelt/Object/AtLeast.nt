@@ -11,31 +11,34 @@ type RequiredIfKeys(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         if Extends(keyof O & K, K) <: 1 then
             RequiredFlat(O)
         else
             O
         end
+end
 
 type __AtLeast(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         // if we can operate on it, take entry & make rest optional
         if K <: keyof O then
             _Pick(O, K) & OptionalFlat(O)
         else
             O
         end
+end
 
 type _AtLeast(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         ComputeRaw(__AtLeast(RequiredIfKeys(O, K), K))
+end
 
 // Make that at least one of the keys `K` are required in `O` at a time.
 export type AtLeast(O, K)
@@ -43,10 +46,11 @@ export type AtLeast(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         if O <: unknown then
             _AtLeast(O, K)
         end
+end
 
 unittest "AtLeast(O, K)" do
     // TODO: evaluator cannot prove this yet (depends on ./Pick, ./Required,

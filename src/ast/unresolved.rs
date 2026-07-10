@@ -403,35 +403,35 @@ mod tests {
 
     #[test]
     fn undefined_bare_ident_warns() {
-        assert_eq!(refs("type A as Foo"), vec![("Foo".to_string(), 1)]);
+        assert_eq!(refs("type A do Foo end"), vec![("Foo".to_string(), 1)]);
     }
 
     #[test]
     fn undefined_generic_head_and_args_warn() {
         assert_eq!(
-            refs("type A as Foo(Bar)"),
+            refs("type A do Foo(Bar) end"),
             vec![("Foo".to_string(), 1), ("Bar".to_string(), 1)]
         );
     }
 
     #[test]
     fn defined_alias_interface_and_symbol_resolve() {
-        let src = "type T as 1\n\
+        let src = "type T do 1 end\n\
             interface I { x: number }\n\
             unique symbol S\n\
-            type A as [T, I, S]";
+            type A do [T, I, S] end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn definition_order_does_not_matter() {
-        assert_eq!(refs("type A as B\ntype B as 1"), vec![]);
+        assert_eq!(refs("type A do B end\ntype B do 1 end"), vec![]);
     }
 
     #[test]
     fn multiple_uses_group_under_one_name() {
         assert_eq!(
-            refs("type A as Foo\ntype B as Foo"),
+            refs("type A do Foo end\ntype B do Foo end"),
             vec![("Foo".to_string(), 2)]
         );
     }
@@ -448,13 +448,13 @@ mod tests {
 
     #[test]
     fn desugared_array_sugar_does_not_warn() {
-        assert_eq!(refs("type A as ReadonlyArray(Array(number))"), vec![]);
+        assert_eq!(refs("type A do ReadonlyArray(Array(number)) end"), vec![]);
     }
 
     #[test]
     fn named_import_resolves() {
         assert_eq!(
-            refs("import { Foo } from \"./m.nt\"\ntype A as Foo"),
+            refs("import { Foo } from \"./m.nt\"\ntype A do Foo end"),
             vec![]
         );
     }
@@ -462,14 +462,17 @@ mod tests {
     #[test]
     fn aliased_import_resolves_the_alias_not_the_original() {
         assert_eq!(
-            refs("import { Foo as Bar } from \"./m.nt\"\ntype A as [Bar, Foo]"),
+            refs("import { Foo as Bar } from \"./m.nt\"\ntype A do [Bar, Foo] end"),
             vec![("Foo".to_string(), 1)]
         );
     }
 
     #[test]
     fn namespace_import_resolves() {
-        assert_eq!(refs("import * as NS from \"./m.nt\"\ntype A as NS"), vec![]);
+        assert_eq!(
+            refs("import * as NS from \"./m.nt\"\ntype A do NS end"),
+            vec![]
+        );
     }
 
     #[test]
@@ -482,7 +485,7 @@ mod tests {
 
     #[test]
     fn spans_point_at_the_use_site() {
-        let src = "type A as Foo";
+        let src = "type A do Foo end";
         let program = parse_newtype_program(src).unwrap().desugar_globals();
         let found = unresolved_references(&program);
         assert_eq!(found.len(), 1);
@@ -492,7 +495,7 @@ mod tests {
 
     #[test]
     fn type_params_are_in_scope_for_body_where_and_defaults() {
-        let src = "type F(A, B) defaults B = A where A <: B as [A, B]";
+        let src = "type F(A, B) defaults B = A where A <: B do [A, B] end";
         assert_eq!(refs(src), vec![]);
     }
 
@@ -503,50 +506,50 @@ mod tests {
 
     #[test]
     fn infer_binds_in_if_condition_and_then_branch() {
-        let src = "type Elem(T) as if T <: Array(?U) then U else never end";
+        let src = "type Elem(T) do if T <: Array(?U) then U else never end end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn infer_does_not_leak_into_else_branch() {
-        let src = "type Elem(T) as if T <: Array(?U) then U else U end";
+        let src = "type Elem(T) do if T <: Array(?U) then U else U end end";
         assert_eq!(refs(src), vec![("U".to_string(), 1)]);
     }
 
     #[test]
     fn match_arm_infer_binds_in_that_arm_only() {
-        let src = "type F(T) as match T do Array(?U) -> U, else -> never end";
+        let src = "type F(T) do match T do Array(?U) -> U, else -> never end end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn cond_arm_infer_binds_in_that_arm() {
-        let src = "type F(T) as cond do T <: Array(?U) -> U, else -> never end";
+        let src = "type F(T) do cond do T <: Array(?U) -> U, else -> never end end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn mapped_type_index_binds_in_body_and_remap() {
-        let src = "type M(O) as map K in keyof O do O[K] end";
+        let src = "type M(O) do map K in keyof O do O[K] end end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn index_signature_key_binds_in_value() {
-        let src = "type M(O) as { [K in keyof O]: O[K] }";
+        let src = "type M(O) do { [K in keyof O]: O[K] } end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn let_bindings_are_in_scope_for_body_and_values() {
-        let src = "type A as let a = 1, b = a in [a, b]";
+        let src = "type A do let a = 1, b = a in [a, b] end";
         assert_eq!(refs(src), vec![]);
     }
 
     #[test]
     fn let_bindings_do_not_leak() {
         assert_eq!(
-            refs("type A as [let a = 1 in a, a]"),
+            refs("type A do [let a = 1 in a, a] end"),
             vec![("a".to_string(), 1)]
         );
     }
@@ -554,12 +557,12 @@ mod tests {
     #[test]
     fn dot_access_rhs_is_not_a_reference() {
         // `T.foo`'s `foo` is a property name; only `T` must resolve.
-        assert_eq!(refs("type A(T) as T.foo"), vec![]);
+        assert_eq!(refs("type A(T) do T.foo end"), vec![]);
     }
 
     #[test]
     fn shadowing_resolves_to_the_inner_binder() {
-        let src = "type T as 1\ntype F(T) as T";
+        let src = "type T do 1 end\ntype F(T) do T end";
         assert_eq!(refs(src), vec![]);
     }
 }

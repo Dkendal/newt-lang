@@ -1,5 +1,5 @@
 // Basic JSON Value
-export type Primitive as string | number | boolean | null
+export type Primitive do string | number | boolean | null end
 
 unittest "Primitive" do
     assert 'json' <: Primitive

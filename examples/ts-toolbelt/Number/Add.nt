@@ -16,41 +16,45 @@ type _AddPositive(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         cond do
             Pos(N2) <: 0 -> N1,                            // If successful
             number <: Pos(N2) -> IterationOf(number),      // If un-success
             else -> _AddPositive(Next(N1), Prev(N2))       // Or continue
         end
+end
 
 type AddPositive(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         if _AddPositive(N1, N2) <: ?X then
             Cast(X, Iteration)
         end
+end
 
 type _AddNegative(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         cond do
             Pos(N2) <: 0 -> N1,                            // If successful
             number <: Pos(N2) -> number,                   // If un-success
             else -> _AddNegative(Prev(N1), Next(N2))       // Or continue
         end
+end
 
 type AddNegative(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         if _AddNegative(N1, N2) <: ?X then
             Cast(X, Iteration)
         end
+end
 
 // TODO: original TS selects via {0: AddPositive, 1: AddNegative}[_IsNegative<N2>];
 // numeric object keys are not supported, so a `match` is used.
@@ -58,23 +62,25 @@ export type _Add(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as
+    do
         match _IsNegative(N2) do
             1 -> AddNegative(N1, N2),
             else -> AddPositive(N1, N2)
         end
+end
 
 // Add a number to another one
 export type Add(N1, N2)
     where
         N1 <: number,
         N2 <: number
-    as
+    do
         if N1 <: unknown then
             if N2 <: unknown then
                 _Add(IterationOf(N1), IterationOf(N2))[0]
             end
         end
+end
 
 unittest "Add(N1, N2)" do
     // TODO: evaluator cannot prove this yet (recursive alias evaluation and

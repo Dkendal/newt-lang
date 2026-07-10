@@ -1,6 +1,6 @@
 Primitive object in a union
 =======
-type A as object | number
+type A do object | number end
 =======
 type A = object | number;
 

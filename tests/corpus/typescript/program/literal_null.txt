@@ -1,6 +1,6 @@
 Literal null type alias
 =======
-type A as null
+type A do null end
 =======
 type A = null;
 

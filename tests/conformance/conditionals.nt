@@ -13,29 +13,29 @@
 // Helper aliases.
 // ---------------------------------------------------------------------------
 
-type Choose(T) as if T <: string then 1 else 2 end
-type ChooseNoElse(T) as if T <: string then 1 end
-type ChooseNot(T) as if T </: string then 1 else 2 end
+type Choose(T) do if T <: string then 1 else 2 end end
+type ChooseNoElse(T) do if T <: string then 1 end end
+type ChooseNot(T) do if T </: string then 1 else 2 end end
 
-type UnionCheck as if string | number <: string then 1 else 2 end
-type RevCheck as if string <: string | number then 1 else 2 end
-type CondResult as if true <: boolean then string else number end
+type UnionCheck do if string | number <: string then 1 else 2 end end
+type RevCheck do if string <: string | number then 1 else 2 end end
+type CondResult do if true <: boolean then string else number end end
 
-type AndBoth as if string <: string and number <: number then 1 else 2 end
-type AndSecond as if string <: string and number <: string then 1 else 2 end
-type AndFirst as if string <: number and number <: number then 1 else 2 end
+type AndBoth do if string <: string and number <: number then 1 else 2 end end
+type AndSecond do if string <: string and number <: string then 1 else 2 end end
+type AndFirst do if string <: number and number <: number then 1 else 2 end end
 
-type OrEither as if string <: number or number <: number then 1 else 2 end
-type OrNeither as if string <: number or number <: string then 1 else 2 end
-type OrFirst as if string <: string or number <: string then 1 else 2 end
+type OrEither do if string <: number or number <: number then 1 else 2 end end
+type OrNeither do if string <: number or number <: string then 1 else 2 end end
+type OrFirst do if string <: string or number <: string then 1 else 2 end end
 
-type NotPass as if not(number <: string) then 1 else 2 end
-type NotFail as if not(string <: string) then 1 else 2 end
+type NotPass do if not(number <: string) then 1 else 2 end end
+type NotFail do if not(string <: string) then 1 else 2 end end
 
-type NestInnerNoElse as if number <: number then if string <: number then 1 end else 9 end
-type NestElseBranch as if number <: string then 9 else if string <: string then 7 end end
+type NestInnerNoElse do if number <: number then if string <: number then 1 end else 9 end end
+type NestElseBranch do if number <: string then 9 else if string <: string then 7 end end end
 
-type NonNull(T) as
+type NonNull(T) do
   if T <: null then
     never
   else
@@ -45,20 +45,21 @@ type NonNull(T) as
       T
     end
   end
+end
 
-type ToArray(T) as if T <: any then T[] else never end
-type ToArrayW(T) as if [T] <: [any] then T[] else never end
-type Excl(T, U) as if T <: U then never else T end
-type IsNever(T) as if T <: never then true else false end
-type IsNeverW(T) as if [T] <: [never] then true else false end
+type ToArray(T) do if T <: any then T[] else never end end
+type ToArrayW(T) do if [T] <: [any] then T[] else never end end
+type Excl(T, U) do if T <: U then never else T end end
+type IsNever(T) do if T <: never then true else false end end
+type IsNeverW(T) do if [T] <: [never] then true else false end end
 
-type ElemA(T) as if T <: Array(?U) then U else never end
-type ReturnOf(T) as if T <: (any) => ?R then R else never end
-type ParamOf(T) as if T <: (?P) => any then P else never end
-type Fst(T) as if T <: [?A, ?B] then A else never end
-type Snd(T) as if T <: [?A, ?B] then B else never end
-type Unwrap(T) as if T <: Promise(?U) then U else never end
-type DupInfer(T) as if T <: {a: ?U, b: ?U} then U else never end
+type ElemA(T) do if T <: Array(?U) then U else never end end
+type ReturnOf(T) do if T <: (any) => ?R then R else never end end
+type ParamOf(T) do if T <: (?P) => any then P else never end end
+type Fst(T) do if T <: [?A, ?B] then A else never end end
+type Snd(T) do if T <: [?A, ?B] then B else never end end
+type Unwrap(T) do if T <: Promise(?U) then U else never end end
+type DupInfer(T) do if T <: {a: ?U, b: ?U} then U else never end end
 
 // ---------------------------------------------------------------------------
 

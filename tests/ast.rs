@@ -453,14 +453,14 @@ mod normalize {
 
     #[test]
     fn expands_alias() {
-        assert_eq!(normalized("type A as 1", "A"), "1");
+        assert_eq!(normalized("type A do 1 end", "A"), "1");
     }
 
     #[test]
     fn expands_generic_application_and_reduces_access() {
         assert_eq!(
             normalized(
-                "type User as { id: number }\ntype Get(T) as T['id']",
+                "type User do { id: number } end\ntype Get(T) do T['id'] end",
                 "Get(User)"
             ),
             "number"
@@ -470,7 +470,7 @@ mod normalize {
     #[test]
     fn reduces_keyof() {
         assert_eq!(
-            normalized("type User as { id: number }", "keyof User"),
+            normalized("type User do { id: number } end", "keyof User"),
             "'id'"
         );
     }
@@ -478,20 +478,20 @@ mod normalize {
     #[test]
     fn reduces_conditional_from_alias_body() {
         assert_eq!(
-            normalized("type C as if 1 <: number then true else false end", "C"),
+            normalized("type C do if 1 <: number then true else false end end", "C"),
             "true"
         );
     }
 
     #[test]
     fn unresolved_reference_is_left_as_is() {
-        assert_eq!(normalized("type A as 1", "Unknown"), "Unknown");
+        assert_eq!(normalized("type A do 1 end", "Unknown"), "Unknown");
     }
 
     #[test]
     fn recursive_alias_terminates() {
         // Must not hang; the exact (partially expanded) output is unspecified.
-        let out = normalized("type Rec as { next: Rec }", "Rec");
+        let out = normalized("type Rec do { next: Rec } end", "Rec");
         assert!(out.contains("next"), "{out}");
     }
 }

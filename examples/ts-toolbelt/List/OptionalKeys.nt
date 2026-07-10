@@ -5,8 +5,9 @@ import { List } from "./List"
 export type OptionalKeys(L)
     where
         L <: List
-    as
+    do
         OOptionalKeys(ObjectOf(L))
+end
 
 unittest "OptionalKeys(L)" do
     // TODO: evaluator cannot prove this yet

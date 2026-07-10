@@ -1,6 +1,6 @@
 Primitive null in an intersection
 =======
-type A as null & B
+type A do null & B end
 =======
 type A = null & B;
 

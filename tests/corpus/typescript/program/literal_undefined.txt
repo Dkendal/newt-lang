@@ -1,6 +1,6 @@
 Literal undefined type alias
 =======
-type A as undefined
+type A do undefined end
 =======
 type A = undefined;
 

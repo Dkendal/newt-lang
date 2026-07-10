@@ -5,4 +5,5 @@ import { List } from "./List"
 // Get the keys of `L` that are `undefined`
 export type UndefinableKeys(L)
     where L <: List
-    as OUndefinableKeys(ObjectOf(L))
+    do OUndefinableKeys(ObjectOf(L))
+end

@@ -18,9 +18,10 @@ import { Function } from "../../Function"
 //
 // Closest expressible form: a single non-generic signature taking the
 // (possibly curried) functions as a non-empty rest parameter.
-export type PipeMultiSync as (
+export type PipeMultiSync do (
     ...fns: [
         Function(any[], any) | Curry(Function(any[], any)),
         ...(Function(any[], any) | Curry(Function(any[], any)))[]
     ]
 ) => Function(any[], any)
+end

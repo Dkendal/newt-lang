@@ -1,9 +1,10 @@
 A let expression with multiple bindings inlines each definition
 =======
-type A as
+type A do
     let a = 1,
         b = 2,
     in [a, b]
+end
 =======
 type A = [1, 2];
 

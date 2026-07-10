@@ -6,5 +6,6 @@ export type Overwrite(L, L1)
     where
         L <: List,
         L1 <: object
-    as
+    do
         Cast(OOverwrite(L, L1), List)
+end

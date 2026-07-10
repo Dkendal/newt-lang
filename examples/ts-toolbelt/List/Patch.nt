@@ -15,5 +15,6 @@ export type Patch(L, L1, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         Cast(OPatch(L, L1, depth, ignore, fill), List)
+end

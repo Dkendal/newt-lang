@@ -11,20 +11,23 @@ export type Diff(O, O1, match)
         O <: object,
         O1 <: object,
         match <: Match
-    as
+    do
         PatchFlat(Exclude(O, O1, match), Exclude(O1, O, match))
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type Person0 as {
+type Person0 do {
     name: string,
     age: string
 }
+end
 
-type Person1 as {
+type Person1 do {
     name: string,
     age: number | string,
     nick: string
 }
+end
 
 unittest "Diff(O, O1, match)" do
     // TODO: evaluator cannot prove these yet (depends on ./Exclude, ./Patch,

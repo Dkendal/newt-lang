@@ -9,7 +9,7 @@ export type Is(A, A1, match)
         A <: any,
         A1 <: any,
         match <: Match
-    as
+    do
         // Original TS indexes an object literal with string-literal keys
         // ({'default': ..., ...}[match]); .nt object literals only accept
         // identifier keys, so this is expressed as a `match` instead.
@@ -21,6 +21,7 @@ export type Is(A, A1, match)
             '<-extends' -> Extends(A1, A),
             'equals' -> Equals(A1, A)
         end
+end
 
 unittest "Is(A, A1, match)" do
     assert Is('a', 'a' | 'b', 'extends->') == 1

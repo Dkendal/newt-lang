@@ -1,6 +1,6 @@
 Primitive object type alias
 =======
-type A as object
+type A do object end
 =======
 type A = object;
 

@@ -1,6 +1,6 @@
 Primitive symbol type alias
 =======
-type A as symbol
+type A do symbol end
 =======
 type A = symbol;
 

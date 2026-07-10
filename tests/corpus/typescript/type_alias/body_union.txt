@@ -2,7 +2,7 @@ Type alias whose body is a union expression
 
 =======
 
-type A as 1 | 2 | 3
+type A do 1 | 2 | 3 end
 
 =======
 

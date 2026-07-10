@@ -1,6 +1,6 @@
 Primitive unknown as a type argument
 =======
-type A as Foo(unknown)
+type A do Foo(unknown) end
 =======
 type A = Foo<unknown>;
 

@@ -7,7 +7,7 @@ unittest "sanity" do
     assert not (number <: string)
 end
 
-type Foo as 1
+type Foo do 1 end
 
 =======
 

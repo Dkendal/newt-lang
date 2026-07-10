@@ -1,6 +1,6 @@
 Primitive string in a union
 =======
-type A as string | number
+type A do string | number end
 =======
 type A = string | number;
 

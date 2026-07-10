@@ -3,12 +3,13 @@ import { List } from "./List"
 // Remove the last element out of `L`
 export type Pop(L)
     where L <: List
-    as
+    do
         if L <: readonly [...?LBody, any] | readonly [...?LBody, any?] then
             LBody
         else
             L
         end
+end
 
 unittest "Pop(L)" do
     // TODO: evaluator cannot prove this yet

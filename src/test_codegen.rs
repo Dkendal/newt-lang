@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn program_without_unittests_emits_no_fence() {
-        let out = generate("type Foo as 1");
+        let out = generate("type Foo do 1 end");
         assert!(!out.contains("Newtype Test Helpers"));
         assert!(out.contains("type Foo = 1;"));
     }
@@ -572,11 +572,11 @@ mod tests {
     #[test]
     fn collect_declaration_mappings_covers_type_aliases_and_interfaces() {
         // `type Foo` on line 1, `interface Bird` on line 3, `type Bar` on line 7.
-        let src = "type Foo as string\n\
+        let src = "type Foo do string end\n\
             \n\
             interface Bird {\n  fly: () => void,\n}\n\
             \n\
-            type Bar as number";
+            type Bar do number end";
         let program = parse_newtype_program(src).unwrap().simplify();
         let mappings = collect_declaration_mappings(&program, src);
         assert_eq!(

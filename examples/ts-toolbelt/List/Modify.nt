@@ -5,14 +5,16 @@ import { Cast } from "../Any/Cast"
 import { At } from "../Any/At"
 
 // TypeScript's global `Exclude<T, U>` (distributive)
-type Exclude(T, U) as
+type Exclude(T, U) do
     if T <: U then never else T end
+end
 
 export type Modify(L, LMod)
     where
         L <: List,
         LMod <: List
-    as
+    do
         Cast(map K in keyof LMod do
             Replace(LMod[K], x, Exclude(At(L, K), undefined))
         end, List)
+end

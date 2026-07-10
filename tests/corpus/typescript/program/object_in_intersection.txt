@@ -1,6 +1,6 @@
 Primitive object in an intersection
 =======
-type A as object & B
+type A do object & B end
 =======
 type A = object & B;
 

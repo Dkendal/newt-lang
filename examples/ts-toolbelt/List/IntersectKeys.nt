@@ -9,4 +9,5 @@ export type IntersectKeys(L, L1, match)
         L <: List,
         L1 <: List,
         match <: Match
-    as OIntersectKeys(ObjectOf(L), L1, match)
+    do OIntersectKeys(ObjectOf(L), L1, match)
+end

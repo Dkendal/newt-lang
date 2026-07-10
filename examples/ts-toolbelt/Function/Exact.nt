@@ -2,7 +2,7 @@ import { Narrowable } from "./_Internal"
 
 // Force `A` to comply with `W`. `A` must be a shape of `W`. In other words,
 // `A` must extend `W` and have the same properties - no more, no less.
-export type Exact(A, W) as
+export type Exact(A, W) do
     if W <: unknown then
         if A <: W then
             if A <: Narrowable then
@@ -20,6 +20,7 @@ export type Exact(A, W) as
             W
         end
     end
+end
 
 unittest "Exact(A, W)" do
     assert Exact(1, number) == 1

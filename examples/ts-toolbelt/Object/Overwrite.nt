@@ -4,7 +4,7 @@ export type Overwrite(O, O1)
     where
         O <: object,
         O1 <: object
-    as
+    do
         (map K in keyof O do
             if K <: keyof O1 then
                 O1[K]
@@ -12,6 +12,7 @@ export type Overwrite(O, O1)
                 O[K]
             end
         end) & {}
+end
 
 unittest "Overwrite(O, O1)" do
     assert Overwrite({a: 1, b: 2}, {b: 3, c: 4}) == {a: 1, b: 3}

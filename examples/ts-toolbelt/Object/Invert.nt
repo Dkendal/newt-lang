@@ -6,27 +6,30 @@ import { ComputeRaw } from "../Any/Compute"
 // Swaps the keys and values of `O`
 export type _Invert(O)
     where O <: Record(Key, Key)
-    as
+    do
         ComputeRaw(IntersectOf(
             (map K in keyof O do
                 Record(O[K], K)
             end)[keyof O]
         ))
+end
 
 // Swaps the keys and values of an [[Object]] (if applicable)
 export type Invert(O)
     where O <: Record(keyof O, Key)
-    as
+    do
         if O <: unknown then
             _Invert(O)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type InvertInput as {
+type InvertInput do {
     A: 'Av',
     B: 'Bv',
     C: 'Cv'
 }
+end
 
 unittest "Invert(O)" do
     // TODO: evaluator cannot prove this yet (depends on ./Record and

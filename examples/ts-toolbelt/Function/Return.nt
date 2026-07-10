@@ -3,10 +3,11 @@ import { List } from "../List/List"
 
 export type Return(F)
     where F <: Function
-    as
+    do
         if F <: (...args: List) => ?R then
             R
         end
+end
 
 unittest "Return(F)" do
     // TODO: evaluator cannot prove this yet (infer through rest-parameter

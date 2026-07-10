@@ -4,7 +4,8 @@ import { Length as LLength } from "../List/Length"
 
 export type Length(Fn)
     where Fn <: Function
-    as LLength(Parameters(Fn))
+    do LLength(Parameters(Fn))
+end
 
 unittest "Length(Fn)" do
     // TODO: evaluator cannot prove this yet

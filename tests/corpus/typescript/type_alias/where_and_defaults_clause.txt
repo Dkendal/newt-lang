@@ -2,7 +2,7 @@ Generic type alias with both where and defaults clauses
 
 =======
 
-type A(x) defaults x = number where x <: number as x
+type A(x) defaults x = number where x <: number do x end
 
 =======
 

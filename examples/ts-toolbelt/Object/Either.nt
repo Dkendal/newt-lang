@@ -9,35 +9,39 @@ type __Either(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         // Merge all but K, with K possibilities
         let picks = map P in K do _Pick(O, P) end in
         _Omit(O, K) & picks[K]
+end
 
 type EitherStrict(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         Strict(__Either(O, K))
+end
 
 type EitherLoose(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         ComputeRaw(__Either(O, K))
+end
 
 export type _Either(O, K, strict)
     where
         O <: object,
         K <: Key,
         strict <: Boolean
-    as
+    do
         match strict do
             1 -> EitherStrict(O, K),
             0 -> EitherLoose(O, K)
         end
+end
 
 // Split `O` into a union with `K` keys in such a way that none of
 // the keys are ever present with one another within the different unions.
@@ -47,10 +51,11 @@ export type Either(O, K, strict)
         O <: object,
         K <: Key,
         strict <: Boolean
-    as
+    do
         if O <: unknown then
             _Either(O, K, strict)
         end
+end
 
 unittest "Either(O, K)" do
     // TODO: evaluator cannot prove this yet (depends on ./Omit, ./Pick,

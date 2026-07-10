@@ -2,7 +2,8 @@
 // See https://stackoverflow.com/questions/56687668
 export type NoInfer(A)
     where A <: any
-    as [A][if A <: any then 0 end]
+    do [A][if A <: any then 0 end]
+end
 
 unittest "NoInfer(A)" do
     // TODO: evaluator cannot prove this yet

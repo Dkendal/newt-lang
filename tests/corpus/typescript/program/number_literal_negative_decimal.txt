@@ -1,6 +1,6 @@
 Negative decimal literal with fraction
 =======
-type A as -1.5
+type A do -1.5 end
 =======
 type A = -1.5;
 

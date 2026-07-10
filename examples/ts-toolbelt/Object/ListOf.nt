@@ -16,12 +16,13 @@ type AppendExists(O, LN, I)
         O <: object,
         LN <: List,
         I <: Iteration
-    as
+    do
         cond do
             Key(I) <: keyof O -> Append(LN, O[Key(I)]),
             Pos(I) <: keyof O -> Append(LN, O[Pos(I)]),
             else -> LN
         end
+end
 
 // TS uses a `{0: ..., 1: ...}[Extends<[K], [never]>]` lookup here; numeric
 // property names are not supported, so an equivalent tuple lookup is used.
@@ -33,37 +34,41 @@ type ___ListOf(O, K, LN, I)
         O <: object,
         LN <: List,
         I <: Iteration
-    as
+    do
         [
             ___ListOf(O, Exclude(K, Key(I)), AppendExists(O, LN, I), Next(I)),
             LN
         ][Extends([K], [never])]
+end
 
 type __ListOf(O)
     where O <: object
-    as
+    do
         cond do
             number <: keyof O -> O[number][],
             string <: keyof O -> O[string][],
             symbol <: keyof O -> O[symbol][],
             else -> ___ListOf(O, Select(keyof O, number | `${number}`))
         end
+end
 
 export type _ListOf(O)
     where O <: object
-    as
+    do
         if __ListOf(O) <: ?X then
             Cast(X, List)
         end
+end
 
 // Transform an [[Object]] into a [[List]]
 // (It will only pick numeric literal indexes)
 export type ListOf(O)
     where O <: object
-    as
+    do
         if O <: unknown then
             _ListOf(O)
         end
+end
 
 unittest "ListOf(O)" do
     // TODO: evaluator cannot prove this yet (recursive iteration over

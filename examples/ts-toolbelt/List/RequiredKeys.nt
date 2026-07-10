@@ -5,4 +5,5 @@ import { List } from "./List"
 // Get the keys of `L` that are required
 export type RequiredKeys(L)
     where L <: List
-    as ORequiredKeys(ObjectOf(L))
+    do ORequiredKeys(ObjectOf(L))
+end

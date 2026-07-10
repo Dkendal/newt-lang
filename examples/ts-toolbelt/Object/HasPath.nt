@@ -12,8 +12,9 @@ export type HasPath(O, Path, M, match)
         Path <: List(Key),
         M <: any,
         match <: Match
-    as
+    do
         Is(OPath(O, Path), M, match)
+end
 
 // TODO: evaluator cannot prove this yet — evaluating `./Path`'s `_Path`
 // recursion does not terminate, which hangs the compiler. The assert is

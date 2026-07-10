@@ -9,7 +9,8 @@ export type Required(L, depth)
     where
         L <: List,
         depth <: Depth
-    as Cast(RequiredPart(L, depth), List)
+    do Cast(RequiredPart(L, depth), List)
+end
 
 unittest "Required(L)" do
     // TODO: evaluator cannot prove this yet

@@ -4,8 +4,9 @@ export type Contains(A1, A2)
     where
         A1 <: any,
         A2 <: any
-    as
+    do
         if Extends(A1, A2) <: 1 then 1 else 0 end
+end
 
 unittest "Contains(A1, A2)" do
     assert Contains('a' | 'b', 'b') == 0

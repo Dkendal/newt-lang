@@ -1,6 +1,6 @@
 Primitive string as a type argument
 =======
-type A as Foo(string)
+type A do Foo(string) end
 =======
 type A = Foo<string>;
 

@@ -11,9 +11,10 @@ export type Either(L, K, strict)
         L <: List,
         K <: Key,
         strict <: Boolean
-    as
+    do
         if OEither(ObjectOf(L), `${K & number}` | K, strict) <: ?OE then
             if OE <: unknown then
                 _ListOf(OE & {})
             end
         end
+end

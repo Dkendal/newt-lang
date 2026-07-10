@@ -2,10 +2,10 @@ A multi-binding let inside a type alias inlines each binding
 
 =======
 
-type A as let a = 1, b = 2 in [a, b]
+type A do let a = 1, b = 2 in [a, b] end
 
 =======
 
-type A as [1, 2]
+type A do [1, 2] end
 
 =======

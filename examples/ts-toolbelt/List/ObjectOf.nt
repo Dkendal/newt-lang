@@ -6,7 +6,7 @@ import { List } from "./List"
 export type ObjectOf(O)
     where
         O <: List
-    as
+    do
         if O <: unknown then
             if number <: Length(O) then // detect arrays
                 _Pick(O, number)        // preserves arrays
@@ -14,6 +14,7 @@ export type ObjectOf(O)
                 _Omit(O, keyof(any[]))  // transforms tuples
             end
         end
+end
 
 unittest "ObjectOf(O)" do
     // TODO: evaluator cannot prove this yet

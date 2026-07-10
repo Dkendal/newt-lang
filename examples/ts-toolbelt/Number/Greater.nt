@@ -9,19 +9,21 @@ export type _Greater(N1, N2)
     where
         N1 <: Iteration,
         N2 <: Iteration
-    as _IsPositive(_Sub(N1, N2))
+    do _IsPositive(_Sub(N1, N2))
+end
 
 // Check if a number is bigger than another one
 export type Greater(N1, N2)
     where
         N1 <: number,
         N2 <: number
-    as
+    do
         if N1 <: unknown then
             if N2 <: unknown then
                 _Greater(IterationOf(N1), IterationOf(N2))
             end
         end
+end
 
 unittest "Greater(N1, N2)" do
     // TODO: evaluator cannot prove this yet (recursive alias evaluation and

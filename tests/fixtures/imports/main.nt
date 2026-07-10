@@ -1,6 +1,6 @@
 import { Key } from "./Key"
 
-type Get(K) where K <: Key as K
+type Get(K) where K <: Key do K end
 
 unittest "imports resolve" do
     assert "id" <: Key

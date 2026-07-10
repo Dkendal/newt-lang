@@ -11,32 +11,32 @@
 // ---------------------------------------------------------------------------
 
 // Identity: returns its sole argument unchanged.
-type Id(T) as T
+type Id(T) do T end
 
 // Projection: first / second of two parameters.
-type Fst(A, B) as A
-type Snd(A, B) as B
+type Fst(A, B) do A end
+type Snd(A, B) do B end
 
 // Two/three parameter constructors.
-type Pair(A, B) as [A, B]
-type Tri(A, B, C) as [A, B, C]
+type Pair(A, B) do [A, B] end
+type Tri(A, B, C) do [A, B, C] end
 
 // Trailing default parameter.
-type PairD(A, B) defaults B = string as [A, B]
+type PairD(A, B) defaults B = string do [A, B] end
 
 // Default that references an earlier type parameter.
-type Wrap(A, B) defaults B = A as [A, B]
+type Wrap(A, B) defaults B = A do [A, B] end
 
 // Sole parameter with a default, plus a trailing default after C.
-type Box(T) defaults T = string as T[]
-type Tri3(A, B, C) defaults C = boolean as [A, B, C]
+type Box(T) defaults T = string do T[] end
+type Tri3(A, B, C) defaults C = boolean do [A, B, C] end
 
 // Constrained parameters (applied only with satisfying arguments).
-type Num(T) where T <: number as T
-type NumD(T) defaults T = 0 where T <: number as T
-type Arr(T) where T <: unknown as T[]
-type Both(A, B) where A <: number, B <: string as [A, B]
-type SubOf(A, B) where B <: A as B
+type Num(T) where T <: number do T end
+type NumD(T) defaults T = 0 where T <: number do T end
+type Arr(T) where T <: unknown do T[] end
+type Both(A, B) where A <: number, B <: string do [A, B] end
+type SubOf(A, B) where B <: A do B end
 
 // ---------------------------------------------------------------------------
 

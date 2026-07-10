@@ -8,7 +8,7 @@ import { Tail } from "../../List/Tail"
 type OmitAt(O, Path)
     where
         Path <: List(Key)
-    as cond do
+    do cond do
         O <: BuiltIn -> O,
         Path <: [Key] and O <: List -> _LOmit(O, Path[0]),
         Path <: [Key] and O <: object -> _OOmit(O, Path[0]),
@@ -22,19 +22,21 @@ type OmitAt(O, Path)
                 end
             end
     end
+end
 
 // Remove out of `O` the fields at `Path`
 export type Omit(O, Path)
     where
         O <: object,
         Path <: List(Key)
-    as
+    do
         if Path <: unknown then
             OmitAt(O, Path)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as {info: {name: string, age: number}, id: number}
+type User do {info: {name: string, age: number}, id: number} end
 
 unittest "Omit(O, Path)" do
     // TODO: evaluator cannot prove this yet (depends on ../Omit and

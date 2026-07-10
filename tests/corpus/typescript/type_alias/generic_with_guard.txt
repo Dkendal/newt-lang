@@ -2,7 +2,7 @@ Generic type alias with a guard
 
 =======
 
-type A(x, y, z) as 1
+type A(x, y, z) do 1 end
 
 =======
 

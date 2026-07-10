@@ -1,6 +1,6 @@
 Primitive symbol as a type argument
 =======
-type A as Foo(symbol)
+type A do Foo(symbol) end
 =======
 type A = Foo<symbol>;
 

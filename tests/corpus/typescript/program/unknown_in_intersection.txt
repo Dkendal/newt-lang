@@ -1,6 +1,6 @@
 Primitive unknown in an intersection
 =======
-type A as unknown & B
+type A do unknown & B end
 =======
 type A = unknown & B;
 

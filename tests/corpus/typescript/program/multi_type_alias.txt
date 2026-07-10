@@ -1,7 +1,7 @@
 Multiple type aliases in one program
 =======
-type A as number
-type B as string
+type A do number end
+type B do string end
 =======
 type A = number;
 

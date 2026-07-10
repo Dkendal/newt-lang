@@ -2,12 +2,14 @@ De Morgan over an or holds inside a type alias
 
 =======
 
-type A as
+type A do
     if not (a <: b or c <: d) then e else f end
+end
 
 =======
 
-type A as
+type A do
     if (not (a <: b)) and (not (c <: d)) then e else f end
+end
 
 =======

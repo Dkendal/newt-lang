@@ -9,7 +9,7 @@ type MergeAt(O, Path, O1, depth)
     where
         Path <: List(Key),
         depth <: Depth
-    as cond do
+    do cond do
         O <: BuiltIn -> O,
         Path <: [] and O <: List -> OMerge(O, O1 & {}, depth),
         Path <: [] and O <: object -> OMerge(O, O1 & {}, depth),
@@ -23,6 +23,7 @@ type MergeAt(O, Path, O1, depth)
                 end
             end
     end
+end
 
 // Complete the fields of `O` at `Path` with the ones of `O1`
 export type Merge(O, Path, O1, depth)
@@ -32,15 +33,16 @@ export type Merge(O, Path, O1, depth)
         Path <: List(Key),
         O1 <: object,
         depth <: Depth
-    as
+    do
         if Path <: unknown then
             MergeAt(O, Path, O1, depth)
         end
+end
 
 // TODO: swap path & o1
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as {info: {name: string}, id: number}
+type User do {info: {name: string}, id: number} end
 
 unittest "Merge(O, Path, O1, depth)" do
     // TODO: evaluator cannot prove this yet (depends on ../Merge and

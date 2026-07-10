@@ -7,11 +7,12 @@ export type Or(B1, B2)
     where
         B1 <: Boolean,
         B2 <: Boolean
-    as
+    do
         [
             [0, 1],
             [1, 1]
         ][B1][B2]
+end
 
 unittest "Or(B1, B2)" do
     assert Or(1, 0) == 1

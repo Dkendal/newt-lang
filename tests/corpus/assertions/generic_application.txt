@@ -2,8 +2,8 @@ generic aliases are beta-reduced when applied in an assertion
 
 =======
 
-type Id(T) as T
-type Pair(A, B) as [A, B]
+type Id(T) do T end
+type Pair(A, B) do [A, B] end
 
 unittest "generics" do
   assert Id(1) <: number

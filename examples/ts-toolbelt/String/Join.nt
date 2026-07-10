@@ -6,12 +6,13 @@ type _Join(T, D)
     where
         T <: List,
         D <: string
-    as match T do
+    do match T do
         [] -> '',
         [Literal] -> `${T[0]}`,
         [Literal, ...?R] -> `${T[0]}${D}${_Join(R, D)}`,
         else -> string
     end
+end
 
 // Concat many literals together
 export type Join(T, D)
@@ -19,10 +20,11 @@ export type Join(T, D)
     where
         T <: List(Literal),
         D <: string
-    as
+    do
         if _Join(T, D) <: ?X then
             Cast(X, string)
         end
+end
 
 unittest "Join(T, D)" do
     // TODO: evaluator cannot prove this yet

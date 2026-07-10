@@ -2,7 +2,7 @@ Generic type alias with three defaults
 
 =======
 
-type A(x, y, z) defaults x = number, y = string, z = boolean as x
+type A(x, y, z) defaults x = number, y = string, z = boolean do x end
 
 =======
 

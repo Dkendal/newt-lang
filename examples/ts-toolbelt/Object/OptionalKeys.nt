@@ -5,19 +5,21 @@ import { _Pick } from "./Pick"
 export type _OptionalKeys(O)
     where
         O <: object
-    as
-        (map -? K in keyof O do
+    do
+        (map -optional K in keyof O do
             if {} <: _Pick(O, K) then K end
         end)[keyof O]
+end
 
 // Get the keys of `O` that are optional
 export type OptionalKeys(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _OptionalKeys(O)
         end
+end
 
 unittest "OptionalKeys(O)" do
     // TODO: evaluator cannot prove this yet (mapped type with conditional

@@ -15,5 +15,6 @@ export type Merge(L, L1, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         Cast(OMerge(L, L1, depth, ignore, fill), List)
+end

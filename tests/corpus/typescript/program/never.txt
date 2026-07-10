@@ -1,6 +1,6 @@
 Primitive never type alias
 =======
-type A as never
+type A do never end
 =======
 type A = never;
 

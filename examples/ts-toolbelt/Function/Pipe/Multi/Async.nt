@@ -20,9 +20,10 @@ import { Curry } from "../../Curry"
 // Closest expressible form: a single non-generic signature taking the
 // (possibly curried) functions as a non-empty rest parameter and returning
 // a promise-returning function.
-export type PipeMultiAsync as (
+export type PipeMultiAsync do (
     ...fns: [
         Function(any[], any) | Curry(Function(any[], any)),
         ...(Function(any[], any) | Curry(Function(any[], any)))[]
     ]
 ) => Function(any[], Promise(Await(any)))
+end

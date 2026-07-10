@@ -2,10 +2,10 @@ import { Equals } from "./Any/Equals"
 import { Boolean } from "./Boolean/_Internal"
 
 // Test should pass
-export type Pass as 1
+export type Pass do 1 end
 
 // Test should fail
-export type Fail as 0
+export type Fail do 0 end
 
 // TODO: no `.nt` equivalent for value-level `declare function` exports.
 // Original TS:
@@ -19,7 +19,8 @@ export type Fail as 0
 export type Check(Type, Expect, Outcome)
     where
         Outcome <: Boolean
-    as Equals(Equals(Type, Expect), Outcome)
+    do Equals(Equals(Type, Expect), Outcome)
+end
 
 unittest "Pass / Fail" do
     assert Pass == 1

@@ -2,20 +2,22 @@ A cond inside a type alias expands to a chain of ifs
 
 =======
 
-type A as cond do
+type A do cond do
     a <: b -> c,
     d <: e -> f,
     else -> g
 end
+end
 
 =======
 
-type A as
+type A do
     if a <: b then c
     else
         if d <: e then f
         else g
         end
     end
+end
 
 =======

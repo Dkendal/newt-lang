@@ -1,6 +1,6 @@
 Primitive bigint as a type argument
 =======
-type A as Foo(bigint)
+type A do Foo(bigint) end
 =======
 type A = Foo<bigint>;
 

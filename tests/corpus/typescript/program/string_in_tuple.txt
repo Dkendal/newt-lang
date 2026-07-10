@@ -1,6 +1,6 @@
 Primitive string as a tuple element
 =======
-type A as [string, number]
+type A do [string, number] end
 =======
 type A = [string, number];
 

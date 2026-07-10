@@ -5,8 +5,9 @@ import { List } from "./List"
 export type NullableKeys(L)
     where
         L <: List
-    as
+    do
         ONullableKeys(ObjectOf(L))
+end
 
 unittest "NullableKeys(L)" do
     // TODO: evaluator cannot prove this yet

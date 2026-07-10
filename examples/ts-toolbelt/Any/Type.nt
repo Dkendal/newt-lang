@@ -11,10 +11,11 @@ export type Type(A, Id)
     where
         A <: any,
         Id <: Key
-    as
+    do
         {
             __id: Id
         } & A
+end
 
 unittest "Type(A, Id)" do
     assert Type(number, 'eur') <: number

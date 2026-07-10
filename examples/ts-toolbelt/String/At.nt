@@ -6,7 +6,8 @@ export type At(S, K)
     where
         S <: string,
         K <: number
-    as AAt(Split(S, ''), K)
+    do AAt(Split(S, ''), K)
+end
 
 unittest "At(S, K)" do
     // TODO: evaluator cannot prove this yet — `infer` inside template literals

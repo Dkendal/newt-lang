@@ -1,6 +1,6 @@
 Primitive undefined in a union
 =======
-type A as undefined | number
+type A do undefined | number end
 =======
 type A = undefined | number;
 

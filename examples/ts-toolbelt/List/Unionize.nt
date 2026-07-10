@@ -9,7 +9,7 @@ export type Unionize(L, L1, K)
         L <: List,
         L1 <: List,
         K <: Key
-    as
+    do
         map P in keyof L do
             if P <: K then
                 L[P] | At(L1, P)
@@ -17,6 +17,7 @@ export type Unionize(L, L1, K)
                 L[P]
             end
         end
+end
 
 unittest "Unionize(L, L1, K)" do
     // TODO: evaluator cannot prove this yet (mapped type over a tuple with a

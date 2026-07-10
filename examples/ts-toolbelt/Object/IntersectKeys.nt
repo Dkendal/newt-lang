@@ -8,9 +8,9 @@ export type _IntersectMatch(O, O1, match)
         O <: object,
         O1 <: object,
         match <: Match
-    as
+    do
         let picks =
-            map -? K in keyof O do
+            map -optional K in keyof O do
                 match Is(O[K], At(O1, K), match) do
                     1 -> K,
                     0 -> never
@@ -18,16 +18,18 @@ export type _IntersectMatch(O, O1, match)
             end
         in
         picks[keyof O]
+end
 
 type IntersectMatch(O, O1, match)
     where
         O <: object,
         O1 <: object,
         match <: Match
-    as
+    do
         if O <: unknown then
             _IntersectMatch(O, O1, match)
         end
+end
 
 // Get the intersecting keys of `O` & `O1`
 // (If `match = 'default'`, no type checks are done)
@@ -37,7 +39,7 @@ export type IntersectKeys(O, O1, match)
         O <: object,
         O1 <: object,
         match <: Match
-    as
+    do
         match match do
             'default' -> Keys(O) & Keys(O1),
             'contains->' -> IntersectMatch(O, O1, 'contains->'),
@@ -46,6 +48,7 @@ export type IntersectKeys(O, O1, match)
             '<-extends' -> IntersectMatch(O, O1, '<-extends'),
             'equals' -> IntersectMatch(O, O1, 'equals')
         end
+end
 
 unittest "IntersectKeys(O, O1, match)" do
     // TODO: evaluator cannot prove this yet (indexing a mapped type by

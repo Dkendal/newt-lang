@@ -4,8 +4,9 @@ export type Concat(L, L1)
     where
         L <: List,
         L1 <: List
-    as
+    do
         [...L, ...L1]
+end
 
 unittest "Concat(L, L1)" do
     // TODO: evaluator cannot prove this yet (tuple spread of a substituted

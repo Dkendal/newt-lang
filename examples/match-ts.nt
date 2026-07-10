@@ -1,19 +1,20 @@
 unique symbol __kind__
 unique symbol __capture__
 
-type True as 1
+type True do 1 end
 
-type SymToStringTag as Symbol.toStringTag
+type SymToStringTag do Symbol.toStringTag end
 
-export type BuiltIn as
+export type BuiltIn do
     Function
     | Error
     | Date
     | {readonly [Symbol.toStringTag]: string}
     | RegExp
     | Generator
+end
 
-type Primitive as
+type Primitive do
   boolean
   | string
   | number
@@ -21,30 +22,34 @@ type Primitive as
   | symbol
   | undefined
   | null
+end
 
-type ExtractSubcapture(T) as
+type ExtractSubcapture(T) do
   match T do
     Primitive | BuiltIn -> never,
     object -> T[ Exclude(keyof(T), keyof([]) | keyof({})) ],
   end
+end
 
-type PartialAssignment(K, V) as
+type PartialAssignment(K, V) do
   cond do
     V <: never -> never,
     K <: string -> map k in K do V end,
     else -> never
   end
+end
 
-type EmptyToNever(T) as
+type EmptyToNever(T) do
   if {} <: T then
     never
   else
     T
   end
+end
 
 // `Kind` is `typeof any_ | typeof rest_ | …` in match-ts; each `X_` const is a
 // string literal (`any_ = 'any'`), so the union is exactly these literals.
-export type Kind as
+export type Kind do
   'any'
   | 'rest'
   | 'string'
@@ -54,6 +59,7 @@ export type Kind as
   | 'symbol'
   | 'bigint'
   | 'object'
+end
 
 export interface Hole(Type, Label)
 defaults
@@ -91,12 +97,13 @@ export interface __ extends Hole(any, 'any') {
   tl: __rest,
 }
 
-export type HoleInnerType(T) as
+export type HoleInnerType(T) do
   if T <: Hole(?U) then
     U
   else
     T
   end
+end
 
 export interface Capture(Name, Pattern)
 defaults
@@ -109,14 +116,15 @@ where
   readonly pattern: Pattern,
 }
 
-type CapturePattern(T) as
+type CapturePattern(T) do
   if T <: Capture(any, ?Pattern) then
     Pattern
   else
     T
   end
+end
 
-type RecursiveExpandCapture(T) as
+type RecursiveExpandCapture(T) do
   if T == any then
     T
   else
@@ -132,43 +140,49 @@ type RecursiveExpandCapture(T) as
       end
     end
   end
+end
 
-export type ExpandCapture(T) as
+export type ExpandCapture(T) do
   T
   |> HoleInnerType()
   |> CapturePattern()
   |> RecursiveExpandCapture()
+end
 
-type NeverToEmpty(T) as
+type NeverToEmpty(T) do
   if [T] <: [never] then
     {}
   else
     T
   end
+end
 
-type Explode(T) as T[keyof(T)]
+type Explode(T) do T[keyof(T)] end
 
-export type RecursiveCollect(Node) as
+export type RecursiveCollect(Node) do
   Node
   |> DoRecursiveCollect()
   |> NeverToEmpty()
+end
 
-type IsLeafNode(T) as
+type IsLeafNode(T) do
   cond do
     not(T <: Record(string, any)) -> true,
     T <: Hole -> true,
     T == any -> true,
     else -> false,
   end
+end
 
 
-type WalkChildren(Node) as
+type WalkChildren(Node) do
   map Key in keyof(Node) do
     DoRecursiveCollect(Node[Key])
   end
   |> Explode()
+end
 
-type DoRecursiveCollect(Node) as
+type DoRecursiveCollect(Node) do
   if IsLeafNode(Node) <: True then
     never
   else
@@ -178,8 +192,9 @@ type DoRecursiveCollect(Node) as
       WalkChildren(Node)
     end
   end
+end
 
-type UnionizeCapture(T) as
+type UnionizeCapture(T) do
   if T <: Capture(?K, ?V) then
     if K <: string then
       map k in K do
@@ -187,31 +202,36 @@ type UnionizeCapture(T) as
       end
     end
   end
+end
 
-export type CaptureToEntry(T) as
+export type CaptureToEntry(T) do
   T
   |> UnionizeCapture()
   |> Union::Merge()
+end
 
-export type VariableCapture(T) as
+export type VariableCapture(T) do
   T
   |> RecursiveCollect()
   |> CaptureToEntry()
   |> ExpandCapture()
+end
 
-export type PatternHandler(Pattern) as
+export type PatternHandler(Pattern) do
   (VariableCapture(Pattern)) => unknown
+end
 
-type IsTopType(T) as
+type IsTopType(T) do
   cond do
       T == unknown -> true,
       T == object -> true,
       T == Object -> true,
       T == any -> true
   end
+end
 
 
-export type UnifyAll(Value, Pattern) as
+export type UnifyAll(Value, Pattern) do
   cond do
     IsTopType(Value) <: True ->
       VariableCapture(Pattern),
@@ -219,8 +239,9 @@ export type UnifyAll(Value, Pattern) as
     Overlapping(Value, ExpandCapture(Pattern)) <: {} ->
       DoUnifyAll(Value, Pattern)
   end
+end
 
-export type DoUnifyAll(Value, Pattern) as
+export type DoUnifyAll(Value, Pattern) do
   cond do
     Pattern <: Capture(?VarName, ?Child) ->
       PartialAssignment(VarName, Overlapping(Value, ExpandCapture(Child)))
@@ -237,8 +258,9 @@ export type DoUnifyAll(Value, Pattern) as
         end
       )
   end
+end
 
-export type ShouldUnifyAll(Value, Pattern) as 
+export type ShouldUnifyAll(Value, Pattern) do 
   if not(
     (Pattern == any and Value == any) or
     ((Pattern <: Primitive) and (Value <: Primitive))
@@ -246,19 +268,21 @@ export type ShouldUnifyAll(Value, Pattern) as
   then true
   else false
   end
+end
 
 
-export type CaseParameters(Value, Pattern) as
+export type CaseParameters(Value, Pattern) do
   UnifyAll(Value, Pattern)
   |> Union::Merge()
   |> EmptyToNever()
+end
 
 export type Overlapping(A, B, Depth)
 defaults
   Depth = I::IterationOf(0)
 where
   Depth <: I::Iteration
-as
+do
   cond do
     A::Equals(A, any) <: True -> B,
     A <: B -> A,
@@ -273,18 +297,20 @@ as
         end
       )
   end
+end
 
-export type RejectMismatch(T) as
+export type RejectMismatch(T) do
   cond do
     {} <: T -> never,
     T <: AnyNever(A::Cast(T, object)) -> never,
     else -> T
   end
+end
 
 export type AnyNever(T)
 where
   T <: object
-as
+do
   if keyof(T) <: ?S then
     if S <: any then
       map K in A::Cast(S, string | number | symbol) do
@@ -296,3 +322,4 @@ as
   else
     never
   end
+end

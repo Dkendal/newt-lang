@@ -1,6 +1,6 @@
 Primitive symbol in an intersection
 =======
-type A as symbol & B
+type A do symbol & B end
 =======
 type A = symbol & B;
 

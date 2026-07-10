@@ -1,6 +1,6 @@
 Primitive object as a type argument
 =======
-type A as Foo(object)
+type A do Foo(object) end
 =======
 type A = Foo<object>;
 

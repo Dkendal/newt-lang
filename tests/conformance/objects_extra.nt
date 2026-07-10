@@ -1,8 +1,8 @@
 // Conformance edge cases added by the 2026-06-30 audit (objects).
 // Every assertion below agrees with tsgo --strict.
 
-type Animal as {legs: number}
-type Dog as {legs: number, bark: string}
+type Animal do {legs: number} end
+type Dog do {legs: number, bark: string} end
 
 unittest "index value covariance" do
   assert {[k in string]: Dog} <: {[k in string]: Animal}

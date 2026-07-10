@@ -1,6 +1,6 @@
 Primitive null as a type argument
 =======
-type A as Foo(null)
+type A do Foo(null) end
 =======
 type A = Foo<null>;
 

@@ -5,7 +5,7 @@ import { IntersectOf } from "./IntersectOf"
 export type Last(U)
     where
         U <: any
-    as
+    do
         // Distribute U to a union of functions, intersect them, then the
         // inferred parameter of the overloaded intersection is the last
         // member (i.e. Parameters<((a: 1) => void) & ((a: 2) => void)> => [2])
@@ -13,6 +13,7 @@ export type Last(U)
         if IntersectOf(fns) <: (x: ?P) => void then
             P
         end
+end
 
 unittest "Last(U)" do
     // TODO: evaluator cannot prove this yet (infer over an intersection of

@@ -4,7 +4,7 @@ import { Narrowable } from "./_Internal"
 // The original TS checks `A[K] extends Function` against the global JS
 // `Function` interface; newtype has no lib globals, so the closest callable
 // shape `(...args: any[]) => any` stands in.
-type NarrowRaw(A) as
+type NarrowRaw(A) do
     (if A <: [] then [] end)
     | (if A <: Narrowable then A end)
     | (map K in keyof A do
@@ -14,8 +14,10 @@ type NarrowRaw(A) as
             NarrowRaw(A[K])
         end
     end)
+end
 
 // Prevent type widening on generic function parameters
 export type Narrow(A)
     where A <: any
-    as Try(A, [], NarrowRaw(A))
+    do Try(A, [], NarrowRaw(A))
+end

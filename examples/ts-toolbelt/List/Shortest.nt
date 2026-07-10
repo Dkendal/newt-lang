@@ -7,7 +7,7 @@ export type Shortest(L, L1)
     where
         L <: List,
         L1 <: List
-    as
+    do
         if L <: unknown then
             if L1 <: unknown then
                 // TS uses a `{0: L1, 1: L}[...]` lookup here; numeric
@@ -16,6 +16,7 @@ export type Shortest(L, L1)
                 [L1, L][Has(keyof L1, keyof L)]
             end
         end
+end
 
 unittest "Shortest(L, L1)" do
     // TODO: evaluator cannot prove this yet

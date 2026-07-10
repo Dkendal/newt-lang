@@ -15,5 +15,6 @@ export type PatchAll(O, Ls, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         Cast(OPatchAll(O, Ls, depth, ignore, fill), List)
+end

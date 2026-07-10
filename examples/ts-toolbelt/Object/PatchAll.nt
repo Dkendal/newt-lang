@@ -18,12 +18,13 @@ type __PatchAll(O, Os, depth, ignore, fill, I)
         ignore <: object,
         fill <: any,
         I <: Iteration
-    as
+    do
         if Pos(I) <: Length(Os) then
             O
         else
             __PatchAll(Patch(O, Os[Pos(I)], depth, ignore, fill), Os, depth, ignore, fill, Next(I))
         end
+end
 
 export type _PatchAll(O, Os, depth, ignore, fill)
     where
@@ -32,10 +33,11 @@ export type _PatchAll(O, Os, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         if __PatchAll(O, Os, depth, ignore, fill) <: ?X then
             Cast(X, object)
         end
+end
 
 // [[Patch]] a list of [[Object]]s into `O`. Patches from left to right.
 export type PatchAll(O, Os, depth, ignore, fill)
@@ -49,9 +51,10 @@ export type PatchAll(O, Os, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         if O <: unknown then
             if Os <: unknown then
                 _PatchAll(O, Os, depth, ignore, fill)
             end
         end
+end

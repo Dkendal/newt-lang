@@ -7,24 +7,26 @@ type __Split(S, D, T)
         S <: string,
         D <: string,
         T <: string[]
-    as
+    do
         if S <: `${?BS}${D}${?AS}` then
             __Split(AS, D, [...T, BS])
         else
             [...T, S]
         end
+end
 
 type _Split(S, D)
     defaults D = ''
     where
         S <: string,
         D <: string
-    as
+    do
         if D <: '' then
             Pop(__Split(S, D))
         else
             __Split(S, D)
         end
+end
 
 // Split `S` by `D` into a List
 export type Split(S, D)
@@ -32,10 +34,11 @@ export type Split(S, D)
     where
         S <: string,
         D <: string
-    as
+    do
         if _Split(S, D) <: ?X then
             Cast(X, string[])
         end
+end
 
 unittest "Split(S, D)" do
     // TODO: evaluator cannot prove this yet — `infer` inside template literals

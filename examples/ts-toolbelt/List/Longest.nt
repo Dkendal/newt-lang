@@ -7,7 +7,7 @@ export type Longest(L, L1)
     where
         L <: List,
         L1 <: List
-    as
+    do
         if L <: unknown then
             if L1 <: unknown then
                 if Has(keyof L, keyof L1) <: 1 then
@@ -17,6 +17,7 @@ export type Longest(L, L1)
                 end
             end
         end
+end
 
 unittest "Longest(L, L1)" do
     assert Longest([1, 2], [1, 2, 3]) == [1, 2, 3]

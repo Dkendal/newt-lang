@@ -1,6 +1,6 @@
 Primitive bigint type alias
 =======
-type A as bigint
+type A do bigint end
 =======
 type A = bigint;
 

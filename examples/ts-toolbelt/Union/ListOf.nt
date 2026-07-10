@@ -13,11 +13,12 @@ type _ListOf(U, LN, LastU)
         LastU = Last(U)
     where
         LN <: List
-    as
+    do
         [
             _ListOf(Exclude(U, LastU), Prepend(LN, LastU)),
             LN
         ][Extends([U], [never])]
+end
 
 // Transform a [[Union]] into a [[List]]
 // (it might not preserve order)
@@ -25,10 +26,11 @@ type _ListOf(U, LN, LastU)
 export type ListOf(U)
     where
         U <: any
-    as
+    do
         if _ListOf(U) <: ?X then
             Cast(X, List)
         end
+end
 
 unittest "ListOf(U)" do
     // TODO: evaluator cannot prove this yet (recursive union consumption via

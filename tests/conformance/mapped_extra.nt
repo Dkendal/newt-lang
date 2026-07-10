@@ -8,7 +8,7 @@ unittest "keyof ignores optional and readonly modifiers" do
   assert 'b' <: keyof {a?: number, readonly b: string}
 end
 
-type Obj as {a: number, b: string, c: boolean}
+type Obj do {a: number, b: string, c: boolean} end
 
 unittest "mapped value to literal and union" do
   assert map k in 'a' | 'b' do 1 end == {a: 1, b: 1}
@@ -27,7 +27,7 @@ unittest "mapped width subtyping" do
   assert not(map k in 'a' | 'b' do number end <: map k in 'a' | 'b' | 'c' do number end)
 end
 
-type R as {readonly a: number, b: string}
+type R do {readonly a: number, b: string} end
 
 unittest "homomorphic preserves readonly" do
   assert map k in keyof(R) do R[k] end == R
@@ -46,7 +46,7 @@ unittest "mapped never key yields empty object" do
   assert {a: number} <: map k in never do number end
 end
 
-type Q as {a: number, b: string}
+type Q do {a: number, b: string} end
 
 unittest "homomorphic identity over required-only source" do
   assert map k in keyof(Q) do Q[k] end == Q
@@ -54,10 +54,10 @@ unittest "homomorphic identity over required-only source" do
   assert Q <: map k in keyof(Q) do Q[k] end
 end
 
-type ModSrc as {a?: number, readonly b: string}
-type ModAllRequired as map -? k in keyof(ModSrc) do ModSrc[k] end
-type ModAllMutable as map -readonly k in keyof(ModSrc) do ModSrc[k] end
-type ModBothRemoved as map -readonly -? k in keyof(ModSrc) do ModSrc[k] end
+type ModSrc do {a?: number, readonly b: string} end
+type ModAllRequired do map -optional k in keyof(ModSrc) do ModSrc[k] end end
+type ModAllMutable do map -readonly k in keyof(ModSrc) do ModSrc[k] end end
+type ModBothRemoved do map -readonly -optional k in keyof(ModSrc) do ModSrc[k] end end
 
 unittest "mapped modifier removal" do
   assert ModAllRequired == {a: number, readonly b: string}

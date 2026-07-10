@@ -20,33 +20,36 @@ type __ZipObj(LKeys, LFields, O, I)
         LFields <: List,
         O <: object,
         I <: Iteration
-    as
+    do
         if Extends(Pos(I), Length(LKeys)) <: 1 then
             O
         else
             __ZipObj(LKeys, LFields, PatchFlat(O, Record(LKeys[Pos(I)], LFields[Pos(I)])), Next(I))
         end
+end
 
 export type _ZipObj(LKeys, LFields)
     where
         LKeys <: List(Key),
         LFields <: List
-    as
+    do
         if __ZipObj(Naked(LKeys), LFields) <: ?X then
             Cast(X, object)
         end
+end
 
 // Create an Object from Lists of keys & fields
 export type ZipObj(LKeys, LFields)
     where
         LKeys <: List(Key),
         LFields <: List
-    as
+    do
         if LKeys <: unknown then
             if LFields <: unknown then
                 _ZipObj(LKeys, LFields)
             end
         end
+end
 
 // TODO: evaluator cannot prove this yet — evaluating the recursive
 // iteration loop does not terminate, so the assert is commented out:

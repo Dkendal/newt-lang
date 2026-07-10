@@ -8,10 +8,11 @@ import { Iteration, IterationMap } from "./Iteration"
 // Move `I`'s position forward
 export type Next(I)
     where I <: Iteration
-    as IterationMap(I[3])
+    do IterationMap(I[3])
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type I20 as [20, '+', '19', '21', '-20']
+type I20 do [20, '+', '19', '21', '-20'] end
 
 unittest "Next(I)" do
     assert Next(I20) == [21, '+', '20', '22', '-21']

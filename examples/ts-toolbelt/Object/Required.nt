@@ -4,35 +4,39 @@ import { Key } from "../Any/Key"
 import { PatchFlat } from "./Patch"
 import { BuiltIn } from "../Misc/BuiltIn"
 
-export type RequiredFlat(O) as
-    map -? K in keyof O do O[K] end & {}
+export type RequiredFlat(O) do
+    map -optional K in keyof O do O[K] end & {}
+end
 
-export type RequiredDeep(O) as
-    map -? K in keyof O do
+export type RequiredDeep(O) do
+    map -optional K in keyof O do
         if O[K] <: BuiltIn then
             O[K]
         else
             RequiredDeep(O[K])
         end
     end
+end
 
 export type RequiredPart(O, depth)
     where
         O <: object,
         depth <: Depth
-    as
+    do
         match depth do
             'flat' -> RequiredFlat(O),
             'deep' -> RequiredDeep(O)
         end
+end
 
 export type _Required(O, K, depth)
     where
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         PatchFlat(RequiredPart(_Pick(O, K), depth), O)
+end
 
 // Make some fields of `O` required (deeply or not)
 export type Required(O, K, depth)
@@ -41,10 +45,11 @@ export type Required(O, K, depth)
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         if O <: unknown then
             _Required(O, K, depth)
         end
+end
 
 unittest "Required(O, K, depth)" do
     assert RequiredFlat({a?: 1, b?: 2}) == {a: 1, b: 2}

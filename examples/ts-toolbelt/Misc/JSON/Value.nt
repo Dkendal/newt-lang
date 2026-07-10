@@ -3,4 +3,4 @@ import { List } from "./Array"
 import { Object } from "./Object"
 
 // Any JSON data/value
-export type Value as Primitive | Object | List
+export type Value do Primitive | Object | List end

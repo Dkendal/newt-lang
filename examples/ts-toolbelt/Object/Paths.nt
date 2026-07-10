@@ -7,17 +7,18 @@ import { Primitive } from "../Misc/Primitive"
 import { Length } from "../List/Length"
 import { Keys } from "../Any/Keys"
 
-type UnionOf(A) as
+type UnionOf(A) do
     if A <: List then
         A[number]
     else
         A[keyof A]
     end
+end
 
 type _Paths(O, P)
     defaults P = []
     where P <: List
-    as UnionOf(
+    do UnionOf(
         map K in keyof O do
             cond do
                 O[K] <: BuiltIn | Primitive -> NonNullableFlat([...P, K?]),
@@ -27,13 +28,15 @@ type _Paths(O, P)
             end
         end
     )
+end
 
 // Get all the possible paths of `O`
 // (this won't work with circular-refs)
 export type Paths(O, P)
     defaults P = []
     where P <: List
-    as
+    do
         if _Paths(O, P) <: ?X then
             Cast(X, List(Key))
         end
+end

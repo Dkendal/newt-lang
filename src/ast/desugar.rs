@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn array_application_becomes_array_type() {
         assert_eq!(
-            desugar_ts("type A as Array(number)"),
+            desugar_ts("type A do Array(number) end"),
             "type A = number[];\n\n"
         );
     }
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn readonly_array_becomes_readonly_array_type() {
         assert_eq!(
-            desugar_ts("type A as ReadonlyArray(number)"),
+            desugar_ts("type A do ReadonlyArray(number) end"),
             "type A = readonly number[];\n\n"
         );
     }
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn readonly_of_tuple_becomes_readonly_tuple() {
         assert_eq!(
-            desugar_ts("type A as Readonly([1, 2])"),
+            desugar_ts("type A do Readonly([1, 2]) end"),
             "type A = readonly [1, 2];\n\n"
         );
     }
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn readonly_of_object_is_left_alone() {
         assert_eq!(
-            desugar_ts("type A as Readonly({a: 1})"),
+            desugar_ts("type A do Readonly({a: 1}) end"),
             "type A = Readonly<{a: 1}>;\n\n"
         );
     }
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn array_with_wrong_arity_is_left_alone() {
         assert_eq!(
-            desugar_ts("type A as Array(1, 2)"),
+            desugar_ts("type A do Array(1, 2) end"),
             "type A = Array<1, 2>;\n\n"
         );
     }
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn keyof_any_becomes_key_union() {
         assert_eq!(
-            desugar_ts("type A as keyof any"),
+            desugar_ts("type A do keyof any end"),
             "type A = string | number | symbol;\n\n"
         );
     }
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn nested_sugar_desugars_bottom_up() {
         assert_eq!(
-            desugar_ts("type A as ReadonlyArray(Array(number))"),
+            desugar_ts("type A do ReadonlyArray(Array(number)) end"),
             "type A = readonly number[][];\n\n"
         );
     }
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn array_of_infer_is_parenthesized_in_conditional() {
         use crate::typescript::Pretty;
-        let src = "type ElemA(T) as if T <: Array(?U) then U else never end";
+        let src = "type ElemA(T) do if T <: Array(?U) then U else never end end";
         let ts = crate::parser::parse_newtype_program(src)
             .unwrap()
             .simplify()
@@ -197,14 +197,14 @@ mod tests {
     #[test]
     fn array_of_function_type_is_parenthesized() {
         assert_eq!(
-            desugar_ts("type A as Array(() => void)"),
+            desugar_ts("type A do Array(() => void) end"),
             "type A = (() => void)[];\n\n"
         );
     }
 
     #[test]
     fn array_of_keyof_is_parenthesized() {
-        let ts = desugar_ts("type A as Array(keyof {a: 1})");
+        let ts = desugar_ts("type A do Array(keyof {a: 1}) end");
         assert!(ts.contains("(keyof"), "{ts}");
         assert!(ts.contains(")[]"), "{ts}");
     }

@@ -9,5 +9,6 @@ import { Function } from "../../Function"
 //   ]): Function<P, R1>
 // newtype has no call-signature object types, overloads, or generic function
 // types, so a single untyped signature is the closest expressible form.
-export type ComposeMultiSync as
+export type ComposeMultiSync do
     (...fns: (Function | Curry(Function))[]) => Function
+end

@@ -1,6 +1,6 @@
 Primitive symbol as a tuple element
 =======
-type A as [symbol, number]
+type A do [symbol, number] end
 =======
 type A = [symbol, number];
 

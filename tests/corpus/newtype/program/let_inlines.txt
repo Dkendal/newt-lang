@@ -2,10 +2,10 @@ A let-binding inlines to its value inside a type alias
 
 =======
 
-type A as let a = 1 in a
+type A do let a = 1 in a end
 
 =======
 
-type A as 1
+type A do 1 end
 
 =======

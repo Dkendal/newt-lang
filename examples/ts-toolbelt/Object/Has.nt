@@ -11,8 +11,9 @@ export type Has(O, K, M, match)
         K <: Key,
         M <: any,
         match <: Match
-    as
+    do
         Is(At(O, K), M, match)
+end
 
 unittest "Has(O, K, M, match)" do
     assert Has({a: 1, b: string}, 'a', number) == 1

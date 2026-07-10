@@ -2,7 +2,7 @@ an omitted generic argument falls back to its declared default
 
 =======
 
-type WithDefault(A, B) defaults B = string as [A, B]
+type WithDefault(A, B) defaults B = string do [A, B] end
 
 unittest "defaults" do
   assert WithDefault(number) == [number, string]

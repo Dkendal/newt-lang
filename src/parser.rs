@@ -651,8 +651,8 @@ where
         just(T::MinusReadonly).to(MappingModifier::Remove),
     ));
     let optional_modifier = choice((
-        just(T::Question).to(MappingModifier::Add),
-        just(T::MinusQuestion).to(MappingModifier::Remove),
+        kw(Kw::Optional).to(MappingModifier::Add),
+        just(T::MinusOptional).to(MappingModifier::Remove),
     ));
     let map_expr_p = kw(Kw::Map)
         .ignore_then(readonly_modifier.or_not())
@@ -944,8 +944,9 @@ where
         .then_ignore(kw(Kw::Type))
         .then(ident)
         .then(definition_options.clone())
-        .then_ignore(kw(Kw::As))
+        .then_ignore(soft("do"))
         .then(expr.clone())
+        .then_ignore(kw(Kw::End))
         .map_with(|(((export, name), params), body), e| {
             Ast::TypeAlias(TypeAlias {
                 span: sp(e.span()),

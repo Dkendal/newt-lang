@@ -4,8 +4,8 @@
 //!
 //! * **Reserved words** lex as [`Token::Kw`]; contextual keywords (`do`,
 //!   `match`, `cond`, `where`, `defaults`, `from`, `and`, `or`) lex as plain
-//!   [`Token::Ident`]s and are matched by text in the parser, so `type and as 1`
-//!   stays legal.
+//!   [`Token::Ident`]s and are matched by text in the parser, so `type and do 1
+//!   end` stays legal.
 //! * `[]` with **no gap** is a single [`Token::BracketPair`] (the array postfix
 //!   and the empty tuple); `[ ]` with a gap lexes as two brackets.
 //! * A macro identifier includes its trailing `!` (`dbg!`) — but `A != B` and
@@ -210,8 +210,8 @@ pub enum Token {
     Ellipsis,
     /// `?`
     Question,
-    /// `-?` (mapped-type optionality removal)
-    MinusQuestion,
+    /// `-optional` (mapped-type optionality removal)
+    MinusOptional,
     /// `-readonly` (mapped-type readonly removal)
     MinusReadonly,
     /// `,`
@@ -260,7 +260,7 @@ impl fmt::Display for Token {
             Token::Dot => f.write_str("."),
             Token::Ellipsis => f.write_str("..."),
             Token::Question => f.write_str("?"),
-            Token::MinusQuestion => f.write_str("-?"),
+            Token::MinusOptional => f.write_str("-optional"),
             Token::MinusReadonly => f.write_str("-readonly"),
             Token::Comma => f.write_str(","),
             Token::Star => f.write_str("*"),
@@ -380,7 +380,7 @@ fn lexer<'src>(
         just(".").to(Token::Dot),
         just("-readonly")
             .to(Token::MinusReadonly)
-            .or(just("-?").to(Token::MinusQuestion)),
+            .or(just("-optional").to(Token::MinusOptional)),
         just("?").to(Token::Question),
         just(",").to(Token::Comma),
         just("*").to(Token::Star),

@@ -1,6 +1,6 @@
 Union type alias
 =======
-type A as 1 | 2
+type A do 1 | 2 end
 =======
 type A = 1 | 2;
 

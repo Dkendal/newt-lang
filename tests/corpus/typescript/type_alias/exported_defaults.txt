@@ -2,7 +2,7 @@ Exported generic type alias with a defaults clause
 
 =======
 
-export type A(x) defaults x = number as x
+export type A(x) defaults x = number do x end
 
 =======
 

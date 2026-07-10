@@ -8,53 +8,60 @@
 // Not portable: Uppercase / Lowercase / Capitalize / Uncapitalize / NoInfer
 // are `intrinsic` in lib.es5.d.ts and have no .nt equivalent.
 
-export type PropertyKey as string | number | symbol
+export type PropertyKey do string | number | symbol end
 
 // ---------------------------------------------------------------------------
 // Utility type aliases (lib.es5.d.ts "Type Operators" block)
 // ---------------------------------------------------------------------------
 
-export type Partial(T) as map ? k in keyof(T) do T[k] end
+export type Partial(T) do map optional k in keyof(T) do T[k] end end
 
-export type Required(T) as map -? k in keyof(T) do T[k] end
+export type Required(T) do map -optional k in keyof(T) do T[k] end end
 
-export type Readonly(T) as map readonly k in keyof(T) do T[k] end
+export type Readonly(T) do map readonly k in keyof(T) do T[k] end end
 
 export type Pick(T, K)
     where K <: keyof T
-    as map k in K do T[k] end
+    do map k in K do T[k] end
+end
 
 export type Record(K, T)
     where K <: PropertyKey
-    as map k in K do T end
+    do map k in K do T end
+end
 
-export type Exclude(T, U) as if T <: U then never else T end
+export type Exclude(T, U) do if T <: U then never else T end end
 
-export type Extract(T, U) as if T <: U then T end
+export type Extract(T, U) do if T <: U then T end end
 
 export type Omit(T, K)
     where K <: PropertyKey
-    as Pick(T, Exclude(keyof T, K))
+    do Pick(T, Exclude(keyof T, K))
+end
 
-export type NonNullable(T) as T & {}
+export type NonNullable(T) do T & {} end
 
 export type Parameters(T)
     where T <: (...args: any[]) => any
-    as if T <: (...args: ?P) => any then P end
+    do if T <: (...args: ?P) => any then P end
+end
 
 export type ConstructorParameters(T)
     where T <: new (...args: any[]) => any
-    as if T <: new (...args: ?P) => any then P end
+    do if T <: new (...args: ?P) => any then P end
+end
 
 export type ReturnType(T)
     where T <: (...args: any[]) => any
-    as if T <: (...args: any[]) => ?R then R else any end
+    do if T <: (...args: any[]) => ?R then R else any end
+end
 
 export type InstanceType(T)
     where T <: new (...args: any[]) => any
-    as if T <: new (...args: any[]) => ?R then R else any end
+    do if T <: new (...args: any[]) => ?R then R else any end
+end
 
-export type Awaited(T) as
+export type Awaited(T) do
     if T <: null | undefined then
         T
     else
@@ -66,6 +73,7 @@ export type Awaited(T) as
             T
         end
     end
+end
 
 // ---------------------------------------------------------------------------
 // Global interfaces (curated structural stubs)
@@ -116,7 +124,7 @@ export interface Promise(T) {
 
 // ---------------------------------------------------------------------------
 
-type Point as { x: number, y?: string }
+type Point do { x: number, y?: string } end
 
 unittest "mapped utility types" do
     assert Partial(Point) == { x?: number, y?: string }

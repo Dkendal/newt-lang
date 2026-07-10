@@ -25,8 +25,8 @@
 //   * T[keyof U] where U has a key ABSENT from T (e.g. A[keyof B], B ⊄ A): a
 //     type error in tsgo (Property does not exist), left unreduced (`Both`).
 
-type A as { a: 1, b: 2 }
-type B as { b: 3, c: 4 }
+type A do { a: 1, b: 2 } end
+type B do { b: 3, c: 4 } end
 
 unittest "keyof union is the intersection of key sets" do
     // keyof A = 'a'|'b', keyof B = 'b'|'c' -> intersection is 'b'.
@@ -36,8 +36,8 @@ unittest "keyof union is the intersection of key sets" do
     assert not ('a' <: keyof (A | B))
 end
 
-type A2 as { a: 1, b: 2, c: 3 }
-type B2 as { b: 4, c: 5, d: 6 }
+type A2 do { a: 1, b: 2, c: 3 } end
+type B2 do { b: 4, c: 5, d: 6 } end
 
 unittest "keyof union with two shared keys" do
     // Shared keys are 'b' and 'c'.
@@ -49,8 +49,8 @@ unittest "keyof union with two shared keys" do
 end
 
 // Intersection with disjoint keys does not collapse to never.
-type P as { a: 1, b: 2 }
-type Q as { c: 3, d: 4 }
+type P do { a: 1, b: 2 } end
+type Q do { c: 3, d: 4 } end
 
 unittest "keyof intersection is the union of key sets" do
     assert keyof (P & Q) == 'a' | 'b' | 'c' | 'd'
@@ -79,8 +79,8 @@ unittest "T[keyof T] reduces via keyof-driven key" do
 end
 
 // T[keyof U] where every key of U is also a key of T.
-type Big as { a: 10, b: 20, c: 30 }
-type Sub as { a: 1, b: 2 }
+type Big do { a: 10, b: 20, c: 30 } end
+type Sub do { a: 1, b: 2 } end
 
 unittest "T[keyof U] with U keys a subset of T" do
     assert Big[keyof Sub] == 10 | 20

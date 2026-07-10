@@ -1,9 +1,10 @@
 A cond expression with an else branch
 =======
-type A(x) as cond do
+type A(x) do cond do
     x <: number -> 1,
     x <: {} and x <: {a: 1} -> 2,
     else -> 3
+end
 end
 =======
 type A<x> = x extends number ? 1 : x extends {} ? x extends {a: 1} ? 2 : 3 : 3;

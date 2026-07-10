@@ -3,23 +3,25 @@
 export type _CompulsoryKeys(O)
     where
         O <: object
-    as
+    do
         let picks =
-            map -? K in keyof O do
+            map -optional K in keyof O do
                 if [O[K] & (undefined | null)] <: [never] then
                     K
                 end
             end
         in
         picks[keyof O]
+end
 
 export type CompulsoryKeys(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _CompulsoryKeys(O)
         end
+end
 
 unittest "CompulsoryKeys(O)" do
     // TODO: evaluator cannot prove these yet (indexing a mapped type by

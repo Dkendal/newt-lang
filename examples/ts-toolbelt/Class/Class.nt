@@ -9,10 +9,11 @@ export type Class(P, R)
     where
         P <: List,
         R <: object
-    as new (...args: P) => R
+    do new (...args: P) => R
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type Test0 as Class([string, number], { a: string, b: number })
+type Test0 do Class([string, number], { a: string, b: number }) end
 
 unittest "Class(P, R)" do
     assert Test0 <: Class

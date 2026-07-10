@@ -9,5 +9,6 @@ export type ExcludeKeys(L, L1, match)
         L <: List,
         L1 <: List,
         match <: Match
-    as
+    do
         OExcludeKeys(ObjectOf(L), ObjectOf(L1), match)
+end

@@ -1,11 +1,11 @@
-Three nested lets in a type alias inline to the same value as one multi-binding let
+Three nested lets in a type alias inline to the same value do one multi-binding let end
 
 =======
 
-type A as let a = 1 in let b = 2 in let c = 3 in [a, b, c]
+type A do let a = 1 in let b = 2 in let c = 3 in [a, b, c] end
 
 =======
 
-type A as let a = 1, b = 2, c = 3 in [a, b, c]
+type A do let a = 1, b = 2, c = 3 in [a, b, c] end
 
 =======

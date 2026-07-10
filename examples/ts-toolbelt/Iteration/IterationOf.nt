@@ -9,12 +9,13 @@ import { IterationKey, IterationMap } from "./Iteration"
 
 export type IterationOf(N)
     where N <: number
-    as
+    do
         if `${N}` <: IterationKey then
             IterationMap(`${N}`)
         else
             IterationMap('__')
         end
+end
 
 unittest "IterationOf(N)" do
     // TODO: evaluator cannot prove this yet (`${N}` over a substituted type

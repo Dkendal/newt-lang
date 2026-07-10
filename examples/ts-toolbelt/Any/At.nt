@@ -5,7 +5,7 @@ export type At(A, K)
     where
         A <: any,
         K <: Key
-    as
+    do
         let value = A[K] in
         let keys = keyof A in
         if A <: List then
@@ -29,9 +29,10 @@ export type At(A, K)
                 else -> undefined
             end
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as {
+type User do {
     info: {
         name: string,
         age: number,
@@ -39,6 +40,7 @@ type User as {
     },
     id: number
 }
+end
 
 unittest "At(A, K)" do
     assert At(User, 'id') <: number

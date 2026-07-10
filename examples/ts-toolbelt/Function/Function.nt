@@ -3,7 +3,8 @@ import { List } from "../List/List"
 export type Function(P, R)
     defaults P = any, R = any
     where P <: List, R <: any
-    as (...args: P) => R
+    do (...args: P) => R
+end
 
 unittest "Function(P, R)" do
     assert Function([string, number], boolean) <: (a: string, b: number) => boolean

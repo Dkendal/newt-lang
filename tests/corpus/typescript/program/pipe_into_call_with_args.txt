@@ -1,6 +1,6 @@
 Pipe operator into a call prepends the piped value as the first argument
 =======
-type A as X |> Y(1)
+type A do X |> Y(1) end
 =======
 type A = Y<X, 1>;
 

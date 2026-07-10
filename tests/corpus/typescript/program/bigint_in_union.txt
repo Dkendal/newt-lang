@@ -1,6 +1,6 @@
 Primitive bigint in a union
 =======
-type A as bigint | number
+type A do bigint | number end
 =======
 type A = bigint | number;
 

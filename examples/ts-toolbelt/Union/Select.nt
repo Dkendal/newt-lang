@@ -8,13 +8,14 @@ export type Select(U, M, match)
         U <: any,
         M <: any,
         match <: Match
-    as
+    do
         // TS uses a `{1: U & M, 0: never}[Is<U, M, match>]` lookup here;
         // numeric property names are not supported, so an equivalent tuple
         // lookup is used.
         if U <: unknown then
             [never, U & M][Is(U, M, match)]
         end
+end
 
 unittest "Select(U, M, match)" do
     // TODO: evaluator cannot prove this yet (distribution over the union and

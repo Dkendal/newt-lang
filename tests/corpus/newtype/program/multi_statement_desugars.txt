@@ -2,20 +2,22 @@ A program with several aliases desugars each statement independently
 
 =======
 
-type A as let x = number in x
+type A do let x = number in x end
 
-type B as match T do
+type B do match T do
     number -> 1,
     else -> 2
+end
 end
 
 =======
 
-type A as number
+type A do number end
 
-type B as
+type B do
     if T <: number then 1
     else 2
     end
+end
 
 =======

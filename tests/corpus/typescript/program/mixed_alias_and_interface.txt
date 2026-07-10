@@ -1,8 +1,8 @@
 Aliases and an interface mixed in one program
 =======
-type A as number
+type A do number end
 interface Foo {}
-type B as string
+type B do string end
 =======
 type A = number;
 

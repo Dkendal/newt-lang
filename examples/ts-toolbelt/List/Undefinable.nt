@@ -10,5 +10,6 @@ export type Undefinable(L, K)
     where
         L <: List,
         K <: Key
-    as
+    do
         Cast(Update(L, `${K & number}` | K, x | undefined), List)
+end

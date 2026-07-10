@@ -9,5 +9,6 @@ export type Writable(L, depth)
     where
         L <: List,
         depth <: Depth
-    as
+    do
         Cast(WritablePart(L, depth), List)
+end

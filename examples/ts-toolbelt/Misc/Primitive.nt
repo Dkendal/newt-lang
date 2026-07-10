@@ -1,5 +1,5 @@
 // All primitive types
-export type Primitive as
+export type Primitive do
     boolean
     | string
     | number
@@ -7,6 +7,7 @@ export type Primitive as
     | symbol
     | undefined
     | null
+end
 
 unittest "Primitive" do
     assert true <: Primitive

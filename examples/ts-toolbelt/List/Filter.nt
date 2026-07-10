@@ -10,5 +10,6 @@ export type Filter(L, M, match)
         L <: List,
         M <: any,
         match <: Match
-    as
+    do
         ListOf(OFilter(ObjectOf(L), M, match))
+end

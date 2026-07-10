@@ -1,7 +1,7 @@
 //! A global type environment for resolving top-level names during assignability
 //! checks (used by the `unittest` harness).
 //!
-//! Programs are otherwise transpiled symbolically — `type Foo as 1` becomes
+//! Programs are otherwise transpiled symbolically — `type Foo do 1 end` becomes
 //! `type Foo = 1` and references to `Foo` stay as identifiers — so the
 //! assignability engine, on its own, treats every named reference as a free type
 //! variable. To make assertions like `assert Foo <: number` meaningful, this

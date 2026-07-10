@@ -9,8 +9,9 @@ export type Filter(O, M, match)
         O <: object,
         M <: any,
         match <: Match
-    as
+    do
         Pick(O, FilterKeys(O, M, match))
+end
 
 unittest "Filter(O, M, match)" do
     // TODO: evaluator cannot prove this yet (depends on ./Pick which may

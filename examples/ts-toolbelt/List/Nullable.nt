@@ -9,8 +9,9 @@ export type Nullable(L, K)
     where
         L <: List,
         K <: Key
-    as
+    do
         Cast(Update(L, `${K & number}` | K, x | null | undefined), List)
+end
 
 unittest "Nullable(L, K)" do
     // TODO: evaluator cannot prove this yet

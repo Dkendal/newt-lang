@@ -5,8 +5,9 @@ export type Diff(U1, U2)
     where
         U1 <: any,
         U2 <: any
-    as
+    do
         Exclude(U1, U2) | Exclude(U2, U1)
+end
 
 unittest "Diff(U1, U2)" do
     assert Diff('a' | 'b' | 'c', 'b' | 'c' | 'd') == 'a' | 'd'

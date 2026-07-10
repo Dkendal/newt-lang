@@ -1,6 +1,6 @@
 Primitive unknown type alias
 =======
-type A as unknown
+type A do unknown end
 =======
 type A = unknown;
 

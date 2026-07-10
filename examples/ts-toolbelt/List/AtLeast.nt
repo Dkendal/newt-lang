@@ -10,13 +10,14 @@ export type AtLeast(L, K)
     where
         L <: List,
         K <: Key
-    as
+    do
         if OAtLeast(ObjectOf(L), `${K & number}` | K) <: ?U then
             // we distribute over the union: each union member to a list
             if U <: unknown then
                 _ListOf(U & {})
             end
         end
+end
 
 unittest "AtLeast(L, K)" do
     // TODO: evaluator cannot prove this yet (depends on ../Object/AtLeast,

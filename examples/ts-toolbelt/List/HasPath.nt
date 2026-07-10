@@ -13,4 +13,5 @@ export type HasPath(L, Path, M, match)
         Path <: List(Key),
         M <: any,
         match <: Match
-    as OHasPath(ObjectOf(L), Path, M, match)
+    do OHasPath(ObjectOf(L), Path, M, match)
+end

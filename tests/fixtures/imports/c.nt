@@ -1,1 +1,1 @@
-export type C as 42
+export type C do 42 end

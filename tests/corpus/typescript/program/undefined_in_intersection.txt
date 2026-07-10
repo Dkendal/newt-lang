@@ -1,6 +1,6 @@
 Primitive undefined in an intersection
 =======
-type A as undefined & B
+type A do undefined & B end
 =======
 type A = undefined & B;
 

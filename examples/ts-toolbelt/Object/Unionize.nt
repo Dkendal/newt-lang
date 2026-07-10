@@ -8,7 +8,7 @@ export type Unionize(O, O1, K)
         O <: object,
         O1 <: object,
         K <: Key
-    as
+    do
         map P in keyof O do
             if P <: K then
                 O[P] | At(O1, P)
@@ -16,6 +16,7 @@ export type Unionize(O, O1, K)
                 O[P]
             end
         end & {}
+end
 
 unittest "Unionize(O, O1, K)" do
     assert Unionize({a: 1, b: 2}, {a: string, b: boolean}, 'a') == {a: 1 | string, b: 2}

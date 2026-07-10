@@ -9,19 +9,21 @@ import { IterationOf } from "../Iteration/IterationOf"
 // numeric object keys are not supported, so a `match` is used.
 export type _Absolute(N)
     where N <: Iteration
-    as
+    do
         match _IsNegative(N) do
             1 -> _Negate(N),
             else -> N
         end
+end
 
 // Get the absolute value of a number
 export type Absolute(N)
     where N <: number
-    as
+    do
         if N <: unknown then
             _Absolute(IterationOf(N))[0]
         end
+end
 
 unittest "Absolute(N)" do
     // TODO: evaluator cannot prove this yet (template-literal interpolation

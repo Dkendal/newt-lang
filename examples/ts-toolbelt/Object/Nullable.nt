@@ -4,31 +4,35 @@ import { _Pick } from "./Pick"
 import { Key } from "../Any/Key"
 import { PatchFlat } from "./Patch"
 
-export type NullableFlat(O) as
+export type NullableFlat(O) do
     (map K in keyof O do UNullable(O[K]) end) & {}
+end
 
-export type NullableDeep(O) as
+export type NullableDeep(O) do
     map K in keyof O do
         NullableDeep(UNullable(O[K]))
     end
+end
 
 type NullablePart(O, depth)
     where
         O <: object,
         depth <: Depth
-    as
+    do
         match depth do
             'flat' -> NullableFlat(O),
             'deep' -> NullableDeep(O)
         end
+end
 
 export type _Nullable(O, K, depth)
     where
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         PatchFlat(NullablePart(_Pick(O, K), depth), O)
+end
 
 // Make some fields of `O` nullable (deeply or not)
 export type Nullable(O, K, depth)
@@ -37,10 +41,11 @@ export type Nullable(O, K, depth)
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         if O <: unknown then
             _Nullable(O, K, depth)
         end
+end
 
 unittest "Nullable(O, K, depth)" do
     // TODO: evaluator cannot prove this yet (depends on ../Union/Nullable,

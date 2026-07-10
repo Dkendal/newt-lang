@@ -8,8 +8,9 @@ export type Optional(L, depth)
     where
         L <: List,
         depth <: Depth
-    as
+    do
         Cast(OptionalPart(L, depth), List)
+end
 
 unittest "Optional(L, depth)" do
     // TODO: evaluator cannot prove this yet

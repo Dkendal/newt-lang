@@ -1,1 +1,1 @@
-export type Key as string | number | symbol
+export type Key do string | number | symbol end

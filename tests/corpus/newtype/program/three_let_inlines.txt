@@ -2,10 +2,10 @@ Three let bindings in a type alias each inline independently
 
 =======
 
-type A as let a = 1, b = 2, c = 3 in [a, b, c]
+type A do let a = 1, b = 2, c = 3 in [a, b, c] end
 
 =======
 
-type A as [1, 2, 3]
+type A do [1, 2, 3] end
 
 =======

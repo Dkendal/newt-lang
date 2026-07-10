@@ -1,10 +1,11 @@
 Shadowed let bindings resolve to the nearest definition
 =======
-type A as
+type A do
     let a = 1 in
     let b = a in
     let a = 2 in
     [b, a, let a = 3 in a]
+end
 =======
 type A = [1, 2, 3];
 

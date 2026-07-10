@@ -1,9 +1,10 @@
 A let binding referencing an earlier binding inlines its value
 =======
-type A as
+type A do
     let a = 1,
         b = a,
     in [a, b]
+end
 =======
 type A = [1, a];
 

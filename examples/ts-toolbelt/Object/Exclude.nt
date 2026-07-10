@@ -10,8 +10,9 @@ export type Exclude(O, O1, match)
         O <: object,
         O1 <: object,
         match <: Match
-    as
+    do
         Pick(O, ExcludeKeys(O, O1, match))
+end
 
 unittest "Exclude(O, O1, match)" do
     // TODO: evaluator cannot prove this yet (depends on ./Pick which may

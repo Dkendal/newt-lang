@@ -2,7 +2,7 @@ Exported type alias
 
 =======
 
-export type A as 1
+export type A do 1 end
 
 =======
 

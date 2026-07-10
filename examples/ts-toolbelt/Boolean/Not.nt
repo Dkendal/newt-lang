@@ -6,8 +6,9 @@ import { Boolean } from "./_Internal"
 export type Not(B)
     where
         B <: Boolean
-    as
+    do
         [1, 0][B]
+end
 
 unittest "Not(B)" do
     assert Not(1) == 0

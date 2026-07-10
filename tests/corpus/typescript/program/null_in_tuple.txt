@@ -1,6 +1,6 @@
 Primitive null as a tuple element
 =======
-type A as [null, number]
+type A do [null, number] end
 =======
 type A = [null, number];
 

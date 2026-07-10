@@ -228,7 +228,7 @@ mod tests {
     fn trace_line_plain_when_colour_off() {
         let out = render_trace_line(
             "x.nt",
-            "type A as 1\n",
+            "type A do 1 end\n",
             Span::new(0, 4),
             "1 <: number",
             Some(Decision::Then),
@@ -248,7 +248,7 @@ mod tests {
         ] {
             let out = render_trace_line(
                 "x.nt",
-                "type A as 1\n",
+                "type A do 1 end\n",
                 Span::new(0, 4),
                 "1 <: number",
                 Some(decision),
@@ -263,8 +263,8 @@ mod tests {
     fn trace_line_without_decision_has_no_arrow() {
         let out = render_trace_line(
             "x.nt",
-            "type A as 1\ntype B as 2\n",
-            Span::new(12, 16),
+            "type A do 1 end\ntype B do 2 end\n",
+            Span::new(16, 20),
             "Id(1) = 1",
             None,
             false,
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn renders_name_line_and_column() {
-        let source = "type A as 1\ntype B as oops\n";
+        let source = "type A do 1 end\ntype B do oops end\n";
         let span = Span::new(
             source.find("oops").unwrap(),
             source.find("oops").unwrap() + 4,
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn renders_warning_with_multiple_labels() {
-        let source = "type A as Foo\ntype B as Foo\n";
+        let source = "type A do Foo end\ntype B do Foo end\n";
         let first = source.find("Foo").unwrap();
         let second = source.rfind("Foo").unwrap();
         let labels = vec![
@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn renders_error_severity() {
-        let source = "type A as Foo\n";
+        let source = "type A do Foo end\n";
         let at = source.find("Foo").unwrap();
         let labels = vec![(Span::new(at, at + 3), "boom".to_string())];
         let out = render_labeled(Severity::Error, "x.nt", source, "bad", &labels, false);
@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn renders_debug_kind() {
-        let source = "type A as 1\n";
+        let source = "type A do 1 end\n";
         let at = source.find('1').unwrap();
         let out = render_debug("x.nt", source, Span::new(at, at + 1), "= 1", false);
         assert!(out.contains("Debug"), "{out}");

@@ -4,29 +4,32 @@ type __Pick(O, K)
     where
         O <: object,
         K <: keyof O
-    as
+    do
         (map P in K do
             O[P]
         end) & {}
+end
 
 export type _Pick(O, K)
     where
         O <: object,
         K <: Key
-    as __Pick(O, keyof O & K)
+    do __Pick(O, keyof O & K)
+end
 
 // Extract out of `O` the fields of key `K`
 export type Pick(O, K)
     where
         O <: object,
         K <: Key
-    as
+    do
         if O <: unknown then
             _Pick(O, K)
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as { name: string, age: number }
+type User do { name: string, age: number } end
 
 unittest "Pick(O, K)" do
     // TODO: evaluator cannot prove these yet (it does not reduce the

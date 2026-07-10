@@ -16,7 +16,7 @@ import { And } from "../Boolean/And"
 
 type UnNestLoose(L)
     where L <: List
-    as
+    do
         (if UnionOf(L) <: ?UL then    // make `L` a union
             if UL <: unknown then     // for each in union
                 if UL <: List then    // if its an array
@@ -26,13 +26,14 @@ type UnNestLoose(L)
                 end
             end
         end)[] & {}                   // make result array
+end
 
 type Flatter(L, LN, I)
     where
         L <: List,
         LN <: List,
         I <: Iteration
-    as
+    do
         if L[Pos(I)] <: ?LP then // handle if undefined
             if LP <: List then
                 Concat(LN, L[Pos(I)]) // if it's a  list
@@ -40,6 +41,7 @@ type Flatter(L, LN, I)
                 Append(LN, L[Pos(I)]) // if it's an item
             end
         end
+end
 
 // TS original selects from `{0: ..., 1: LN}[Extends<Pos<I>, Length<L>>]`;
 // numeric object keys are unsupported, so it is written as a conditional.
@@ -49,32 +51,35 @@ type UnNestStrict(L, LN, I)
         L <: List,
         LN <: List,
         I <: Iteration
-    as
+    do
         if Extends(Pos(I), Length(L)) <: 1 then
             LN
         else
             UnNestStrict(L, Flatter(L, LN, I), Next(I))
         end
+end
 
 type __UnNest(L, strict)
     where
         L <: List,
         strict <: Boolean
-    as
+    do
         if And(Not(Extends(number, Length(L))), strict) <: 1 then
             UnNestStrict(L)
         else
             UnNestLoose(L)
         end
+end
 
 export type _UnNest(L, strict)
     where
         L <: List,
         strict <: Boolean
-    as
+    do
         if __UnNest(Naked(L), strict) <: ?X then
             Cast(X, List)
         end
+end
 
 // Remove a dimension of `L`; `strict = 0` does not preserve tuples
 export type UnNest(L, strict)
@@ -82,10 +87,11 @@ export type UnNest(L, strict)
     where
         L <: List,
         strict <: Boolean
-    as
+    do
         if L <: unknown then
             _UnNest(L, strict)
         end
+end
 
 // TODO: evaluator cannot prove this yet — evaluating the recursive
 // iteration loop does not terminate, so the assert is commented out:

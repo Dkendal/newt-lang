@@ -1,8 +1,8 @@
 An import followed by two type aliases
 =======
 import { Foo } from 'mod'
-type A as Foo
-type B as Foo | number
+type A do Foo end
+type B do Foo | number end
 =======
 import type { Foo } from 'mod';
 

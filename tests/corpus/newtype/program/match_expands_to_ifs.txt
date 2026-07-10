@@ -2,20 +2,22 @@ A match inside a type alias expands to a chain of ifs
 
 =======
 
-type A as match T do
+type A do match T do
     number -> 1,
     string -> 2,
     else -> 3
 end
+end
 
 =======
 
-type A as
+type A do
     if T <: number then 1
     else
         if T <: string then 2
         else 3
         end
     end
+end
 
 =======

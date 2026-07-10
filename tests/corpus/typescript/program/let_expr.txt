@@ -1,6 +1,6 @@
 A let expression inlines its single binding
 =======
-type A as let a = 1 in a
+type A do let a = 1 in a end
 =======
 type A = 1;
 

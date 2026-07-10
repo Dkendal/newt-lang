@@ -13,13 +13,14 @@
 //     the engine leaves it unreduced (`Both`).
 //   * generic / unresolvable object sides.
 
-type User as {
+type User do {
     info: {
         name: string,
         age: number
     },
     id: number
 }
+end
 
 unittest "basic string-literal indexed access" do
     // Property type is looked up and related structurally.
@@ -39,7 +40,7 @@ unittest "nested object indexed access reduces innermost-first" do
 end
 
 // Access through a generic alias that substitutes the key into an access body.
-type Get(O, K) where O <: object, K <: keyof O as O[K]
+type Get(O, K) where O <: object, K <: keyof O do O[K] end
 
 unittest "indexed access via generic alias" do
     assert Get(User, 'id') <: number
@@ -50,10 +51,11 @@ end
 // Optional-property access. Under --strict (no exactOptionalPropertyTypes)
 // tsc widens O['x'] of an optional `x?: V` to `V | undefined`. This probe
 // records tsgo's actual behavior; the engine must match it.
-type Opt as {
+type Opt do {
     x?: number,
     y: string
 }
+end
 
 unittest "optional-property indexed access includes undefined" do
     assert Opt['x'] <: number | undefined
@@ -68,7 +70,7 @@ end
 // Tuple object side. `[A, B]` carries numeric-literal element keys, a literal
 // `length`, and a `number` index yielding the element union. All verified
 // against tsgo --strict.
-type Pair as [string, number]
+type Pair do [string, number] end
 
 unittest "tuple numeric-literal indexed access" do
     assert Pair[0] <: string
@@ -94,8 +96,8 @@ end
 // ---------------------------------------------------------------------------
 // Array object side. `E[]` reduces `[number]`/`[0]` to `E` and `['length']` to
 // `number`. `readonly E[]` behaves identically for reads.
-type Arr as string[]
-type RArr as readonly number[]
+type Arr do string[] end
+type RArr do readonly number[] end
 
 unittest "array indexed access" do
     assert Arr[number] <: string
@@ -118,7 +120,7 @@ end
 // ---------------------------------------------------------------------------
 // Union KEY: `T['a' | 'b']` distributes to `T['a'] | T['b']`. All-or-nothing:
 // every branch must itself reduce.
-type Rec as { a: string, b: number }
+type Rec do { a: string, b: number } end
 
 unittest "union key distributes over the object" do
     assert Rec['a' | 'b'] <: string | number
@@ -129,8 +131,8 @@ end
 
 // ---------------------------------------------------------------------------
 // Union OBJECT side: `(X | Y)['k']` distributes to `X['k'] | Y['k']`.
-type X as { k: string }
-type Y as { k: number }
+type X do { k: string } end
+type Y do { k: number } end
 
 unittest "union object side distributes the access" do
     assert (X | Y)['k'] <: string | number
@@ -142,7 +144,7 @@ end
 // Intersection OBJECT side: `(X & Y)['k']` yields the intersection of the
 // property types from the members that carry `k`. If only one member carries
 // it, that member's type. `string & number` is uninhabited (`never`).
-type Zk as { m: boolean }
+type Zk do { m: boolean } end
 
 unittest "intersection object side intersects member property types" do
     // Both members carry `k`: string & number, which is never.

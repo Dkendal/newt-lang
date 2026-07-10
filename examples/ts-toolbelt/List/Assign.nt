@@ -12,8 +12,9 @@ export type Assign(L, Ls, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         Cast(OAssign(L, Ls, depth, ignore, fill), List)
+end
 
 unittest "Assign(L, Ls)" do
     // TODO: evaluator cannot prove this yet (depends on ../Object/Assign,

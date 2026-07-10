@@ -4,8 +4,9 @@ import { Exclude } from "./Exclude"
 export type NonNullable(U)
     where
         U <: any
-    as
+    do
         Exclude(U, undefined | null)
+end
 
 unittest "NonNullable(U)" do
     assert NonNullable(string | undefined | null) == string

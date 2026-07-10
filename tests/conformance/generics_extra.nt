@@ -1,8 +1,8 @@
 // Conformance edge cases added by the 2026-06-30 audit (generics).
 // Every assertion below agrees with tsgo --strict.
 
-type Quad(A, B, C, D) as [A, B, C, D]
-type Quint(A, B, C, D, E) as [A, B, C, D, E]
+type Quad(A, B, C, D) do [A, B, C, D] end
+type Quint(A, B, C, D, E) do [A, B, C, D, E] end
 
 unittest "higher-arity application builds the body" do
   assert Quad(1, 2, 3, 4) == [1, 2, 3, 4]
@@ -11,7 +11,7 @@ unittest "higher-arity application builds the body" do
   assert not(Quad(1, 2, 3, 4) == [1, 2, 3])
 end
 
-type Flatten(T) as if T <: Array(?U) then Flatten(U) else T end
+type Flatten(T) do if T <: Array(?U) then Flatten(U) else T end end
 
 unittest "recursive alias flattens nested arrays" do
   assert Flatten(number[][]) == number
@@ -20,7 +20,7 @@ unittest "recursive alias flattens nested arrays" do
   assert Flatten(string[]) == string
 end
 
-type DeepAwait(T) as if T <: Promise(?U) then DeepAwait(U) else T end
+type DeepAwait(T) do if T <: Promise(?U) then DeepAwait(U) else T end end
 
 unittest "recursive alias unwraps nested promises" do
   assert DeepAwait(Promise(Promise(string))) == string
@@ -28,8 +28,8 @@ unittest "recursive alias unwraps nested promises" do
   assert DeepAwait(boolean) == boolean
 end
 
-type Id(T) as T
-type Pair(A, B) as [A, B]
+type Id(T) do T end
+type Pair(A, B) do [A, B] end
 
 unittest "alias application is covariant through structural subtyping" do
   assert Pair(1, 2) <: Pair(number, number)
@@ -38,7 +38,7 @@ unittest "alias application is covariant through structural subtyping" do
   assert Pair(1, 'x') <: Pair(number, string)
 end
 
-type Num(T) where T <: number as T
+type Num(T) where T <: number do T end
 
 unittest "constraint admits any, never, and unions" do
   assert Num(any) == any
@@ -46,7 +46,7 @@ unittest "constraint admits any, never, and unions" do
   assert Num(1 | 2) == 1 | 2
 end
 
-type Keys(T) as keyof T
+type Keys(T) do keyof T end
 
 unittest "keyof over a generic application" do
   assert Keys({a: 1, b: 2}) == 'a' | 'b'
@@ -54,7 +54,7 @@ unittest "keyof over a generic application" do
   assert not(Keys({a: 1, b: 2}) == 'a')
 end
 
-type Stringify(T) as map k in keyof(T) do string end
+type Stringify(T) do map k in keyof(T) do string end end
 
 unittest "generic alias body is a mapped type" do
   assert Stringify({a: 1, b: 2}) == {a: string, b: string}
@@ -62,8 +62,8 @@ unittest "generic alias body is a mapped type" do
   assert not(Stringify({a: 1}) == {a: number})
 end
 
-type Optionalize(T) as map ?k in keyof(T) do T[k] end
-type ReadonlyT(T) as map readonly k in keyof(T) do T[k] end
+type Optionalize(T) do map optional k in keyof(T) do T[k] end end
+type ReadonlyT(T) do map readonly k in keyof(T) do T[k] end end
 
 unittest "optional and readonly mapped modifiers in a generic alias" do
   assert Optionalize({a: number}) == {a?: number}
@@ -71,24 +71,24 @@ unittest "optional and readonly mapped modifiers in a generic alias" do
   assert ReadonlyT({a: number}) == {readonly a: number}
 end
 
-type Wrap2(T) as [T, T]
-type Nest(T) as Wrap2(Wrap2(T))
+type Wrap2(T) do [T, T] end
+type Nest(T) do Wrap2(Wrap2(T)) end
 
 unittest "deeply nested generic alias evaluates fully" do
   assert Nest(number) == [[number, number], [number, number]]
   assert Nest(1) <: [[number, number], [number, number]]
 end
 
-type Wrap2c(T) as [T, T]
-type Cond(T) as if T <: number then 'num' else 'other' end
-type ApplyCond(T) as Wrap2c(Cond(T))
+type Wrap2c(T) do [T, T] end
+type Cond(T) do if T <: number then 'num' else 'other' end end
+type ApplyCond(T) do Wrap2c(Cond(T)) end
 
 unittest "generic alias composing a conditional" do
   assert ApplyCond(5) == ['num', 'num']
   assert ApplyCond(string) == ['other', 'other']
 end
 
-type AllDef(A, B) defaults A = number, B = string as [A, B]
+type AllDef(A, B) defaults A = number, B = string do [A, B] end
 
 unittest "all-default multi-parameter bare reference" do
   assert AllDef == [number, string]
@@ -97,16 +97,16 @@ unittest "all-default multi-parameter bare reference" do
   assert not(AllDef == [string, number])
 end
 
-type Idn(T) as T
-type Numn(T) where T <: number as T
-type Pairn(A, B) as [A, B]
+type Idn(T) do T end
+type Numn(T) where T <: number do T end
+type Pairn(A, B) do [A, B] end
 
 unittest "constraint satisfied through nested application" do
   assert Numn(Idn(5)) == 5
   assert Pairn(Numn(1), Numn(2)) == [1, 2]
 end
 
-type ToArr(T) as if T <: any then T[] else never end
+type ToArr(T) do if T <: any then T[] else never end end
 
 unittest "distributive generic application equality" do
   assert ToArr(1 | 2) == 1[] | 2[]

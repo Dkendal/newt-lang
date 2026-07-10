@@ -3,13 +3,14 @@ import { Class } from "./Class"
 export type Parameters(C)
     where
         C <: Class
-    as
+    do
         if C <: Class(?P, any) then
             P
         end
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as Class([string, string], { firstname: string, lastname: string })
+type User do Class([string, string], { firstname: string, lastname: string }) end
 
 unittest "Parameters(C)" do
     assert Parameters(User) == [string, string]

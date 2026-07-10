@@ -7,13 +7,14 @@ export type _Replace(O, M, A, match)
         M <: any,
         A <: any,
         match <: Match
-    as
+    do
         map K in keyof O do
             match Is(M, O[K], match) do
                 1 -> A,
                 0 -> O[K]
             end
         end & {}
+end
 
 // Update with `A` the fields of `O` that match `M`
 export type Replace(O, M, A, match)
@@ -23,10 +24,11 @@ export type Replace(O, M, A, match)
         M <: any,
         A <: any,
         match <: Match
-    as
+    do
         if O <: unknown then
             _Replace(O, M, A, match)
         end
+end
 
 unittest "Replace(O, M, A, match)" do
     assert Replace({a: 1, b: string}, string, boolean) == {a: 1, b: boolean}

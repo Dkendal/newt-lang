@@ -8,7 +8,7 @@ import { List } from "./List"
 
 export type NonNullableFlat(O, K)
     defaults K = Key
-    as
+    do
         (map P in keyof O do
             if P <: K then
                 UNonNullable(O[P])
@@ -16,8 +16,9 @@ export type NonNullableFlat(O, K)
                 O[P]
             end
         end) & {}
+end
 
-type _NonNullableDeep(O) as
+type _NonNullableDeep(O) do
     map K in keyof O do
         if O[K] <: BuiltIn then
             O[K]
@@ -25,24 +26,27 @@ type _NonNullableDeep(O) as
             NonNullableDeep(O[K], Key)
         end
     end
+end
 
 export type NonNullableDeep(O, K)
     defaults K = Key
-    as
+    do
         _NonNullableDeep(NonNullableFlat(O, K))
+end
 
 export type NonNullablePart(O, K, depth)
     where
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         // NOTE: quoted property names are unsupported; identifier keys
         // `flat`/`deep` denote the same string keys as TS `'flat'`/`'deep'`.
         {
             flat: NonNullableFlat(O, K),
             deep: NonNullableDeep(O, K)
         }[depth]
+end
 
 export type NonNullable(L, K, depth)
     defaults
@@ -52,5 +56,6 @@ export type NonNullable(L, K, depth)
         L <: List,
         K <: Key,
         depth <: Depth
-    as
+    do
         Cast(NonNullablePart(L, `${K & number}` | K, depth), List)
+end

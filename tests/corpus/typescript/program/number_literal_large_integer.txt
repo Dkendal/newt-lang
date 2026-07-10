@@ -1,6 +1,6 @@
 Large integer literal type alias
 =======
-type A as 100
+type A do 100 end
 =======
 type A = 100;
 

@@ -21,7 +21,7 @@ import { RequiredKeys } from "../List/RequiredKeys"
 type _SplitParams(P, PSplit, PRest)
     defaults PSplit = [], PRest = Tail(P)
     where P <: List, PSplit <: List[], PRest <: List
-    as cond do
+    do cond do
         number <: Length(P) -> P[number][][],
         P <: [] -> PSplit,
         else ->
@@ -29,52 +29,60 @@ type _SplitParams(P, PSplit, PRest)
                 _SplitParams(Tail(P), [...PSplit, A], Tail(PRest))
             end
     end
+end
 
 // Splits tuples to preserve their labels
 type SplitParams(P)
     where P <: List
-    as if _SplitParams(P) <: ?X then Cast(X, List[]) end
+    do if _SplitParams(P) <: ?X then Cast(X, List[]) end
+end
 
 type _JoinParams(PSplit, L)
     defaults L = []
     where PSplit <: List[], L <: List
-    as cond do
+    do cond do
         number <: Length(PSplit) -> PSplit[number][],
         PSplit <: [] -> L,
         else -> _JoinParams(Tail(PSplit), [...L, ...PSplit[0]])
     end
+end
 
 // Undoes the job of SplitParams
 type JoinParams(P)
     where P <: List[]
-    as if _JoinParams(P) <: ?X then Cast(X, List) end
+    do if _JoinParams(P) <: ?X then Cast(X, List) end
+end
 
 type GapOf(L1, L2, LN, I)
     where L1 <: List, L2 <: List[], LN <: List, I <: Iteration
-    as if L1[Pos(I)] <: x then
+    do if L1[Pos(I)] <: x then
         Concat(LN, L2[Pos(I)])
     else
         LN
     end
+end
 
 // The original indexes `{0: recurse, 1: finish}[Extends<Pos<I>, Length<L1>>]`;
 // this is the same dispatch written as a conditional.
 type _GapsOf(L1, L2, LN, L2D, I)
     defaults LN = [], L2D = L2, I = IterationOf(0)
     where L1 <: List, L2 <: List[], LN <: List, L2D <: List[], I <: Iteration
-    as if Pos(I) <: Length(L1) then
+    do if Pos(I) <: Length(L1) then
         Concat(LN, JoinParams(L2D))
     else
         _GapsOf(L1, L2, GapOf(L1, L2, LN, I), Tail(L2D), Next(I))
     end
+end
 
 type GapsOf(L1, L2)
     where L1 <: List, L2 <: List
-    as if _GapsOf(L1, SplitParams(L2)) <: ?X then Cast(X, List) end
+    do if _GapsOf(L1, SplitParams(L2)) <: ?X then Cast(X, List) end
+end
 
 type Gaps(L)
     where L <: List
-    as Cast(NonNullableFlat(map ? K in keyof L do L[K] | x end), List)
+    do Cast(NonNullableFlat(map optional K in keyof L do L[K] | x end), List)
+end
 
 // TODO: the original `Curry` is a generic function type with inference-driven
 // defaults, which newtype cannot express (no generic call signatures):
@@ -91,4 +99,5 @@ type Gaps(L)
 // the final result or a further curried function.
 export type Curry(F)
     where F <: Function
-    as (...p: Gaps(Parameters(F))) => Return(F) | Function
+    do (...p: Gaps(Parameters(F))) => Return(F) | Function
+end

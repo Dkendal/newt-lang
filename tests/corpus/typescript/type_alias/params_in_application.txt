@@ -2,7 +2,7 @@ Generic type alias whose param is used in a type application body
 
 =======
 
-type A(x) as Array(x)
+type A(x) do Array(x) end
 
 =======
 

@@ -451,39 +451,39 @@ mod tests {
 
     #[test]
     fn plain_dbg_is_erased() {
-        let (cleaned, _) = run("type User as { id: number }\ntype T as dbg!(User)");
+        let (cleaned, _) = run("type User do { id: number } end\ntype T do dbg!(User) end");
         // Erased: renders exactly as if dbg! weren't there.
         assert_eq!(
             cleaned.render_pretty_ts(120),
-            render("type User as { id: number }\ntype T as User")
+            render("type User do { id: number } end\ntype T do User end")
         );
     }
 
     #[test]
     fn pipeline_is_erased() {
-        let src = "type Id(T) as T\n\
-            type Box(T) as { value: T }\n\
-            type T as 1 |> Id |> Box |> dbg!()";
+        let src = "type Id(T) do T end\n\
+            type Box(T) do { value: T } end\n\
+            type T do 1 |> Id |> Box |> dbg!() end";
         let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
-            render("type Id(T) as T\ntype Box(T) as { value: T }\ntype T as 1 |> Id |> Box")
+            render("type Id(T) do T end\ntype Box(T) do { value: T } end\ntype T do 1 |> Id |> Box end")
         );
     }
 
     #[test]
     fn mid_pipeline_dbg_is_transparent() {
-        let src = "type Id(T) as T\ntype T as 1 |> dbg!() |> Id";
+        let src = "type Id(T) do T end\ntype T do 1 |> dbg!() |> Id end";
         let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
-            render("type Id(T) as T\ntype T as 1 |> Id")
+            render("type Id(T) do T end\ntype T do 1 |> Id end")
         );
     }
 
     #[test]
     fn hand_written_application_is_a_single_step() {
-        let (_, watches) = run("type Box(T) as { value: T }\ntype T as dbg!(Box(1))");
+        let (_, watches) = run("type Box(T) do { value: T } end\ntype T do dbg!(Box(1)) end");
         assert_eq!(watches.iter().count(), 1);
     }
 
@@ -517,7 +517,7 @@ mod tests {
 
     #[test]
     fn program_without_dbg_is_untouched_and_has_no_watches() {
-        let src = "type A as 1";
+        let src = "type A do 1 end";
         let (cleaned, watches) = run(src);
         assert!(watches.is_empty());
         assert_eq!(cleaned.render_pretty_ts(120), render(src));
@@ -526,32 +526,32 @@ mod tests {
     #[test]
     #[should_panic(expected = "dbg! expects exactly one argument")]
     fn dbg_with_wrong_arity_panics_with_report() {
-        run("type T as dbg!(1, 2)");
+        run("type T do dbg!(1, 2) end");
     }
 
     #[test]
     fn dbg_inside_let_binding_is_erased() {
-        let src = "type T as let x = dbg!(1) in x";
+        let src = "type T do let x = dbg!(1) in x end";
         let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
-            render("type T as let x = 1 in x")
+            render("type T do let x = 1 in x end")
         );
     }
 
     #[test]
     fn dbg_inside_if_branch_is_erased() {
-        let src = "type Get(A, K) as if K <: keyof A then dbg!(A[K]) else never end";
+        let src = "type Get(A, K) do if K <: keyof A then dbg!(A[K]) else never end end";
         let (cleaned, _) = run(src);
         assert_eq!(
             cleaned.render_pretty_ts(120),
-            render("type Get(A, K) as if K <: keyof A then A[K] else never end")
+            render("type Get(A, K) do if K <: keyof A then A[K] else never end end")
         );
     }
 
     #[test]
     fn watches_record_marked_spans() {
-        let src = "type T as dbg!(1)";
+        let src = "type T do dbg!(1) end";
         let (_, watches) = run(src);
         let at = src.find('1').unwrap();
         assert!(watches.contains(crate::ast::Span::new(at, at + 1)));
@@ -559,14 +559,14 @@ mod tests {
 
     #[test]
     fn pipeline_yields_one_watch_per_step() {
-        let src = "type Id(T) as T\ntype B as 1 |> Id |> dbg!()";
+        let src = "type Id(T) do T end\ntype B do 1 |> Id |> dbg!() end";
         let (_, watches) = run(src);
         assert_eq!(watches.iter().count(), 2);
     }
 
     #[test]
     fn bare_ident_watch_is_flagged() {
-        let src = "type Get(A, K) as dbg!(K)";
+        let src = "type Get(A, K) do dbg!(K) end";
         let (_, watches) = run(src);
         let at = src.rfind('K').unwrap();
         assert_eq!(

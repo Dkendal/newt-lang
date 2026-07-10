@@ -2,8 +2,9 @@ export type Cast(A1, A2)
     where
         A1 <: any,
         A2 <: any
-    as
+    do
         if A1 <: A2 then A1 else A2 end
+end
 
 unittest "Cast(A1, A2)" do
     assert Cast('42', string) == '42'

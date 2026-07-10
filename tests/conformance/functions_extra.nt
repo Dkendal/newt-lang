@@ -86,7 +86,7 @@ unittest "optional function parameters" do
   assert not((x?: string) => void <: (x: number) => void)
   assert (x?: string) => void == (x?: string) => void
 end
-type CtorSigSig as new () => string
+type CtorSigSig do new () => string end
 
 unittest "constructor types" do
   assert CtorSig == new () => string

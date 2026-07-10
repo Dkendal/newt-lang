@@ -10,7 +10,8 @@ export type SelectKeys(L, M, match)
         L <: List,
         M <: any,
         match <: Match
-    as OSelectKeys(ObjectOf(L), M, match)
+    do OSelectKeys(ObjectOf(L), M, match)
+end
 
 unittest "SelectKeys(L, M)" do
     // TODO: evaluator cannot prove this yet

@@ -16,11 +16,12 @@ type DropForth(L, N)
     where
         L <: List,
         N <: Iteration
-    as
+    do
         [
             DropForth(Tail(L), Prev(N)),
             L
         ][Extends(0, Pos(N))]
+end
 
 type DropBack(L, N, I, LN)
     defaults I = Prev(N), LN = []
@@ -29,11 +30,12 @@ type DropBack(L, N, I, LN)
         N <: Iteration,
         I <: Iteration,
         LN <: List
-    as
+    do
         [
             DropBack(L, N, Prev(I), Prepend(LN, L[Pos(I)])),
             LN
         ][Extends(-1, Pos(I))]
+end
 
 // TS uses a `{'->': ..., '<-': ...}[way]` lookup here; string property names
 // are not supported, so an equivalent match on `way` is used.
@@ -42,11 +44,12 @@ type __Drop(L, N, way)
         L <: List,
         N <: Iteration,
         way <: Way
-    as
+    do
         match way do
             '->' -> DropForth(L, N),
             '<-' -> DropBack(L, N)
         end
+end
 
 export type _Drop(L, N, way)
     defaults way = '->'
@@ -54,10 +57,11 @@ export type _Drop(L, N, way)
         L <: List,
         N <: number,
         way <: Way
-    as
+    do
         if __Drop(Naked(L), IterationOf(N), way) <: ?X then
             Cast(X, List)
         end
+end
 
 export type Drop(L, N, way)
     defaults way = '->'
@@ -65,9 +69,10 @@ export type Drop(L, N, way)
         L <: List,
         N <: number,
         way <: Way
-    as
+    do
         if L <: unknown then
             if N <: unknown then
                 _Drop(L, N, way)
             end
         end
+end

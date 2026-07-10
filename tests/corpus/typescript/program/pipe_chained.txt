@@ -1,6 +1,6 @@
 Chained pipe operators nest left-to-right
 =======
-type A as A |> B(1) |> C |> D(2, 3, 4)
+type A do A |> B(1) |> C |> D(2, 3, 4) end
 =======
 type A = D<C<B<A, 1>>, 2, 3, 4>;
 

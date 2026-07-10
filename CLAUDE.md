@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **Evaluates** every `assert` claim inside a `unittest` at compile time
    (structural assignability, `==`, `not`/`and`/`or`), reporting ok/FAILED to
    stderr.
-2. **Transpiles** the program to TypeScript (`type Foo as 1` → `type Foo = 1;`).
+2. **Transpiles** the program to TypeScript (`type Foo do 1 end` → `type Foo = 1;`).
 3. With `--generate-tests`, **emits TypeScript type-level assertions** so the
    same claims can be checked by `tsc`/`tsgo` (each `assert` becomes a
    `type _newtype_test__… = Assert<…>` alias).

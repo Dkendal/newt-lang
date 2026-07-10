@@ -120,7 +120,11 @@ mod map_expr_modifiers {
 
     #[test]
     fn optional() {
-        assert_renders_like(Rule::map_expr, "map ?k in t do 1 end", "{ [k in t]?: 1 }");
+        assert_renders_like(
+            Rule::map_expr,
+            "map optional k in t do 1 end",
+            "{ [k in t]?: 1 }",
+        );
     }
 
     #[test]

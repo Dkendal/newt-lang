@@ -2,18 +2,20 @@ An if without an else branch in a type alias defaults to never
 
 =======
 
-type A as
+type A do
     if a <: b then
         c
     end
+end
 
 =======
 
-type A as
+type A do
     if a <: b then
         c
     else
         never
     end
+end
 
 =======

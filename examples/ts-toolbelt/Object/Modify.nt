@@ -8,10 +8,11 @@ export type Modify(O, OMod)
     where
         O <: object,
         OMod <: object
-    as
+    do
         (map K in keyof OMod do
             Replace(OMod[K], x, Exclude(At(O, K), undefined))
         end) & {}
+end
 
 unittest "Modify(O, OMod)" do
     // TODO: evaluator cannot prove this yet (depends on ../Union/Replace,

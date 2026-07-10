@@ -21,11 +21,12 @@ type RangeForth(From, To, L)
         From <: Iteration,
         To <: Iteration,
         L <: List
-    as
+    do
         match Extends(From, To) do
             1 -> L,
             else -> RangeForth(Prev(From), To, Prepend(L, Pos(From)))
         end
+end
 
 type RangeBack(From, To, L)
     defaults L = []
@@ -33,11 +34,12 @@ type RangeBack(From, To, L)
         From <: Iteration,
         To <: Iteration,
         L <: List
-    as
+    do
         match Extends(From, To) do
             1 -> L,
             else -> RangeBack(Next(From), To, Prepend(L, Pos(From)))
         end
+end
 
 // TODO: original TS selects via {'->': ..., '<-': ...}[way]; quoted object
 // keys are not supported, so a `match` on `way` is used.
@@ -46,21 +48,23 @@ type __Range(From, To, way)
         From <: Iteration,
         To <: Iteration,
         way <: Way
-    as
+    do
         match way do
             '->' -> RangeForth(To, Prev(From)),  // Reverse logic to work naturally #`Prepend`
             '<-' -> RangeBack(From, Next(To))    // Works in reverse mode (default) #`Prepend`
         end
+end
 
 export type _Range(From, To, way)
     where
         From <: number,
         To <: number,
         way <: Way
-    as
+    do
         if __Range(IterationOf(From), IterationOf(To), way) <: ?X then
             Cast(X, (string | number)[])
         end
+end
 
 // Create a range of numbers
 export type Range(From, To, way)
@@ -69,12 +73,13 @@ export type Range(From, To, way)
         From <: number,
         To <: number,
         way <: Way
-    as
+    do
         if From <: unknown then
             if To <: unknown then
                 _Range(From, To, way)
             end
         end
+end
 
 unittest "Range(From, To, way)" do
     // TODO: evaluator cannot prove this yet (recursive alias evaluation and

@@ -13,23 +13,25 @@ type Longer(L, L1)
     where
         L <: List,
         L1 <: List
-    as
+    do
         if L <: unknown then
             if L1 <: unknown then
                 if Has(RequiredKeys(L), RequiredKeys(L1)) <: 1 then 1 else 0 end
             end
         end
+end
 
 type MergeProp(OK, O1K, fill, OOKeys, K)
     where
         OOKeys <: Key,
         K <: Key
-    as cond do
+    do cond do
         K <: OOKeys -> Exclude(OK, undefined) | O1K, // if prop of `O` is optional, merge it with prop of `O1`
         [OK] <: [never] -> O1K,                      // complete with prop of `O1`
         OK <: fill -> O1K,                           // fill/replace if required
         else -> OK
     end
+end
 
 type MergeFlatObject(O, O1, fill, OOKeys)
     defaults OOKeys = _OptionalKeys(O)
@@ -37,10 +39,11 @@ type MergeFlatObject(O, O1, fill, OOKeys)
         O <: object,
         O1 <: object,
         OOKeys <: Key
-    as
+    do
         (map K in keyof (Anyfy(O) & O1) do
             MergeProp(At(O, K), At(O1, K), fill, OOKeys, K)
         end) & {}
+end
 
 type MergeFlatList(L, L1, ignore, fill, LOK)
     defaults LOK = _OptionalKeys(L)
@@ -49,7 +52,7 @@ type MergeFlatList(L, L1, ignore, fill, LOK)
         L1 <: List,
         ignore <: object,
         LOK <: Key
-    as
+    do
         if number <: Length(L | L1) then
             MergeFlatChoice(L[number], L1[number], ignore, fill)[]
         else
@@ -63,18 +66,20 @@ type MergeFlatList(L, L1, ignore, fill, LOK)
                 end
             end
         end
+end
 
 export type MergeFlatChoice(O, O1, ignore, fill)
     where
         O <: object,
         O1 <: object,
         ignore <: object
-    as cond do
+    do cond do
         O <: ignore -> O,
         O1 <: ignore -> O,
         O <: List and O1 <: List -> MergeFlatList(O, O1, ignore, fill),
         else -> MergeFlatObject(O, O1, fill)
     end
+end
 
 export type MergeFlat(O, O1, ignore, fill)
     defaults
@@ -84,19 +89,20 @@ export type MergeFlat(O, O1, ignore, fill)
         O <: object,
         O1 <: object,
         ignore <: object
-    as
+    do
         if O <: unknown then
             if O1 <: unknown then
                 MergeFlatChoice(O, O1, ignore, fill)
             end
         end
+end
 
 type MergeDeepList(L, L1, ignore, fill)
     where
         L <: List,
         L1 <: List,
         ignore <: object
-    as
+    do
         if number <: Length(L | L1) then
             MergeDeepChoice(L[number], L1[number], ignore, fill, never, any)[]
         else
@@ -110,6 +116,7 @@ type MergeDeepList(L, L1, ignore, fill)
                 end
             end
         end
+end
 
 type MergeDeepObject(O, O1, ignore, fill, OOKeys)
     defaults OOKeys = _OptionalKeys(O)
@@ -118,17 +125,18 @@ type MergeDeepObject(O, O1, ignore, fill, OOKeys)
         O1 <: object,
         ignore <: object,
         OOKeys <: Key
-    as
+    do
         map K in keyof (Anyfy(O) & O1) do
             MergeDeepChoice(At(O, K), At(O1, K), ignore, fill, OOKeys, K)
         end
+end
 
 type MergeDeepChoice(OK, O1K, ignore, fill, OOKeys, K)
     where
         ignore <: object,
         OOKeys <: Key,
         K <: Key
-    as cond do
+    do cond do
         [OK] <: [never] -> MergeProp(OK, O1K, fill, OOKeys, K),
         [O1K] <: [never] -> MergeProp(OK, O1K, fill, OOKeys, K),
         OK <: ignore -> MergeProp(OK, O1K, fill, OOKeys, K),
@@ -138,18 +146,20 @@ type MergeDeepChoice(OK, O1K, ignore, fill, OOKeys, K)
         OK <: object and O1K <: object -> MergeDeepObject(OK, O1K, ignore, fill),
         else -> MergeProp(OK, O1K, fill, OOKeys, K)
     end
+end
 
 export type MergeDeep(O, O1, ignore, fill)
     where
         O <: object,
         O1 <: object,
         ignore <: object
-    as
+    do
         if O <: unknown then
             if O1 <: unknown then
                 MergeDeepChoice(O, O1, ignore, fill, 'x', 'y') // dummy x, y
             end
         end
+end
 
 // Accurately merge the fields of `O` with the ones of `O1`. It is
 // equivalent to the spread operator in JavaScript. [[Union]]s and [[Optional]]
@@ -166,16 +176,17 @@ export type Merge(O, O1, depth, ignore, fill)
         depth <: Depth,
         ignore <: object,
         fill <: any
-    as
+    do
         // NOTE: quoted property names are unsupported; identifier keys
         // `flat`/`deep` denote the same string keys as TS `'flat'`/`'deep'`.
         {
             flat: MergeFlat(O, O1, ignore, fill),
             deep: MergeDeep(O, O1, ignore, fill)
         }[depth]
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type O0 as {
+type O0 do {
     name?: string,
     age?: number,
     zip?: string,
@@ -183,8 +194,9 @@ type O0 as {
         cvv?: number
     }
 }
+end
 
-type O1 as {
+type O1 do {
     age: number,
     zip?: number,
     city: string,
@@ -193,6 +205,7 @@ type O1 as {
         ccn?: string
     }
 }
+end
 
 unittest "Merge(O, O1, depth)" do
     // TODO: evaluator cannot prove this yet (depends on ../Union/Exclude,

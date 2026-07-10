@@ -5,7 +5,8 @@ import { Promise } from "../Any/Promise"
 
 export type Promisify(F)
     where F <: Function
-    as (...args: Parameters(F)) => Promise(Return(F))
+    do (...args: Parameters(F)) => Promise(Return(F))
+end
 
 unittest "Promisify(F)" do
     // TODO: evaluator cannot prove this yet (infer through rest-parameter

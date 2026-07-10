@@ -5,10 +5,11 @@
 // * `<-contains`  : Y contains   X (Contains(Y, X))
 // * `<-extends`   : Y extends    X (Extends(Y, X))
 // * `equals`      : X equals     Y (Equals(X, Y))
-export type Match as
+export type Match do
     'default'
     | 'contains->'
     | 'extends->'
     | '<-contains'
     | '<-extends'
     | 'equals'
+end

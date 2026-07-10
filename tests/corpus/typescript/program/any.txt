@@ -1,6 +1,6 @@
 Primitive any type alias
 =======
-type A as any
+type A do any end
 =======
 type A = any;
 

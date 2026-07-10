@@ -3,7 +3,8 @@ import { List } from "./List"
 // Transform a List into an Union
 export type UnionOf(L)
     where L <: List
-    as L[number]
+    do L[number]
+end
 
 unittest "UnionOf(L)" do
     assert UnionOf([1, 2, 3]) == 1 | 2 | 3

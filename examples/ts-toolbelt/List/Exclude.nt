@@ -10,5 +10,6 @@ export type Exclude(L, L1, match)
         L <: List,
         L1 <: List,
         match <: Match
-    as
+    do
         ListOf(OExclude(ObjectOf(L), ObjectOf(L1), match))
+end

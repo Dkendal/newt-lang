@@ -9,4 +9,5 @@ export type Includes(L, M, match)
         L <: List,
         M <: any,
         match <: Match
-    as OIncludes(ObjectOf(L), M, match)
+    do OIncludes(ObjectOf(L), M, match)
+end

@@ -1,6 +1,6 @@
 import { Nope } from "./nonexistent"
 
-type Get(K) where K <: Nope as K
+type Get(K) where K <: Nope do K end
 
 unittest "missing module" do
     assert Get("id") == "id"

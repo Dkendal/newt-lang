@@ -6,12 +6,13 @@ type _Replace(S, R, W)
         S <: string,
         R <: Literal,
         W <: Literal
-    as
+    do
         if S <: `${?BS}${R}${?AS}` then
             Replace(`${BS}${W}${AS}`, R, W)
         else
             S
         end
+end
 
 // Replace `R` with `W` in `S`
 export type Replace(S, R, W)
@@ -19,10 +20,11 @@ export type Replace(S, R, W)
         S <: string,
         R <: Literal,
         W <: Literal
-    as
+    do
         if _Replace(S, R, W) <: ?X then
             Cast(X, string)
         end
+end
 
 unittest "Replace(S, R, W)" do
     // TODO: evaluator cannot prove this yet

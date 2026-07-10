@@ -9,7 +9,7 @@ export type Update(O, K, A)
         O <: object,
         K <: Key,
         A <: any
-    as
+    do
         map P in keyof O do
             if P <: K then
                 Replace(A, x, O[P])
@@ -17,9 +17,10 @@ export type Update(O, K, A)
                 O[P]
             end
         end & {}
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type User as {
+type User do {
     info: {
         name: string,
         age: number,
@@ -27,6 +28,7 @@ type User as {
     },
     id: number
 }
+end
 
 unittest "Update(O, K, A)" do
     // TODO: evaluator cannot prove this yet (depends on ../Union/Replace and

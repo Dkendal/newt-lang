@@ -4,8 +4,9 @@ export type Append(L, A)
     where
         L <: List,
         A <: any
-    as
+    do
         [...L, A]
+end
 
 unittest "Append(L, A)" do
     // TODO: evaluator cannot prove this yet (tuple spread of a substituted

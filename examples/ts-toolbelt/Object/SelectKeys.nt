@@ -6,9 +6,9 @@ export type _SelectKeys(O, M, match)
         O <: object,
         M <: any,
         match <: Match
-    as
+    do
         let picks =
-            map -? K in keyof O do
+            map -optional K in keyof O do
                 match Is(O[K], M, match) do
                     1 -> K,
                     0 -> never
@@ -16,6 +16,7 @@ export type _SelectKeys(O, M, match)
             end
         in
         picks[keyof O]
+end
 
 // Get the keys of `O` which fields match `M`
 export type SelectKeys(O, M, match)
@@ -24,10 +25,11 @@ export type SelectKeys(O, M, match)
         O <: object,
         M <: any,
         match <: Match
-    as
+    do
         if O <: unknown then
             _SelectKeys(O, M, match)
         end
+end
 
 unittest "SelectKeys(O, M, match)" do
     // TODO: evaluator cannot prove these yet (mapped type with conditional

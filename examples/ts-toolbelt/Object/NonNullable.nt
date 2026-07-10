@@ -5,10 +5,11 @@ import { Key } from "../Any/Key"
 import { PatchFlat } from "./Patch"
 import { BuiltIn } from "../Misc/BuiltIn"
 
-export type NonNullableFlat(O) as
+export type NonNullableFlat(O) do
     (map K in keyof O do UNonNullable(O[K]) end) & {}
+end
 
-export type NonNullableDeep(O) as
+export type NonNullableDeep(O) do
     map K in keyof O do
         if O[K] <: BuiltIn then
             O[K]
@@ -16,24 +17,27 @@ export type NonNullableDeep(O) as
             NonNullableDeep(UNonNullable(O[K]))
         end
     end
+end
 
 export type NonNullablePart(O, depth)
     where
         O <: object,
         depth <: Depth
-    as
+    do
         match depth do
             'flat' -> NonNullableFlat(O),
             'deep' -> NonNullableDeep(O)
         end
+end
 
 export type _NonNullable(O, K, depth)
     where
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         PatchFlat(NonNullablePart(_Pick(O, K), depth), O)
+end
 
 // Make some fields of `O` not nullable (deeply or not)
 // (Optional fields will be left untouched & `undefined`)
@@ -43,10 +47,11 @@ export type NonNullable(O, K, depth)
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         if O <: unknown then
             _NonNullable(O, K, depth)
         end
+end
 
 unittest "NonNullable(O, K, depth)" do
     // TODO: evaluator cannot prove this yet (depends on ../Union/NonNullable,

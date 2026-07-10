@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn unevaluated_dbg_prints_nothing() {
-        let src = "type T as dbg!(1)"; // no unittest → nothing demands it
+        let src = "type T do dbg!(1) end"; // no unittest → nothing demands it
         let (_, out) = run_src_dbg(src);
         assert!(!out.contains("Debug"), "{out}");
     }
@@ -582,7 +582,7 @@ mod tests {
     /// still runs (with zero assertions) but should still surface the hint.
     #[test]
     fn never_demanded_mark_gets_a_hint_note() {
-        let src = "type T as dbg!(1)"; // no unittest → the mark never fires
+        let src = "type T do dbg!(1) end"; // no unittest → the mark never fires
         let (_, out) = run_src_dbg(src);
         assert!(
             out.contains("note: 1 dbg! mark(s) were never evaluated"),
@@ -593,7 +593,7 @@ mod tests {
     /// Two unexercised marks → the note's count reflects both.
     #[test]
     fn never_demanded_hint_counts_every_unfired_mark() {
-        let src = "type T as dbg!(1)\ntype U as dbg!(2)";
+        let src = "type T do dbg!(1) end\ntype U do dbg!(2) end";
         let (_, out) = run_src_dbg(src);
         assert!(
             out.contains("note: 2 dbg! mark(s) were never evaluated"),
@@ -623,7 +623,7 @@ mod tests {
         let src = "unittest \"t\" do\n  assert dbg!(1) <: number\n  assert dbg!(1) <: number\nend";
         // NOTE: two *separate* dbg! sites (different spans) print twice; the
         // dedupe key is (span, value). Same-site re-evaluation is the dedupe case:
-        let src2 = "type One as dbg!(1)\nunittest \"t\" do\n  assert One <: number\n  assert One <: number\nend";
+        let src2 = "type One do dbg!(1) end\nunittest \"t\" do\n  assert One <: number\n  assert One <: number\nend";
         let (_, out) = run_src_dbg(src);
         assert_eq!(out.matches("Debug").count(), 2, "{out}");
         let (_, out2) = run_src_dbg(src2);
@@ -634,8 +634,8 @@ mod tests {
 
     #[test]
     fn dbg_fires_with_live_bindings_and_dead_branches_stay_silent() {
-        let src = "type User as { id: number, name: string }\n\
-            type At(A, K) as if K <: keyof A then dbg!(A[K]) else dbg!(never) end\n\
+        let src = "type User do { id: number, name: string } end\n\
+            type At(A, K) do if K <: keyof A then dbg!(A[K]) else dbg!(never) end end\n\
             unittest \"t\" do\n  assert At(User, 'id') <: number\nend";
         let (report, out) = run_src_dbg(src);
         assert_eq!((report.passed, report.failed), (1, 0), "{out}");
@@ -649,7 +649,7 @@ mod tests {
 
     #[test]
     fn bare_parameter_dbg_reports_the_argument() {
-        let src = "type Probe(K) as dbg!(K)\n\
+        let src = "type Probe(K) do dbg!(K) end\n\
             unittest \"t\" do\n  assert Probe('id') <: string\nend";
         let (report, out) = run_src_dbg(src);
         assert_eq!((report.passed, report.failed), (1, 0), "{out}");
@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn distinct_instantiations_each_fire() {
-        let src = "type Probe(K) as dbg!(K)\n\
+        let src = "type Probe(K) do dbg!(K) end\n\
             unittest \"t\" do\n  assert Probe('a') <: string\n  assert Probe('b') <: string\nend";
         let (_, out) = run_src_dbg(src);
         assert_eq!(out.matches("Debug").count(), 2, "{out}");
@@ -667,7 +667,7 @@ mod tests {
 
     #[test]
     fn keyof_operand_dbg_fires() {
-        let src = "type User as { id: number }\n\
+        let src = "type User do { id: number } end\n\
             unittest \"t\" do\n  assert 'id' <: keyof dbg!(User)\nend";
         let (_, out) = run_src_dbg(src);
         assert_eq!(out.matches("Debug").count(), 1, "{out}");
@@ -688,9 +688,9 @@ mod tests {
         // mark's dedupe key (span, value) differs across the two asserts —
         // isolating the renormalization hazard from ordinary same-value
         // dedupe (already covered by `repeated_evaluation_prints_once`).
-        let src = "type User as { id: number, name: string }\n\
-            type Thing as { id: string }\n\
-            type At(A, K) as if K <: keyof dbg!(A) then dbg!(A[K]) else dbg!(never) end\n\
+        let src = "type User do { id: number, name: string } end\n\
+            type Thing do { id: string } end\n\
+            type At(A, K) do if K <: keyof dbg!(A) then dbg!(A[K]) else dbg!(never) end end\n\
             unittest \"t\" do\n  \
                 assert At(User, 'id') <: number\n  \
                 assert At(Thing, 'id') <: string\n\
@@ -719,7 +719,7 @@ mod tests {
     /// re-run, and the bare-parameter mark on `K` would silently never fire.
     #[test]
     fn paused_flush_instantiation_does_not_poison_the_cache() {
-        let src = "type Probe(K) as dbg!(K)\n\
+        let src = "type Probe(K) do dbg!(K) end\n\
             unittest \"t\" do\n  \
                 assert dbg!({a: Probe('x')}) <: unknown\n  \
                 assert Probe('x') <: string\n\
@@ -744,9 +744,9 @@ mod tests {
     /// 1-based source location.
     #[test]
     fn dbg_report_includes_instantiation_stacktrace() {
-        let src = "type User as { id: number }\n\
-            type Get(A, K) as if dbg!(K) <: keyof A then A[K] else never end\n\
-            type At(A, K) as Get(A, K)\n\
+        let src = "type User do { id: number } end\n\
+            type Get(A, K) do if dbg!(K) <: keyof A then A[K] else never end end\n\
+            type At(A, K) do Get(A, K) end\n\
             unittest \"t\" do\n\
             \x20 assert At(User, 'id') <: number\n\
             end";
@@ -775,8 +775,8 @@ mod tests {
     /// frames to the first's cache entry).
     #[test]
     fn each_distinct_instantiation_gets_a_full_stack() {
-        let src = "type Probe(K) as dbg!(K)\n\
-            type Wrap(K) as Probe(K)\n\
+        let src = "type Probe(K) do dbg!(K) end\n\
+            type Wrap(K) do Probe(K) end\n\
             unittest \"t\" do\n\
             \x20 assert Wrap(1) <: number\n\
             \x20 assert Wrap(2) <: number\n\
@@ -798,8 +798,8 @@ mod tests {
     /// harness's ordinary report.
     #[test]
     fn trace_eval_reports_instantiation_and_conditional_lines() {
-        let src = "type Id(T) as T\n\
-            type IsNum(T) as if T <: number then true else false end\n\
+        let src = "type Id(T) do T end\n\
+            type IsNum(T) do if T <: number then true else false end end\n\
             unittest \"t\" do\n\
             \x20 assert Id(1) <: number\n\
             \x20 assert IsNum(1) == true\n\
@@ -844,8 +844,8 @@ mod tests {
     /// same program instantiates a generic and reduces a conditional.
     #[test]
     fn trace_eval_off_by_default_produces_no_trace_lines() {
-        let src = "type Id(T) as T\n\
-            type IsNum(T) as if T <: number then true else false end\n\
+        let src = "type Id(T) do T end\n\
+            type IsNum(T) do if T <: number then true else false end end\n\
             unittest \"t\" do\n\
             \x20 assert Id(1) <: number\n\
             \x20 assert IsNum(1) == true\n\
@@ -944,7 +944,7 @@ mod tests {
 
     #[test]
     fn program_without_unittests_reports_nothing() {
-        let (report, stderr) = run_src("type Foo as 1", false);
+        let (report, stderr) = run_src("type Foo do 1 end", false);
         assert_eq!(
             report,
             Report {
@@ -958,7 +958,7 @@ mod tests {
     #[test]
     fn resolves_top_level_alias() {
         let (report, _) = run_src(
-            "type Foo as 1\nunittest \"t\" do\n  assert Foo <: number\n  assert Foo == 1\nend",
+            "type Foo do 1 end\nunittest \"t\" do\n  assert Foo <: number\n  assert Foo == 1\nend",
             false,
         );
         assert_eq!(
@@ -973,7 +973,7 @@ mod tests {
     #[test]
     fn alias_that_does_not_hold_fails() {
         let (report, _) = run_src(
-            "type Foo as 1\nunittest \"t\" do\n  assert Foo <: string\nend",
+            "type Foo do 1 end\nunittest \"t\" do\n  assert Foo <: string\nend",
             false,
         );
         assert_eq!(
@@ -988,7 +988,7 @@ mod tests {
     #[test]
     fn resolves_generic_application() {
         let (report, _) = run_src(
-            "type Id(T) as T\nunittest \"t\" do\n  assert Id(1) <: number\n  assert Id(string) == string\nend",
+            "type Id(T) do T end\nunittest \"t\" do\n  assert Id(1) <: number\n  assert Id(string) == string\nend",
             false,
         );
         assert_eq!(
@@ -1037,7 +1037,7 @@ mod tests {
     #[test]
     fn generic_with_too_many_args_is_an_error() {
         let (report, stderr) = run_src(
-            "type Id(T) as T\nunittest \"t\" do\n  assert Id(1, 2) <: number\nend",
+            "type Id(T) do T end\nunittest \"t\" do\n  assert Id(1, 2) <: number\nend",
             false,
         );
         assert_eq!(
@@ -1053,7 +1053,7 @@ mod tests {
     #[test]
     fn generic_with_too_few_args_is_an_error() {
         let (report, stderr) = run_src(
-            "type Pair(A, B) as [A, B]\nunittest \"t\" do\n  assert Pair(1) <: [number, number]\nend",
+            "type Pair(A, B) do [A, B] end\nunittest \"t\" do\n  assert Pair(1) <: [number, number]\nend",
             false,
         );
         assert_eq!(
@@ -1069,7 +1069,7 @@ mod tests {
     #[test]
     fn generic_default_fills_omitted_argument() {
         let (report, _) = run_src(
-            "type WithDefault(A, B) defaults B = string as [A, B]\n\
+            "type WithDefault(A, B) defaults B = string do [A, B] end\n\
             unittest \"t\" do\n  assert WithDefault(number) == [number, string]\nend",
             false,
         );
@@ -1136,7 +1136,7 @@ mod tests {
     fn mapped_type_expands_against_object_literals() {
         // A mapped type over a statically-known key set expands to the equivalent
         // object literal and relates structurally (verified against tsgo --strict).
-        let src = "type O as { a: number, b: string }\n\
+        let src = "type O do { a: number, b: string } end\n\
             unittest \"t\" do\n\
             \x20 assert map K in \"a\" | \"b\" do number end <: { a: number, b: number }\n\
             \x20 assert { a: number, b: number } <: map K in \"a\" | \"b\" do number end\n\
@@ -1219,7 +1219,7 @@ mod tests {
         // A self-referential type must not loop forever: the coinductive guard
         // takes `Rec <: Rec` as holding while it is being proven.
         let (report, _) = run_src(
-            "type Rec as { next: Rec, value: number }\n\
+            "type Rec do { next: Rec, value: number } end\n\
             unittest \"t\" do\n  assert Rec <: Rec\n  assert Rec == Rec\nend",
             false,
         );
@@ -1237,7 +1237,7 @@ mod tests {
         // `T["k"]` on either operand reduces to the property's type before the
         // structural match, so these are definite (not indeterminate `Both`).
         let (report, stderr) = run_src(
-            "type User as { info: { name: string, age: number }, id: number }\n\
+            "type User do { info: { name: string, age: number }, id: number } end\n\
             unittest \"t\" do\n\
             \x20 assert User['id'] <: number\n\
             \x20 assert User['id'] == number\n\
@@ -1263,8 +1263,8 @@ mod tests {
     fn indexed_access_via_generic_alias_reduces() {
         // The substituted access body `O[K]` reduces after the alias resolves.
         let (report, stderr) = run_src(
-            "type User as { id: number }\n\
-            type Get(O, K) where O <: object, K <: keyof O as O[K]\n\
+            "type User do { id: number } end\n\
+            type Get(O, K) where O <: object, K <: keyof O do O[K] end\n\
             unittest \"t\" do\n\
             \x20 assert Get(User, 'id') <: number\n\
             \x20 assert Get(User, 'id') == number\n\
@@ -1285,7 +1285,7 @@ mod tests {
     fn optional_property_indexed_access_widens_to_undefined() {
         // `x?: V` accessed as `T["x"]` widens to `V | undefined` (tsc --strict).
         let (report, stderr) = run_src(
-            "type Opt as { x?: number, y: string }\n\
+            "type Opt do { x?: number, y: string } end\n\
             unittest \"t\" do\n\
             \x20 assert Opt['x'] <: number | undefined\n\
             \x20 assert Opt['x'] == number | undefined\n\
@@ -1310,7 +1310,7 @@ mod tests {
         // Numeric-literal keys, ['length'] (literal arity), and [number]
         // (element union) all reduce to definite results.
         let (report, stderr) = run_src(
-            "type Pair as [string, number]\n\
+            "type Pair do [string, number] end\n\
             unittest \"t\" do\n\
             \x20 assert Pair[0] <: string\n\
             \x20 assert Pair[0] == string\n\
@@ -1337,8 +1337,8 @@ mod tests {
     fn array_indexed_access_reduces() {
         // `E[]` and `readonly E[]`: [number]/[0] -> E, ['length'] -> number.
         let (report, stderr) = run_src(
-            "type Arr as string[]\n\
-            type RArr as readonly number[]\n\
+            "type Arr do string[] end\n\
+            type RArr do readonly number[] end\n\
             unittest \"t\" do\n\
             \x20 assert Arr[number] == string\n\
             \x20 assert Arr[0] == string\n\
@@ -1364,7 +1364,7 @@ mod tests {
     fn union_key_indexed_access_distributes() {
         // `T['a' | 'b']` -> `T['a'] | T['b']`.
         let (report, stderr) = run_src(
-            "type Rec as { a: string, b: number }\n\
+            "type Rec do { a: string, b: number } end\n\
             unittest \"t\" do\n\
             \x20 assert Rec['a' | 'b'] == string | number\n\
             \x20 assert string <: Rec['a' | 'b']\n\
@@ -1386,9 +1386,9 @@ mod tests {
     fn union_and_intersection_object_side_indexed_access() {
         // `(X | Y)['k']` distributes; `(X & Y)['k']` intersects member types.
         let (report, stderr) = run_src(
-            "type X as { k: string }\n\
-            type Y as { k: number }\n\
-            type Zk as { m: boolean }\n\
+            "type X do { k: string } end\n\
+            type Y do { k: number } end\n\
+            type Zk do { m: boolean } end\n\
             unittest \"t\" do\n\
             \x20 assert (X | Y)['k'] == string | number\n\
             \x20 assert not ((X | Y)['k'] <: string)\n\
@@ -1412,8 +1412,8 @@ mod tests {
     fn keyof_union_is_the_intersection_of_key_sets() {
         // keyof (A | B) = keyof A & keyof B: the shared plain keys.
         let (report, stderr) = run_src(
-            "type A as { a: 1, b: 2 }\n\
-            type B as { b: 3, c: 4 }\n\
+            "type A do { a: 1, b: 2 } end\n\
+            type B do { b: 3, c: 4 } end\n\
             unittest \"t\" do\n\
             \x20 assert keyof (A | B) == 'b'\n\
             \x20 assert 'b' <: keyof (A | B)\n\
@@ -1435,8 +1435,8 @@ mod tests {
     fn keyof_intersection_is_the_union_of_key_sets() {
         // keyof (P & Q) = keyof P | keyof Q (disjoint keys, no never-collapse).
         let (report, stderr) = run_src(
-            "type P as { a: 1, b: 2 }\n\
-            type Q as { c: 3, d: 4 }\n\
+            "type P do { a: 1, b: 2 } end\n\
+            type Q do { c: 3, d: 4 } end\n\
             unittest \"t\" do\n\
             \x20 assert keyof (P & Q) == 'a' | 'b' | 'c' | 'd'\n\
             \x20 assert 'a' <: keyof (P & Q)\n\
@@ -1464,7 +1464,7 @@ mod tests {
         // definite reduction to the key union would be a wrong-definite
         // (`not ('x' <: keyof C)` would pass while tsgo says `'x'` IS a key).
         let (report, stderr) = run_src(
-            "type C as { a: 1 } & { a: 's' }\n\
+            "type C do { a: 1 } & { a: 's' } end\n\
             unittest \"t\" do\n\
             \x20 assert not ('x' <: keyof C)\n\
             \x20 assert keyof C == 'a'\n\
@@ -1506,9 +1506,9 @@ mod tests {
     fn keyof_driven_indexed_access_reduces() {
         // T[keyof T] and T[keyof U] reduce the keyof key then distribute.
         let (report, stderr) = run_src(
-            "type A as { a: 1, b: 2 }\n\
-            type Big as { a: 10, b: 20, c: 30 }\n\
-            type Sub as { a: 1, b: 2 }\n\
+            "type A do { a: 1, b: 2 } end\n\
+            type Big do { a: 10, b: 20, c: 30 } end\n\
+            type Sub do { a: 1, b: 2 } end\n\
             unittest \"t\" do\n\
             \x20 assert A[keyof A] == 1 | 2\n\
             \x20 assert 1 <: A[keyof A]\n\

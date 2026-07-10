@@ -2,7 +2,7 @@ Generic type alias mixing union and intersection over params
 
 =======
 
-type A(x, y, z) as x & y | z
+type A(x, y, z) do x & y | z end
 
 =======
 

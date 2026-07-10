@@ -11,7 +11,8 @@ export type Replace(L, M, A, match)
         M <: any,
         A <: any,
         match <: Match
-    as Cast(OReplace(L, M, A, match), List)
+    do Cast(OReplace(L, M, A, match), List)
+end
 
 unittest "Replace(L, M, A)" do
     // TODO: evaluator cannot prove this yet

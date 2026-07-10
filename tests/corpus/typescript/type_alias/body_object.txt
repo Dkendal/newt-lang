@@ -2,7 +2,7 @@ Type alias whose body is an object literal
 
 =======
 
-type A as {x: 1, y: 2}
+type A do {x: 1, y: 2} end
 
 =======
 

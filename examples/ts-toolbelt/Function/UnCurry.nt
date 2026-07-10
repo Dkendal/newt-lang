@@ -2,10 +2,11 @@ import { Curry } from "./Curry"
 
 export type UnCurry(F)
     where F <: Curry(any)
-    as
+    do
         if F <: Curry(?UF) then
             UF
         end
+end
 
 unittest "UnCurry(F)" do
     // TODO: evaluator cannot prove this yet (infer through a generic alias

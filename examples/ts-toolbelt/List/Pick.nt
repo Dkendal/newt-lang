@@ -8,16 +8,18 @@ export type _Pick(L, K)
     where
         L <: List,
         K <: Key
-    as _ListOf(_OPick(ObjectOf(L), `${K & number}` | K))
+    do _ListOf(_OPick(ObjectOf(L), `${K & number}` | K))
+end
 
 export type Pick(L, K)
     where
         L <: List,
         K <: Key
-    as
+    do
         if L <: unknown then
             _Pick(L, K)
         end
+end
 
 unittest "Pick(L, K)" do
     // TODO: evaluator cannot prove this yet

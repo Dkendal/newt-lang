@@ -6,36 +6,40 @@ import { PatchFlat } from "./Patch"
 import { BuiltIn } from "../Misc/BuiltIn"
 
 export type CompulsoryFlat(O)
-    as
-        map -? K in keyof O do NonNullable(O[K]) end & {}
+    do
+        map -optional K in keyof O do NonNullable(O[K]) end & {}
+end
 
 export type CompulsoryDeep(O)
-    as
-        map -? K in keyof O do
+    do
+        map -optional K in keyof O do
             if O[K] <: BuiltIn then
                 O[K]
             else
                 CompulsoryDeep(NonNullable(O[K]))
             end
         end
+end
 
 export type CompulsoryPart(O, depth)
     where
         O <: object,
         depth <: Depth
-    as
+    do
         match depth do
             'flat' -> CompulsoryFlat(O),
             'deep' -> CompulsoryDeep(O)
         end
+end
 
 export type _Compulsory(O, K, depth)
     where
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         PatchFlat(CompulsoryPart(_Pick(O, K), depth), O)
+end
 
 // Make that `O`'s fields cannot be nullable or optional (it's like
 // `Required` & `NonNullable` at once).
@@ -45,10 +49,11 @@ export type Compulsory(O, K, depth)
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         if O <: unknown then
             _Compulsory(O, K, depth)
         end
+end
 
 unittest "Compulsory(O)" do
     // TODO: evaluator cannot prove this yet (depends on ./Pick, ./Patch,

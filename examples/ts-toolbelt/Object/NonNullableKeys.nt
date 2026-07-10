@@ -1,22 +1,24 @@
 export type _NonNullableKeys(O)
     where
         O <: object
-    as
-        (map -? K in keyof O do
+    do
+        (map -optional K in keyof O do
             if [O[K] & (undefined | null)] <: [never] then
                 K
             end
         end)[keyof O]
+end
 
 // Get the keys of `O` that are non-nullable
 // (needs `--strictNullChecks` enabled)
 export type NonNullableKeys(O)
     where
         O <: object
-    as
+    do
         if O <: unknown then
             _NonNullableKeys(O)
         end
+end
 
 unittest "NonNullableKeys(O)" do
     // TODO: evaluator cannot prove this yet (mapped type with conditional

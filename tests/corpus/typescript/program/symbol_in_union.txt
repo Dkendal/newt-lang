@@ -1,6 +1,6 @@
 Primitive symbol in a union
 =======
-type A as symbol | number
+type A do symbol | number end
 =======
 type A = symbol | number;
 

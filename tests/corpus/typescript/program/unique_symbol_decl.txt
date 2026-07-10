@@ -4,7 +4,7 @@ a unique symbol declaration lowers to `declare const` and references to `typeof`
 
 unique symbol Kind
 
-type K as Kind
+type K do Kind end
 
 interface Hole(Label) {
   readonly [Kind]: Label

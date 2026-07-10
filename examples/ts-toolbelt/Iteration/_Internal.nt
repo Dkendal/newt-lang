@@ -5,7 +5,7 @@
 // .nt equivalent and is omitted.
 
 // Describes how to perform iterations
-export type Way as '->' | '<-'
+export type Way do '->' | '<-' end
 
 unittest "Way" do
     assert '->' <: Way

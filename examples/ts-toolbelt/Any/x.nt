@@ -3,4 +3,4 @@
 //   export type x = typeof _ & {}
 // newtype has no value declarations, `typeof`, or unique symbols, so the
 // closest expressible placeholder is `symbol & {}`.
-export type x as symbol & {}
+export type x do symbol & {} end

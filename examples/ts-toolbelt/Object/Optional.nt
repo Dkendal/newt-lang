@@ -4,23 +4,26 @@ import { Key } from "../Any/Key"
 import { PatchFlat } from "./Patch"
 import { Equals } from "../Any/Equals"
 
-export type OptionalFlat(O) as
-    (map ? K in keyof O do O[K] end) & {}
+export type OptionalFlat(O) do
+    (map optional K in keyof O do O[K] end) & {}
+end
 
-export type OptionalDeep(O) as
-    map ? K in keyof O do
+export type OptionalDeep(O) do
+    map optional K in keyof O do
         OptionalDeep(O[K])
     end
+end
 
 export type OptionalPart(O, depth)
     where
         O <: object,
         depth <: Depth
-    as
+    do
         match depth do
             'flat' -> OptionalFlat(O),
             'deep' -> OptionalDeep(O)
         end
+end
 
 // Make some fields of `O` optional (deeply or not)
 // NOTE: the TS original selects via `{1: ..., 0: ...}[Equals<Key, K>]`;
@@ -31,12 +34,13 @@ export type Optional(O, K, depth)
         O <: object,
         K <: Key,
         depth <: Depth
-    as
+    do
         if Equals(Key, K) <: 1 then
             OptionalPart(O, depth)
         else
             PatchFlat(OptionalPart(Pick(O, K), depth), O)
         end
+end
 
 unittest "Optional(O, K, depth)" do
     assert OptionalFlat({a: 1, b: 2}) == {a?: 1, b?: 2}

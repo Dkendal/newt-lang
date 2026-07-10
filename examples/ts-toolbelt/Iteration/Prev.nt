@@ -8,10 +8,11 @@ import { Iteration, IterationMap } from "./Iteration"
 // Move `I`'s position backwards
 export type Prev(I)
     where I <: Iteration
-    as IterationMap(I[2])
+    do IterationMap(I[2])
+end
 
 // TODO allow for types in unittest blocks that aren't emitted
-type I20 as [20, '+', '19', '21', '-20']
+type I20 do [20, '+', '19', '21', '-20'] end
 
 unittest "Prev(I)" do
     assert Prev(I20) == [19, '+', '18', '20', '-19']
