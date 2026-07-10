@@ -1,7 +1,0 @@
-type ParamValue = string | number
-
-type ResultValue = string | URL
-
-type ReqOrUrl = URL | request
-
-type Params(keys) when keys <: string = Record(keys, ParamValue)
